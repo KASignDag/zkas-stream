@@ -1,0 +1,79 @@
+name: Publish ZKAS Stream v0.6.14 View Nodes Fix
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/publish-v0.6.14-view-nodes.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  patch-build-publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Wire View nodes and verify production build
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+
+          p = Path('src/App.tsx')
+          s = p.read_text()
+
+          replacements = [
+              (
+                  "type Tab = 'intelligence' | 'merged' | 'health' | 'events' | 'history' | 'supply' | 'reference';",
+                  "type Tab = 'intelligence' | 'merged' | 'health' | 'nodes' | 'events' | 'history' | 'supply' | 'reference';",
+              ),
+              (
+                  "  health: 'Network health signals',\n  events: 'Live event intelligence',",
+                  "  health: 'Network health signals',\n  nodes: 'Public node view',\n  events: 'Live event intelligence',",
+              ),
+              (
+                  "        {tab === 'health' && <NetworkHealthPage data={data} diffValues={diffValues} txValues={txValues} pulseTimes={pulseTimes} />}\n        {tab === 'events' && <EventsPage data={data} history={history} />}",
+                  "        {tab === 'health' && <NetworkHealthPage data={data} diffValues={diffValues} txValues={txValues} pulseTimes={pulseTimes} onOpenNodes={() => setTab('nodes')} />}\n        {tab === 'nodes' && <NodesPage data={data} />}\n        {tab === 'events' && <EventsPage data={data} history={history} />}",
+              ),
+              (
+                  "function NetworkHealthPage({ data, diffValues, txValues, pulseTimes }: { data: DashboardData; diffValues: Array<number | null>; txValues: Array<number | null>; pulseTimes: number[] }) {",
+                  "function NetworkHealthPage({ data, diffValues, txValues, pulseTimes, onOpenNodes }: { data: DashboardData; diffValues: Array<number | null>; txValues: Array<number | null>; pulseTimes: number[]; onOpenNodes: () => void }) {",
+              ),
+              (
+                  "      <PublicNodeSummary data={data} onOpen={() => {}} />",
+                  "      <PublicNodeSummary data={data} onOpen={onOpenNodes} />",
+              ),
+              (
+                  "<div className=\"footer-brand\"><ShieldCheck size={17} /> ZKAS Stream <span>v0.6.13</span></div>",
+                  "<div className=\"footer-brand\"><ShieldCheck size={17} /> ZKAS Stream <span>v0.6.14</span></div>",
+              ),
+          ]
+
+          for old, new in replacements:
+              count = s.count(old)
+              if count != 1:
+                  raise SystemExit(f'Expected exactly one match, found {count}: {old[:100]}')
+              s = s.replace(old, new)
+
+          p.write_text(s)
+          PY
+
+          npm version 0.6.14 --no-git-tag-version
+          npm ci --no-audit --no-fund
+          npm run build
+
+          rm -rf node_modules dist
+          rm -f .github/workflows/publish-v0.6.14-view-nodes.yml
+
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -A
+          git commit -m 'Fix View nodes navigation for v0.6.14'
+          git push
