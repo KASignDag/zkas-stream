@@ -1,0 +1,15 @@
+node_modules/
+dist/
+.env.local
+.env.*.local
+.DS_Store
+.vite/
+*.log
+*.tsbuildinfo
+zkas-v0.6.1-live-motion-stability/
+README-*.txt
+README.txt
+standalone-preview.html
+/App.tsx
+/api.ts
+/styles.css
