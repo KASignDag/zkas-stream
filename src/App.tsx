@@ -38,7 +38,7 @@ import {
 import { MetricCard } from './components/MetricCard';
 import { SparkChart } from './components/SparkChart';
 
-type Tab = 'intelligence' | 'merged' | 'health' | 'events' | 'history' | 'supply' | 'reference';
+type Tab = 'intelligence' | 'merged' | 'health' | 'nodes' | 'events' | 'history' | 'supply' | 'reference';
 type Detail = { type: 'block' | 'transaction' | 'privacy'; query: string; data: unknown };
 
 const fmt = new Intl.NumberFormat('en-US', { maximumFractionDigits: 2 });
@@ -536,6 +536,7 @@ const heroTitles: Record<Tab, string> = {
   intelligence: 'Merged-mining & network intelligence',
   merged: 'Mining & merged-mining intelligence',
   health: 'Network health signals',
+  nodes: 'Public node view',
   events: 'Live event intelligence',
   history: 'Historical intelligence',
   supply: 'Supply & privacy intelligence',
@@ -730,7 +731,8 @@ function App() {
         )}
 
         {tab === 'merged' && <MergedIntelligencePage data={data} />}
-        {tab === 'health' && <NetworkHealthPage data={data} diffValues={diffValues} txValues={txValues} pulseTimes={pulseTimes} />}
+        {tab === 'health' && <NetworkHealthPage data={data} diffValues={diffValues} txValues={txValues} pulseTimes={pulseTimes} onOpenNodes={() => setTab('nodes')} />}
+        {tab === 'nodes' && <NodesPage data={data} />}
         {tab === 'events' && <EventsPage data={data} history={history} />}
         {tab === 'history' && <HistoryPage data={data} history={history} range={historyRange} onRange={setHistoryRange} />}
         {tab === 'supply' && <SupplyPrivacyPage data={data} history={history} range={historyRange} onRange={setHistoryRange} />}
@@ -738,7 +740,7 @@ function App() {
       </main>
 
       <footer>
-        <div className="footer-brand"><ShieldCheck size={17} /> ZKAS Stream <span>v0.6.13</span></div>
+        <div className="footer-brand"><ShieldCheck size={17} /> ZKAS Stream <span>v0.6.14</span></div>
         <div>Merged-mining & network intelligence • Public data only • Explorer reference included</div>
       </footer>
 
@@ -1227,7 +1229,7 @@ function MergedPeersTable({ nodes, ports }: { nodes: DashboardData['merged']['no
   );
 }
 
-function NetworkHealthPage({ data, diffValues, txValues, pulseTimes }: { data: DashboardData; diffValues: Array<number | null>; txValues: Array<number | null>; pulseTimes: number[] }) {
+function NetworkHealthPage({ data, diffValues, txValues, pulseTimes, onOpenNodes }: { data: DashboardData; diffValues: Array<number | null>; txValues: Array<number | null>; pulseTimes: number[]; onOpenNodes: () => void }) {
   return (
     <section className="page-stack">
       <div className="privacy-callout"><Activity size={21} /><div><b>Observed health signals, not an authoritative global score</b><span>These metrics come from the public explorer vantage point and consensus data. They are intended to show changes and anomalies without claiming to see every node on the network.</span></div></div>
@@ -1245,7 +1247,7 @@ function NetworkHealthPage({ data, diffValues, txValues, pulseTimes }: { data: D
         <div className="panel"><div className="panel-head"><div><span className="panel-icon"><Gauge size={20} /></span><h2>Difficulty signal</h2></div><span className="range-chip">15M</span></div><SparkChart values={diffValues} labels={pulseTimes} height={240} /></div>
         <div className="panel"><div className="panel-head"><div><span className="panel-icon"><Waves size={20} /></span><h2>Transaction signal</h2></div><span className="range-chip">15M</span></div><SparkChart values={txValues} labels={pulseTimes} height={240} /></div>
       </section>
-      <PublicNodeSummary data={data} onOpen={() => {}} />
+      <PublicNodeSummary data={data} onOpen={onOpenNodes} />
       <section className="two-col"><CountriesTable data={data} /><NodeClientSummary nodes={data.publicNodes.nodes} /></section>
     </section>
   );
