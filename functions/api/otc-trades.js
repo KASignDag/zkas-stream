@@ -44,24 +44,20 @@ function tradeArray(payload) {
   return null;
 }
 
-function normalizeTrade(value, index) {
+function normalizeTrade(value) {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
-  const idValue = first(value, ['id', 'tradeId', 'trade_id', 'orderId', 'order_id', 'messageId', 'message_id']);
   const zkasAmount = numberish(first(value, ['zkasAmount', 'zkas_amount', 'amount', 'quantity', 'tokenAmount', 'token_amount']));
   let priceKas = numberish(first(value, ['priceKas', 'price_kas', 'price', 'unitPrice', 'unit_price', 'rate']));
-  const priceUsd = numberish(first(value, ['priceUsd', 'price_usd', 'usdPrice', 'usd_price']));
   let totalKas = numberish(first(value, ['totalKas', 'total_kas', 'kasAmount', 'kas_amount', 'total', 'notional']));
 
   if (priceKas === null && totalKas !== null && zkasAmount !== null && zkasAmount !== 0) priceKas = totalKas / zkasAmount;
   if (totalKas === null && priceKas !== null && zkasAmount !== null) totalKas = priceKas * zkasAmount;
 
   return {
-    id: idValue === null ? `trade-${index + 1}` : String(idValue),
     timestamp: timestampish(first(value, ['timestamp', 'createdAt', 'created_at', 'completedAt', 'completed_at', 'time', 'date'])),
     side: sideish(first(value, ['side', 'type', 'direction', 'action'])),
     zkasAmount,
     priceKas,
-    priceUsd,
     totalKas,
   };
 }
@@ -76,7 +72,7 @@ function json(body, status = 200, cacheControl = 'private, no-store, max-age=0')
   });
 }
 
-export async function onRequestGet({ request, env, waitUntil }) {
+async function handleGet({ request, env, waitUntil }) {
   const updatedAt = Date.now();
   const endpoint = env.ZKAS_OTC_API_URL;
   if (!endpoint) {
@@ -171,6 +167,7 @@ export async function onRequestGet({ request, env, waitUntil }) {
   }
 }
 
-export function onRequest() {
+export function onRequest(context) {
+  if (context.request.method === 'GET') return handleGet(context);
   return json({ error: 'method_not_allowed' }, 405);
 }
