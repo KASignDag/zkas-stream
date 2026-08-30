@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { Activity, CalendarDays, Clock3, Coins, RefreshCw, TrendingUp } from 'lucide-react';
 import { fetchOtcTrades, type OtcTrade, type OtcTradeFeed } from '../otc';
 
@@ -185,33 +185,32 @@ function OtcPriceChart({ trades }: { trades: OtcTrade[] }) {
   const points = trades
     .map((trade) => ({ trade, value: trade.priceKas }))
     .filter((point): point is { trade: OtcTrade; value: number } => point.value !== null && Number.isFinite(point.value));
+  const scrollRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const container = scrollRef.current;
+    if (!container) return;
+    container.scrollLeft = container.scrollWidth - container.clientWidth;
+  }, [points.length]);
 
   if (!points.length) {
     return <div className="otc-chart-empty"><TrendingUp size={30} /><b>Waiting for completed trades</b><span>The secure chart connection is built and ready for Ronnie’s API details.</span></div>;
   }
 
-  const width = 920;
-  const height = 360;
   const left = 76;
   const right = 112;
   const top = 24;
   const bottom = 52;
+  const pointGap = 9;
+  const width = Math.max(920, left + right + Math.max(1, points.length - 1) * pointGap);
+  const height = 360;
   const values = points.map((point) => point.value);
   const rawMin = Math.min(...values);
   const rawMax = Math.max(...values);
   const spread = rawMax - rawMin || Math.max(Math.abs(rawMax) * 0.08, 0.000001);
   const min = Math.max(0, rawMin - spread * 0.14);
   const max = rawMax + spread * 0.14;
-  const validTimes = points.map((point) => point.trade.timestamp).filter((time): time is number => time !== null);
-  const firstTime = validTimes.length ? Math.min(...validTimes) : null;
-  const lastTime = validTimes.length ? Math.max(...validTimes) : null;
-
-  const xFor = (point: typeof points[number], index: number) => {
-    if (firstTime !== null && lastTime !== null && lastTime > firstTime && point.trade.timestamp !== null) {
-      return left + ((point.trade.timestamp - firstTime) / (lastTime - firstTime)) * (width - left - right);
-    }
-    return left + (index / Math.max(1, points.length - 1)) * (width - left - right);
-  };
+  const xFor = (_point: typeof points[number], index: number) => left + index * pointGap;
   const yFor = (value: number) => top + ((max - value) / Math.max(max - min, Number.EPSILON)) * (height - top - bottom);
   const coordinates = points.map((point, index) => ({ ...point, x: xFor(point, index), y: yFor(point.value) }));
   const path = coordinates.map((point, index) => `${index ? 'L' : 'M'} ${point.x.toFixed(2)} ${point.y.toFixed(2)}`).join(' ');
@@ -224,8 +223,8 @@ function OtcPriceChart({ trades }: { trades: OtcTrade[] }) {
   const xLabels = [coordinates[0], coordinates[Math.floor((coordinates.length - 1) / 2)], coordinates.at(-1)!];
 
   return (
-    <div className="otc-chart-wrap">
-      <svg className="otc-chart" viewBox={`0 0 ${width} ${height}`} role="img" aria-label="ZKAS OTC completed trade price chart in KAS">
+    <div className="otc-chart-wrap" ref={scrollRef}>
+      <svg className="otc-chart" style={{ width: `${width}px`, minWidth: `${width}px` }} viewBox={`0 0 ${width} ${height}`} role="img" aria-label="ZKAS OTC completed trade price chart in KAS">
         <defs>
           <linearGradient id="otc-area" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="currentColor" stopOpacity=".22" /><stop offset="100%" stopColor="currentColor" stopOpacity="0" /></linearGradient>
         </defs>

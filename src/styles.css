@@ -598,7 +598,7 @@ footer { width: min(1320px, calc(100% - 40px)); margin: 0 auto; padding: 22px 0 
 .otc-chart-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 22px; padding: 21px 22px 0; }
 .otc-chart-head h2 { margin: 8px 0 5px; font-size: 22px; letter-spacing: -.5px; }
 .otc-chart-head p { margin: 0; color: var(--muted); font-size: 11px; line-height: 1.5; }
-.otc-chart-wrap { width: 100%; padding: 4px 12px 0; overflow: hidden; }
+.otc-chart-wrap { width: 100%; padding: 4px 12px 8px; overflow-x: auto; overflow-y: hidden; scrollbar-width: thin; scrollbar-color: var(--border) transparent; }
 .otc-chart { width: 100%; height: auto; min-height: 300px; display: block; color: var(--accent); overflow: visible; }
 .otc-grid { stroke: var(--border); stroke-width: 1; stroke-dasharray: 3 5; }
 .otc-axis-label { fill: var(--muted); font-size: 10px; font-family: Inter, ui-sans-serif, system-ui, sans-serif; }
