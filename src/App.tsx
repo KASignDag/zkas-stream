@@ -36,9 +36,10 @@ import {
   type TxRow,
 } from './api';
 import { MetricCard } from './components/MetricCard';
+import { OtcMarketPage } from './components/OtcMarketPage';
 import { SparkChart } from './components/SparkChart';
 
-type Tab = 'intelligence' | 'merged' | 'health' | 'nodes' | 'events' | 'history' | 'supply' | 'reference';
+type Tab = 'intelligence' | 'merged' | 'health' | 'nodes' | 'events' | 'otc' | 'history' | 'supply' | 'reference';
 type Detail = { type: 'block' | 'transaction' | 'privacy'; query: string; data: unknown };
 
 const fmt = new Intl.NumberFormat('en-US', { maximumFractionDigits: 2 });
@@ -538,9 +539,22 @@ const heroTitles: Record<Tab, string> = {
   health: 'Network health signals',
   nodes: 'Public node view',
   events: 'Live event intelligence',
+  otc: 'ZKAS OTC market price',
   history: 'Historical intelligence',
   supply: 'Supply & privacy intelligence',
   reference: 'ZKas quick reference',
+};
+
+const heroDescriptions: Record<Tab, string> = {
+  intelligence: 'Public ZKas intelligence with a focus on Kaspa ↔ ZKas merged mining, network work, peer signals and security context.',
+  merged: 'Public mining signals, producer distribution and practical solo merged-mining estimates for the ZKas network.',
+  health: 'Current public network capacity, consensus activity, peer reachability and relay health in one view.',
+  nodes: 'Privacy-aware observations of the public nodes currently visible to the ZKas network scanner.',
+  events: 'Recent public block and network activity, organized into stable signals instead of a reconstructed animated DAG.',
+  otc: 'Completed ZKAS OTC trades, actual traded prices and volume—prepared to update automatically from the private trade-log connection.',
+  history: 'Chain-derived work history and observer history, kept separate so unavailable historical data is never invented.',
+  supply: 'Consensus supply, emission and aggregate shielded-activity intelligence without exposing individual holders.',
+  reference: 'Convenient public chain information and links to the official ZKas explorer.',
 };
 
 function App() {
@@ -676,6 +690,7 @@ function App() {
     ['merged', 'Merged Mining'],
     ['health', 'Network Health'],
     ['events', 'Events'],
+    ['otc', 'OTC Price'],
     ['history', 'History'],
     ['supply', 'Supply & Privacy'],
     ['reference', 'Reference'],
@@ -709,22 +724,24 @@ function App() {
           <div>
             <div className="eyebrow"><span className="pulse-dot" /> ZKas public network intelligence</div>
             <h1>{heroTitles[tab]}</h1>
-            <p>Public ZKas intelligence with a focus on Kaspa ↔ ZKas merged mining, network work, peer signals and security context. Explorer data remains available as supporting reference, not the main product.</p>
+            <p>{heroDescriptions[tab]}</p>
           </div>
-          <div className="sync-box">
+          {tab !== 'otc' && <div className="sync-box">
             <span>Network</span><b>{data.network}</b>
             <span>Updated</span><b>{new Date(data.updatedAt).toLocaleTimeString()}</b>
-          </div>
+          </div>}
         </section>
 
-        <form className="searchbar" onSubmit={onSearch}>
-          <Search size={21} />
-          <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search public block hash or transaction ID" aria-label="Search public block hash or transaction ID" />
-          <button disabled={searching}>{searching ? 'Searching…' : 'Search'}</button>
-        </form>
-        {searchError && <div className="inline-error">{searchError}</div>}
-        {status === 'stale' && <div className="demo-banner"><b>Live refresh delayed.</b> Showing the last good public mainnet snapshot while the API retries. {error && <span>{error}</span>}</div>}
-        {status === 'connecting' && <div className="demo-banner"><b>Connecting to ZKas mainnet.</b> Waiting for the first public API snapshot. {error && <span>{error}</span>}</div>}
+        {tab !== 'otc' && <>
+          <form className="searchbar" onSubmit={onSearch}>
+            <Search size={21} />
+            <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search public block hash or transaction ID" aria-label="Search public block hash or transaction ID" />
+            <button disabled={searching}>{searching ? 'Searching…' : 'Search'}</button>
+          </form>
+          {searchError && <div className="inline-error">{searchError}</div>}
+        </>}
+        {tab !== 'otc' && status === 'stale' && <div className="demo-banner"><b>Live refresh delayed.</b> Showing the last good public mainnet snapshot while the API retries. {error && <span>{error}</span>}</div>}
+        {tab !== 'otc' && status === 'connecting' && <div className="demo-banner"><b>Connecting to ZKas mainnet.</b> Waiting for the first public API snapshot. {error && <span>{error}</span>}</div>}
 
         {tab === 'intelligence' && (
           <IntelligenceHome data={data} txValues={txValues} pulseTimes={pulseTimes} onReference={() => setTab('reference')} />
@@ -734,14 +751,15 @@ function App() {
         {tab === 'health' && <NetworkHealthPage data={data} diffValues={diffValues} txValues={txValues} pulseTimes={pulseTimes} onOpenNodes={() => setTab('nodes')} />}
         {tab === 'nodes' && <NodesPage data={data} />}
         {tab === 'events' && <EventsPage data={data} history={history} />}
+        {tab === 'otc' && <OtcMarketPage />}
         {tab === 'history' && <HistoryPage data={data} history={history} range={historyRange} onRange={setHistoryRange} />}
         {tab === 'supply' && <SupplyPrivacyPage data={data} history={history} range={historyRange} onRange={setHistoryRange} />}
         {tab === 'reference' && <ReferencePage data={data} txs={txs} onSelect={(value) => void doSearch(value)} />}
       </main>
 
       <footer>
-        <div className="footer-brand"><ShieldCheck size={17} /> ZKAS Stream <span>v0.6.14</span></div>
-        <div>Merged-mining & network intelligence • Public data only • Explorer reference included</div>
+        <div className="footer-brand"><ShieldCheck size={17} /> ZKAS Stream <span>v0.7.0</span></div>
+        <div>Merged-mining, network & OTC intelligence • Public display • Private API credentials remain server-side</div>
       </footer>
 
       {detail && <DetailDrawer detail={detail} onClose={() => setDetail(null)} />}
