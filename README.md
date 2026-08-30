@@ -92,7 +92,7 @@ The frontend is built with:
 npm run build
 ```
 
-The generated site is written to `dist/`. The public deployment is intended for Cloudflare Workers / Static Assets with Git-based deployment.
+The generated site is written to `dist/`. Production deploys to Cloudflare from the repository's `main` branch.
 
 ## Data boundaries
 
