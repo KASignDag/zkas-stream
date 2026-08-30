@@ -23,6 +23,12 @@ export type OtcTradeFeed = {
   message?: string;
 };
 
+export type KasUsdQuote = {
+  priceUsd: number;
+  updatedAt: number;
+  source: string;
+};
+
 function isFeed(value: unknown): value is OtcTradeFeed {
   if (!value || typeof value !== 'object') return false;
   const candidate = value as Partial<OtcTradeFeed>;
@@ -47,4 +53,16 @@ export async function fetchOtcTrades(signal?: AbortSignal): Promise<OtcTradeFeed
 
   if (isFeed(payload)) return payload;
   throw new Error('The OTC trade feed returned an unexpected format.');
+}
+
+export async function fetchKasUsd(signal?: AbortSignal): Promise<KasUsdQuote> {
+  const response = await fetch('/api/kas-price', {
+    signal,
+    headers: { Accept: 'application/json' },
+  });
+  const payload = await response.json() as Partial<KasUsdQuote>;
+  if (response.ok && typeof payload.priceUsd === 'number' && Number.isFinite(payload.priceUsd) && payload.priceUsd > 0) {
+    return payload as KasUsdQuote;
+  }
+  throw new Error('The KAS/USD quote is temporarily unavailable.');
 }

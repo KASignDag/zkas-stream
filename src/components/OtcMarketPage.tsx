@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { Activity, CalendarDays, Clock3, Coins, RefreshCw, TrendingUp } from 'lucide-react';
-import { fetchOtcTrades, type OtcTrade, type OtcTradeFeed } from '../otc';
+import { fetchKasUsd, fetchOtcTrades, type OtcTrade, type OtcTradeFeed } from '../otc';
 
 type Range = '1D' | '7D' | '30D' | 'ALL';
 
@@ -17,6 +17,12 @@ function priceText(value: number | null) {
   if (value === null || !Number.isFinite(value)) return '—';
   const digits = value < 0.001 ? 8 : value < 1 ? 6 : 4;
   return `${value.toLocaleString('en-US', { minimumFractionDigits: digits, maximumFractionDigits: digits })} KAS`;
+}
+
+function usdPriceText(value: number | null) {
+  if (value === null || !Number.isFinite(value)) return null;
+  const digits = value < 0.01 ? 6 : value < 1 ? 4 : 2;
+  return `$${value.toLocaleString('en-US', { minimumFractionDigits: digits, maximumFractionDigits: digits })}`;
 }
 
 function dateText(timestamp: number | null, approximate = false) {
@@ -55,6 +61,7 @@ export function OtcMarketPage() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [range, setRange] = useState<Range>('30D');
+  const [kasUsd, setKasUsd] = useState<number | null>(null);
 
   useEffect(() => {
     let stopped = false;
@@ -86,6 +93,31 @@ export function OtcMarketPage() {
     };
   }, []);
 
+  useEffect(() => {
+    let stopped = false;
+    let activeController: AbortController | null = null;
+
+    async function refreshKasPrice() {
+      activeController?.abort();
+      const controller = new AbortController();
+      activeController = controller;
+      try {
+        const quote = await fetchKasUsd(controller.signal);
+        if (!stopped) setKasUsd(quote.priceUsd);
+      } catch {
+        // The ZKAS/KAS market remains usable if the optional USD estimate is unavailable.
+      }
+    }
+
+    void refreshKasPrice();
+    const timer = window.setInterval(refreshKasPrice, 60_000);
+    return () => {
+      stopped = true;
+      activeController?.abort();
+      window.clearInterval(timer);
+    };
+  }, []);
+
   const allTrades = useMemo(() => {
     return [...(feed?.trades ?? [])].sort((a, b) => {
       if (a.timestamp === null && b.timestamp === null) return 0;
@@ -108,6 +140,7 @@ export function OtcMarketPage() {
   const firstPrice = pricedTrades.length ? pricedTrades[0].priceKas : null;
   const lastPrice = pricedTrades.length ? pricedTrades[pricedTrades.length - 1].priceKas : null;
   const change = changePercent(firstPrice, lastPrice);
+  const zkasUsd = lastPrice !== null && kasUsd !== null ? lastPrice * kasUsd : null;
   const zkasVolume = filteredTrades.reduce((sum, trade) => sum + (trade.zkasAmount ?? 0), 0);
   const kasVolume = filteredTrades.reduce((sum, trade) => sum + (trade.totalKas ?? 0), 0);
   const state = statusCopy(feed, error, loading);
@@ -121,7 +154,7 @@ export function OtcMarketPage() {
       </div>
 
       <section className="otc-summary-grid">
-        <OtcSummary icon={<TrendingUp size={18} />} label="Latest ZKAS price" value={priceText(lastPrice)} detail="ZKAS/KAS · KAS per ZKAS" />
+        <OtcSummary icon={<TrendingUp size={18} />} label="Latest ZKAS price" value={priceText(lastPrice)} detail={usdPriceText(zkasUsd) ? `≈ ${usdPriceText(zkasUsd)} USD per ZKAS` : 'ZKAS/KAS · KAS per ZKAS'} />
         <OtcSummary icon={<Activity size={18} />} label={`${range} price change`} value={change === null ? '—' : `${change >= 0 ? '+' : ''}${change.toFixed(2)}%`} detail={rangeLabel(range)} tone={change === null ? undefined : change >= 0 ? 'positive' : 'negative'} />
         <OtcSummary icon={<Coins size={18} />} label="ZKAS volume" value={zkasVolume ? compactFormat.format(zkasVolume) : '—'} detail={`${amountFormat.format(kasVolume)} KAS exchanged`} />
         <OtcSummary icon={<Clock3 size={18} />} label="Completed trades" value={filteredTrades.length ? amountFormat.format(filteredTrades.length) : '—'} detail={rangeLabel(range)} />
