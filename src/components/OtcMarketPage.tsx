@@ -50,6 +50,7 @@ function changePercent(first: number | null, last: number | null) {
 
 function statusCopy(feed: OtcTradeFeed | null, error: string | null, loading: boolean) {
   if (loading && !feed) return { tone: 'waiting', title: 'Preparing the OTC trade feed', detail: 'Checking for the secure server connection…' };
+  if (feed?.source === 'screenshot-import' && feed.status === 'live') return { tone: 'live', title: 'Reviewed screenshot trades loaded', detail: 'This is snapshot data. The chart updates when new reviewed trade-log screenshots are published.' };
   if (feed?.status === 'live') return { tone: 'live', title: 'OTC trade log connected', detail: 'The chart refreshes automatically as completed trades become available.' };
   if (feed?.status === 'awaiting_configuration' && feed.source === 'screenshot-import') return { tone: 'waiting', title: 'Screenshot importer ready', detail: 'Reviewed completed trades will appear here as soon as the first screenshot is published.' };
   if (feed?.status === 'awaiting_configuration') return { tone: 'waiting', title: 'Ready for Ronnie’s API', detail: 'The private connection is prepared. The endpoint and access key still need to be added on the server.' };
@@ -144,13 +145,14 @@ export function OtcMarketPage() {
   const zkasVolume = filteredTrades.reduce((sum, trade) => sum + (trade.zkasAmount ?? 0), 0);
   const kasVolume = filteredTrades.reduce((sum, trade) => sum + (trade.totalKas ?? 0), 0);
   const state = statusCopy(feed, error, loading);
+  const refreshLabel = feed?.source === 'screenshot-import' ? '30 sec data check' : '30 sec refresh';
 
   return (
     <div className="page-stack otc-page">
       <div className={`otc-status ${state.tone}`}>
         <span className="otc-status-dot" />
         <div><b>{state.title}</b><span>{state.detail}</span></div>
-        <span className="otc-refresh"><RefreshCw size={13} className={loading ? 'spinning' : ''} /> 30 sec refresh</span>
+        <span className="otc-refresh"><RefreshCw size={13} className={loading ? 'spinning' : ''} /> {refreshLabel}</span>
       </div>
 
       <section className="otc-summary-grid">
