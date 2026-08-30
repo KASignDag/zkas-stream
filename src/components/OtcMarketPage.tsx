@@ -121,7 +121,7 @@ export function OtcMarketPage() {
       </div>
 
       <section className="otc-summary-grid">
-        <OtcSummary icon={<TrendingUp size={18} />} label="Latest OTC price" value={priceText(lastPrice)} detail="KAS per ZKAS" />
+        <OtcSummary icon={<TrendingUp size={18} />} label="Latest ZKAS price" value={priceText(lastPrice)} detail="ZKAS/KAS · KAS per ZKAS" />
         <OtcSummary icon={<Activity size={18} />} label={`${range} price change`} value={change === null ? '—' : `${change >= 0 ? '+' : ''}${change.toFixed(2)}%`} detail={rangeLabel(range)} tone={change === null ? undefined : change >= 0 ? 'positive' : 'negative'} />
         <OtcSummary icon={<Coins size={18} />} label="ZKAS volume" value={zkasVolume ? compactFormat.format(zkasVolume) : '—'} detail={`${amountFormat.format(kasVolume)} KAS exchanged`} />
         <OtcSummary icon={<Clock3 size={18} />} label="Completed trades" value={filteredTrades.length ? amountFormat.format(filteredTrades.length) : '—'} detail={rangeLabel(range)} />
@@ -130,9 +130,9 @@ export function OtcMarketPage() {
       <section className="panel otc-chart-panel">
         <div className="otc-chart-head">
           <div>
-            <div className="eyebrow"><Activity size={14} /> ZKAS OTC MARKET</div>
-            <h2>Completed trade price</h2>
-            <p>Each point represents a completed OTC trade. The line follows the actual traded price.</p>
+            <div className="eyebrow"><Activity size={14} /> ZKAS/KAS OTC MARKET</div>
+            <h2>ZKAS completed trade price</h2>
+            <p>Each point shows the price of one ZKAS, quoted in KAS.</p>
           </div>
           <div className="segmented" aria-label="OTC chart time range">
             {(['1D', '7D', '30D', 'ALL'] as Range[]).map((item) => (
@@ -151,7 +151,7 @@ export function OtcMarketPage() {
         </div>
         <div className="table-scroll">
           <table>
-            <thead><tr><th>Date & time</th><th>Side</th><th>ZKAS amount</th><th>Price</th><th>Total</th></tr></thead>
+            <thead><tr><th>Date & time</th><th>Side</th><th>ZKAS amount</th><th>Price (KAS per ZKAS)</th><th>Total</th></tr></thead>
             <tbody>
               {[...filteredTrades].reverse().map((trade, index) => (
                 <tr key={`${trade.timestamp ?? 'undated'}-${index}`}>
@@ -221,19 +221,20 @@ function OtcPriceChart({ trades }: { trades: OtcTrade[] }) {
     return { y: top + ratio * (height - top - bottom), value: max - ratio * (max - min) };
   });
   const xLabels = [coordinates[0], coordinates[Math.floor((coordinates.length - 1) / 2)], coordinates.at(-1)!];
+  const plotRight = width - right;
 
   return (
     <div className="otc-chart-wrap" ref={scrollRef}>
-      <svg className="otc-chart" style={{ width: `${width}px`, minWidth: `${width}px` }} viewBox={`0 0 ${width} ${height}`} role="img" aria-label="ZKAS OTC completed trade price chart in KAS">
+      <svg className="otc-chart" style={{ width: `${width}px`, minWidth: `${width}px` }} viewBox={`0 0 ${width} ${height}`} role="img" aria-label="ZKAS KAS trading pair chart, quoted in KAS per ZKAS">
         <defs>
           <linearGradient id="otc-area" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="currentColor" stopOpacity=".22" /><stop offset="100%" stopColor="currentColor" stopOpacity="0" /></linearGradient>
         </defs>
-        {grid.map((line) => <g key={line.y}><line className="otc-grid" x1={left} x2={width - right} y1={line.y} y2={line.y} /><text className="otc-axis-label" x={left - 10} y={line.y + 4} textAnchor="end">{priceText(line.value)}</text></g>)}
+        {grid.map((line) => <g key={line.y}><line className="otc-grid" x1={left} x2={plotRight} y1={line.y} y2={line.y} /><text className="otc-axis-label" x={plotRight + 10} y={line.y + 4} textAnchor="start">{priceText(line.value)}</text></g>)}
         <path className="otc-area" d={areaPath} />
         <path className="otc-line" d={path} />
         <line className="otc-current-line" x1={left} x2={width - 18} y1={latest.y} y2={latest.y} />
-        <rect className="otc-current-tag" x={width - right + 8} y={latest.y - 16} width={right - 2} height={32} rx="8" />
-        <text className="otc-current-text" x={width - right + 16} y={latest.y + 5}>{priceText(latest.value)}</text>
+        <rect className="otc-current-tag" x={plotRight + 6} y={latest.y - 16} width={right - 8} height={32} rx="8" />
+        <text className="otc-current-text" x={plotRight + 14} y={latest.y + 5}>{priceText(latest.value)}</text>
         {coordinates.map((point, index) => <circle key={`${point.trade.timestamp ?? 'undated'}-${index}`} className={`otc-point ${point.trade.side}`} cx={point.x} cy={point.y} r="4.5"><title>{`${dateText(point.trade.timestamp)} · ${priceText(point.value)}`}</title></circle>)}
         {xLabels.map((point, index) => <text key={`${point.trade.timestamp ?? 'undated'}-${index}`} className="otc-axis-label" x={point.x} y={height - 18} textAnchor={index === 0 ? 'start' : index === 2 ? 'end' : 'middle'}>{point.trade.timestamp === null ? `Trade ${index + 1}` : new Date(point.trade.timestamp).toLocaleDateString([], { month: 'short', day: 'numeric' })}</text>)}
       </svg>
