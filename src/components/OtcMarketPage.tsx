@@ -19,8 +19,9 @@ function priceText(value: number | null) {
   return `${value.toLocaleString('en-US', { minimumFractionDigits: digits, maximumFractionDigits: digits })} KAS`;
 }
 
-function dateText(timestamp: number | null) {
+function dateText(timestamp: number | null, approximate = false) {
   if (timestamp === null) return 'Time unavailable';
+  if (approximate) return `${new Date(timestamp).toLocaleDateString([], { month: 'short', day: 'numeric' })} · approx.`;
   return new Date(timestamp).toLocaleString([], {
     month: 'short',
     day: 'numeric',
@@ -154,7 +155,7 @@ export function OtcMarketPage() {
             <tbody>
               {[...filteredTrades].reverse().map((trade, index) => (
                 <tr key={`${trade.timestamp ?? 'undated'}-${index}`}>
-                  <td>{dateText(trade.timestamp)}</td>
+                  <td>{dateText(trade.timestamp, feed?.source === 'screenshot-import')}</td>
                   <td><span className={`otc-side ${trade.side}`}>{trade.side === 'unknown' ? 'Trade' : trade.side}</span></td>
                   <td>{trade.zkasAmount === null ? '—' : amountFormat.format(trade.zkasAmount)}</td>
                   <td>{priceText(trade.priceKas)}</td>

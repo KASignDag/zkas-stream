@@ -9,11 +9,12 @@ type DraftTrade = {
   zkasAmount: string;
   priceKas: string;
   totalKas: string;
+  warning: boolean;
 };
 
 function blankTrade(): DraftTrade {
   const local = new Date(Date.now() - new Date().getTimezoneOffset() * 60_000).toISOString().slice(0, 16);
-  return { id: crypto.randomUUID(), timestamp: local, side: 'unknown', zkasAmount: '', priceKas: '', totalKas: '' };
+  return { id: crypto.randomUUID(), timestamp: local, side: 'unknown', zkasAmount: '', priceKas: '', totalKas: '', warning: false };
 }
 
 function numberText(value: string | undefined) {
@@ -38,50 +39,97 @@ function parseTimestamp(text: string) {
   return new Date(parsed.getTime() - parsed.getTimezoneOffset() * 60_000).toISOString().slice(0, 16);
 }
 
-function parseCandidates(raw: string): DraftTrade[] {
-  const lines = raw.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
-  const blocks: string[] = [];
-  let current: string[] = [];
+function relativeTimestamp(text: string, order: number) {
+  const match = text.match(/(\d+)\s*(m|min|minute|h|hr|hour|d|day)s?\s*ago/i);
+  if (!match) return '';
+  const count = Number(match[1]);
+  const unit = match[2].toLowerCase();
+  const multiplier = unit.startsWith('d') ? 86_400_000 : unit.startsWith('h') ? 3_600_000 : 60_000;
+  const date = new Date(Date.now() - count * multiplier - order * 60_000);
+  return new Date(date.getTime() - date.getTimezoneOffset() * 60_000).toISOString().slice(0, 16);
+}
 
-  for (const line of lines) {
-    const tradeSignal = /\b(?:completed|filled|bought|sold|buy|sell|trade)\b/i.test(line);
-    if (tradeSignal && current.length) {
-      blocks.push(current.join(' '));
-      current = [];
-    }
-    if (tradeSignal || current.length || /\bZ?KAS\b/i.test(line)) current.push(line);
-    if (current.length >= 8) {
-      blocks.push(current.join(' '));
-      current = [];
-    }
-  }
-  if (current.length) blocks.push(current.join(' '));
-
-  return blocks.map((text) => {
-    const lower = text.toLowerCase();
-    const zkasAmount = findValue(text, [
-      /(?:amount|quantity|qty)\s*[:=-]?\s*([\d,.]+)/i,
-      /([\d,.]+)\s*ZKAS\b/i,
-      /ZKAS\s*(?:amount)?\s*[:=-]?\s*([\d,.]+)/i,
-    ]);
-    const priceKas = findValue(text, [
-      /(?:price|rate)\s*[:=@-]?\s*([\d,.]+)\s*KAS/i,
-      /([\d,.]+)\s*KAS\s*(?:\/|per)\s*ZKAS/i,
-    ]);
-    const totalKas = findValue(text, [
-      /(?:total|value|paid)\s*[:=-]?\s*([\d,.]+)\s*KAS/i,
-      /([\d,.]+)\s*KAS\s*(?:total|paid)/i,
-    ]);
-    const inferredTotal = !totalKas && zkasAmount && priceKas ? String(Number(zkasAmount) * Number(priceKas)) : totalKas;
+function parseCandidates(raw: string, detectedSides: OtcTradeSide[] = [], orderOffset = 0): DraftTrade[] {
+  // The Discord desk uses: "300000 ZKAS · 12500.001 KAS". Dollar values
+  // follow later and must not be mistaken for the KAS-per-ZKAS price.
+  const tradePattern = /([\d,.]+(?:e[-+]?\d+)?)\s*ZKAS\s*[·•|.:=—-]*\s*([\d,.]+(?:e[-+]?\d+)?)\s*KAS\b/gi;
+  const matches = [...raw.matchAll(tradePattern)];
+  if (matches.length) return matches.map((match, index) => {
+    const text = raw.slice(match.index, matches[index + 1]?.index ?? raw.length);
+    const zkasAmount = numberText(match[1]);
+    const totalKas = numberText(match[2]);
+    const amount = Number(zkasAmount);
+    const total = Number(totalKas);
     return {
       id: crypto.randomUUID(),
-      timestamp: parseTimestamp(text) || blankTrade().timestamp,
+      timestamp: relativeTimestamp(text, orderOffset + index) || blankTrade().timestamp,
+      side: detectedSides[index] || 'unknown',
+      zkasAmount,
+      priceKas: amount > 0 && Number.isFinite(total) ? String(total / amount) : '',
+      totalKas,
+      warning: amount > 0 && amount < 10,
+    } satisfies DraftTrade;
+  });
+
+  // Fallback for a differently formatted log. These rows remain review-only.
+  const lines = raw.split(/\r?\n/).map((line) => line.trim()).filter((line) => /\bZKAS\b/i.test(line));
+  return lines.map((text, index) => {
+    const lower = text.toLowerCase();
+    const zkasAmount = findValue(text, [/([\d,.]+)\s*ZKAS\b/i]);
+    const totalKas = findValue(text, [/ZKAS\D{0,10}([\d,.]+)\s*KAS\b/i]);
+    const amount = Number(zkasAmount);
+    const total = Number(totalKas);
+    return {
+      id: crypto.randomUUID(),
+      timestamp: parseTimestamp(text) || relativeTimestamp(text, orderOffset + index) || blankTrade().timestamp,
       side: /\b(?:sell|sold|seller)\b/.test(lower) ? 'sell' : /\b(?:buy|bought|buyer)\b/.test(lower) ? 'buy' : 'unknown',
       zkasAmount,
-      priceKas,
-      totalKas: inferredTotal,
+      priceKas: amount > 0 && Number.isFinite(total) ? String(total / amount) : '',
+      totalKas,
+      warning: amount > 0 && amount < 10,
     } satisfies DraftTrade;
-  }).filter((trade) => trade.zkasAmount || trade.priceKas || trade.totalKas);
+  });
+}
+
+async function detectTradeSides(file: File): Promise<OtcTradeSide[]> {
+  const bitmap = await createImageBitmap(file);
+  const width = Math.min(480, bitmap.width);
+  const height = Math.round(bitmap.height * (width / bitmap.width));
+  const canvas = document.createElement('canvas');
+  canvas.width = width;
+  canvas.height = height;
+  const context = canvas.getContext('2d', { willReadFrequently: true });
+  if (!context) return [];
+  context.drawImage(bitmap, 0, 0, width, height);
+  bitmap.close();
+  const pixels = context.getImageData(0, 0, width, height).data;
+  const scores = Array.from({ length: height }, () => ({ red: 0, green: 0 }));
+  for (let y = Math.floor(height * 0.15); y < Math.floor(height * 0.84); y += 1) {
+    for (let x = Math.floor(width * 0.15); x < Math.floor(width * 0.36); x += 1) {
+      const offset = (y * width + x) * 4;
+      const red = pixels[offset];
+      const green = pixels[offset + 1];
+      const blue = pixels[offset + 2];
+      if (red > 145 && red > green * 1.45 && red > blue * 1.3) scores[y].red += 1;
+      if (green > 105 && green > red * 1.35 && green > blue * 1.2) scores[y].green += 1;
+    }
+  }
+  const groups: Array<{ start: number; end: number; red: number; green: number }> = [];
+  let current: { start: number; end: number; red: number; green: number } | null = null;
+  for (let y = 0; y < height; y += 1) {
+    if (scores[y].red + scores[y].green >= 4) {
+      if (!current || y - current.end > 3) {
+        if (current) groups.push(current);
+        current = { start: y, end: y, red: 0, green: 0 };
+      }
+      current.end = y;
+      current.red += scores[y].red;
+      current.green += scores[y].green;
+    }
+  }
+  if (current) groups.push(current);
+  return groups.filter((group) => group.end - group.start >= 5 && group.red + group.green >= 45)
+    .map((group) => group.green > group.red ? 'buy' : 'sell');
 }
 
 export function OtcScreenshotImporter() {
@@ -108,6 +156,7 @@ export function OtcScreenshotImporter() {
       if ((field === 'zkasAmount' || field === 'priceKas') && Number(next.zkasAmount) > 0 && Number(next.priceKas) > 0) {
         next.totalKas = String(Number(next.zkasAmount) * Number(next.priceKas));
       }
+      next.warning = Number(next.zkasAmount) > 0 && Number(next.zkasAmount) < 10;
       return next;
     }));
   }
@@ -126,20 +175,24 @@ export function OtcScreenshotImporter() {
         },
       });
       let combined = '';
+      const candidates: DraftTrade[] = [];
       try {
         for (let index = 0; index < files.length; index += 1) {
           setProgress(`Reading screenshot ${index + 1} of ${files.length}`);
           const result = await worker.recognize(files[index]);
-          combined += `${result.data.text}\n`;
+          const text = result.data.text;
+          const sides = await detectTradeSides(files[index]);
+          candidates.push(...parseCandidates(text, sides, candidates.length));
+          combined += `${text}\n`;
         }
       } finally {
         await worker.terminate();
       }
       setOcrText(combined.trim());
-      const candidates = parseCandidates(combined);
       setRows(candidates.length ? candidates : [blankTrade()]);
+      const warnings = candidates.filter((candidate) => candidate.warning).length;
       setMessage(candidates.length
-        ? { tone: 'success', text: `Found ${candidates.length} possible trade${candidates.length === 1 ? '' : 's'}. Review every field before publishing.` }
+        ? { tone: 'success', text: `Found ${candidates.length} possible trade${candidates.length === 1 ? '' : 's'}. Review every field before publishing.${warnings ? ` ${warnings} tiny trade${warnings === 1 ? ' is' : 's are'} highlighted as possible tests.` : ''}` }
         : { tone: 'error', text: 'No complete row was detected automatically. The OCR text is available below; enter the trade facts manually.' });
     } catch (reason) {
       setMessage({ tone: 'error', text: reason instanceof Error ? reason.message : 'The screenshots could not be read.' });
@@ -196,12 +249,12 @@ export function OtcScreenshotImporter() {
       <section className="panel importer-step">
         <div className="importer-step-head"><span>3</span><div><h2>Review every detected trade</h2><p>OCR can make mistakes. A row will publish only when all numeric fields and the date are valid.</p></div></div>
         <div className="importer-table-wrap"><table className="importer-table"><thead><tr><th>Date & time</th><th>Side</th><th>ZKAS amount</th><th>Price (KAS)</th><th>Total (KAS)</th><th /></tr></thead><tbody>
-          {rows.map((row) => <tr key={row.id}>
+          {rows.map((row) => <tr key={row.id} className={row.warning ? 'review-warning' : ''}>
             <td><input type="datetime-local" value={row.timestamp} onChange={(event) => update(row.id, 'timestamp', event.target.value)} /></td>
             <td><select value={row.side} onChange={(event) => update(row.id, 'side', event.target.value)}><option value="unknown">Trade</option><option value="buy">Buy</option><option value="sell">Sell</option></select></td>
             <td><input inputMode="decimal" value={row.zkasAmount} onChange={(event) => update(row.id, 'zkasAmount', event.target.value)} placeholder="0" /></td>
             <td><input inputMode="decimal" value={row.priceKas} onChange={(event) => update(row.id, 'priceKas', event.target.value)} placeholder="0" /></td>
-            <td><input inputMode="decimal" value={row.totalKas} onChange={(event) => update(row.id, 'totalKas', event.target.value)} placeholder="0" /></td>
+            <td><input inputMode="decimal" value={row.totalKas} onChange={(event) => update(row.id, 'totalKas', event.target.value)} placeholder="0" />{row.warning && <small className="trade-warning">Possible test trade</small>}</td>
             <td><button className="icon-btn" aria-label="Remove row" onClick={() => setRows((current) => current.filter((item) => item.id !== row.id))}><Trash2 size={16} /></button></td>
           </tr>)}
           {!rows.length && <tr><td colSpan={6} className="empty-cell">Read screenshots or add a blank row to begin.</td></tr>}

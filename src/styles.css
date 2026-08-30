@@ -498,6 +498,8 @@ footer { width: min(1320px, calc(100% - 40px)); margin: 0 auto; padding: 22px 0 
 .importer-table input, .importer-table select { width: 100%; min-width: 112px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface-2); color: var(--text); padding: 9px 10px; outline: none; }
 .importer-table input[type="datetime-local"] { min-width: 190px; }
 .importer-table input:focus, .importer-table select:focus { border-color: var(--accent); }
+.importer-table tr.review-warning { background: color-mix(in srgb, #d99122 9%, var(--surface)); }
+.trade-warning { display: block; margin-top: 5px; color: #b06d12; font-size: 8px; font-weight: 850; text-transform: uppercase; letter-spacing: .55px; }
 .importer-actions { display: flex; align-items: center; gap: 14px; }
 .importer-actions .text-btn { display: inline-flex; align-items: center; gap: 6px; }
 .importer-actions > span { margin-left: auto; color: var(--muted); font-size: 10px; }
