@@ -41,6 +41,24 @@ import { OtcScreenshotImporter } from './components/OtcScreenshotImporter';
 import { SparkChart } from './components/SparkChart';
 
 type Tab = 'intelligence' | 'merged' | 'health' | 'nodes' | 'events' | 'otc' | 'importer' | 'history' | 'supply' | 'reference';
+
+const tabHashes: Record<Tab, string> = {
+  intelligence: '',
+  merged: 'merged-mining',
+  health: 'network-health',
+  nodes: 'nodes',
+  events: 'events',
+  otc: 'otc',
+  importer: 'otc-import',
+  history: 'history',
+  supply: 'supply-privacy',
+  reference: 'reference',
+};
+
+function tabFromHash(hash: string): Tab {
+  const route = hash.replace(/^#\/?/, '').toLowerCase();
+  return (Object.entries(tabHashes).find(([, value]) => value === route)?.[0] as Tab | undefined) ?? 'intelligence';
+}
 type Detail = { type: 'block' | 'transaction' | 'privacy'; query: string; data: unknown };
 
 const fmt = new Intl.NumberFormat('en-US', { maximumFractionDigits: 2 });
@@ -561,7 +579,7 @@ const heroDescriptions: Record<Tab, string> = {
 };
 
 function App() {
-  const [tab, setTab] = useState<Tab>(() => window.location.hash === '#otc-import' ? 'importer' : 'intelligence');
+  const [tab, setTab] = useState<Tab>(() => tabFromHash(window.location.hash));
   const [data, setData] = useState<DashboardData>(initialCachedLive ?? emptyDashboard);
   const [status, setStatus] = useState<'connecting' | 'live' | 'stale'>(initialCachedLive ? 'live' : 'connecting');
   const [error, setError] = useState<string | null>(null);
@@ -588,10 +606,17 @@ function App() {
   useEffect(() => { document.documentElement.dataset.theme = dark ? 'dark' : 'light'; }, [dark]);
 
   useEffect(() => {
-    const onHashChange = () => setTab(window.location.hash === '#otc-import' ? 'importer' : 'intelligence');
+    const onHashChange = () => setTab(tabFromHash(window.location.hash));
     window.addEventListener('hashchange', onHashChange);
     return () => window.removeEventListener('hashchange', onHashChange);
   }, []);
+
+  function navigateToTab(nextTab: Tab) {
+    setTab(nextTab);
+    const nextHash = tabHashes[nextTab];
+    if (nextHash) window.location.hash = nextHash;
+    else window.history.pushState(null, '', `${window.location.pathname}${window.location.search}`);
+  }
 
   useEffect(() => {
     if (status !== 'live') return;
@@ -708,7 +733,7 @@ function App() {
   return (
     <div className="app-shell">
       <header className="topbar">
-        <button className="brand" onClick={() => setTab('intelligence')} aria-label="ZKAS Stream home">
+        <button className="brand" onClick={() => navigateToTab('intelligence')} aria-label="ZKAS Stream home">
           <span className="brand-mark"><ShieldCheck size={22} /></span>
           <span><b>ZKAS</b><em>.stream</em></span>
           <small>INTELLIGENCE</small>
@@ -716,7 +741,7 @@ function App() {
 
         <nav className={`nav ${menuOpen ? 'open' : ''}`}>
           {nav.map(([id, label]) => (
-            <button key={id} className={tab === id ? 'active' : ''} onClick={() => { setTab(id); setMenuOpen(false); }}>{label}</button>
+            <button key={id} className={tab === id ? 'active' : ''} onClick={() => { navigateToTab(id); setMenuOpen(false); }}>{label}</button>
           ))}
         </nav>
 
@@ -753,11 +778,11 @@ function App() {
         {tab !== 'otc' && tab !== 'importer' && status === 'connecting' && <div className="demo-banner"><b>Connecting to ZKas mainnet.</b> Waiting for the first public API snapshot. {error && <span>{error}</span>}</div>}
 
         {tab === 'intelligence' && (
-          <IntelligenceHome data={data} txValues={txValues} pulseTimes={pulseTimes} onReference={() => setTab('reference')} />
+          <IntelligenceHome data={data} txValues={txValues} pulseTimes={pulseTimes} onReference={() => navigateToTab('reference')} />
         )}
 
         {tab === 'merged' && <MergedIntelligencePage data={data} />}
-        {tab === 'health' && <NetworkHealthPage data={data} diffValues={diffValues} txValues={txValues} pulseTimes={pulseTimes} onOpenNodes={() => setTab('nodes')} />}
+        {tab === 'health' && <NetworkHealthPage data={data} diffValues={diffValues} txValues={txValues} pulseTimes={pulseTimes} onOpenNodes={() => navigateToTab('nodes')} />}
         {tab === 'nodes' && <NodesPage data={data} />}
         {tab === 'events' && <EventsPage data={data} history={history} />}
         {tab === 'otc' && <OtcMarketPage />}
