@@ -1,12 +1,10 @@
 export type OtcTradeSide = 'buy' | 'sell' | 'unknown';
 
 export type OtcTrade = {
-  id: string;
   timestamp: number | null;
   side: OtcTradeSide;
   zkasAmount: number | null;
   priceKas: number | null;
-  priceUsd: number | null;
   totalKas: number | null;
 };
 
