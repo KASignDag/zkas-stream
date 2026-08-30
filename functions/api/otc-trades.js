@@ -76,6 +76,21 @@ async function handleGet({ request, env, waitUntil }) {
   const updatedAt = Date.now();
   const endpoint = env.ZKAS_OTC_API_URL;
   if (!endpoint) {
+    if (env.OTC_TRADES) {
+      const stored = await env.OTC_TRADES.get('trades:v1', 'json');
+      const trades = Array.isArray(stored?.trades) ? stored.trades.map(normalizeTrade).filter(Boolean).slice(-5000) : [];
+      if (trades.length) {
+        return json({ schemaVersion: 1, status: 'live', source: 'screenshot-import', updatedAt: stored.updatedAt || updatedAt, trades }, 200, 'public, max-age=10, s-maxage=30, stale-while-revalidate=120');
+      }
+      return json({
+        schemaVersion: 1,
+        status: 'awaiting_configuration',
+        source: 'screenshot-import',
+        updatedAt,
+        trades: [],
+        message: 'The private screenshot importer is ready for its first reviewed trade.',
+      });
+    }
     return json({
       schemaVersion: 1,
       status: 'awaiting_configuration',

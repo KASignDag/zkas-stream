@@ -17,7 +17,7 @@ export type OtcFeedStatus =
 export type OtcTradeFeed = {
   schemaVersion: 1;
   status: OtcFeedStatus;
-  source: 'ronnie-api' | 'not-configured';
+  source: 'ronnie-api' | 'screenshot-import' | 'not-configured';
   updatedAt: number;
   trades: OtcTrade[];
   message?: string;

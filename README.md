@@ -1,4 +1,4 @@
-# ZKAS Stream v0.7.0
+# ZKAS Stream v0.8.0
 
 Independent, privacy-aware ZKas public-network intelligence frontend.
 
@@ -37,6 +37,7 @@ The site is **public-network only**. It does not connect to or display a user's 
   - current-price guide line and buy/sell trade markers
   - dated completed-trades table and automatic 30-second refresh
   - private server-side connector for the OTC bot trade log
+  - private browser-side screenshot OCR and reviewed trade importer fallback
 - History
   - browser/VPS observer history
   - chain-work backfill where the public API supports it
@@ -80,9 +81,12 @@ ZKAS_OTC_API_URL=
 ZKAS_OTC_API_KEY=
 ZKAS_OTC_API_HEADER=Authorization
 ZKAS_OTC_API_PREFIX=Bearer
+OTC_IMPORT_SECRET=
 ```
 
 The API URL and access key are read only by `functions/api/otc-trades.js`. They are never included in the browser bundle or returned to visitors. Live responses are held in a short shared edge cache so website traffic does not create one request to Ronnie's service per visitor. Until the endpoint is configured, the OTC page displays a ready-to-connect state without fabricated trades.
+
+While the official API is unavailable, the unlisted `#otc-import` workspace reads screenshots locally in the browser, requires a human review of every row, and publishes only timestamp, side, ZKAS amount, KAS price and KAS total. Raw screenshots and OCR text are never sent to the server. Configure a Cloudflare KV binding named `OTC_TRADES` and an encrypted `OTC_IMPORT_SECRET` to enable publishing. When Ronnie's API URL is added later, the public feed switches to that source without changing the chart schema.
 
 ## Production
 

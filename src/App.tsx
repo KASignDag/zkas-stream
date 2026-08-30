@@ -37,9 +37,10 @@ import {
 } from './api';
 import { MetricCard } from './components/MetricCard';
 import { OtcMarketPage } from './components/OtcMarketPage';
+import { OtcScreenshotImporter } from './components/OtcScreenshotImporter';
 import { SparkChart } from './components/SparkChart';
 
-type Tab = 'intelligence' | 'merged' | 'health' | 'nodes' | 'events' | 'otc' | 'history' | 'supply' | 'reference';
+type Tab = 'intelligence' | 'merged' | 'health' | 'nodes' | 'events' | 'otc' | 'importer' | 'history' | 'supply' | 'reference';
 type Detail = { type: 'block' | 'transaction' | 'privacy'; query: string; data: unknown };
 
 const fmt = new Intl.NumberFormat('en-US', { maximumFractionDigits: 2 });
@@ -540,6 +541,7 @@ const heroTitles: Record<Tab, string> = {
   nodes: 'Public node view',
   events: 'Live event intelligence',
   otc: 'ZKAS OTC market price',
+  importer: 'OTC screenshot importer',
   history: 'Historical intelligence',
   supply: 'Supply & privacy intelligence',
   reference: 'ZKas quick reference',
@@ -552,13 +554,14 @@ const heroDescriptions: Record<Tab, string> = {
   nodes: 'Privacy-aware observations of the public nodes currently visible to the ZKas network scanner.',
   events: 'Recent public block and network activity, organized into stable signals instead of a reconstructed animated DAG.',
   otc: 'Completed ZKAS OTC trades, actual traded prices and volume—prepared to update automatically from the private trade-log connection.',
+  importer: 'Privately read trade-log screenshots, review the detected facts and publish completed trades to the OTC chart.',
   history: 'Chain-derived work history and observer history, kept separate so unavailable historical data is never invented.',
   supply: 'Consensus supply, emission and aggregate shielded-activity intelligence without exposing individual holders.',
   reference: 'Convenient public chain information and links to the official ZKas explorer.',
 };
 
 function App() {
-  const [tab, setTab] = useState<Tab>('intelligence');
+  const [tab, setTab] = useState<Tab>(() => window.location.hash === '#otc-import' ? 'importer' : 'intelligence');
   const [data, setData] = useState<DashboardData>(initialCachedLive ?? emptyDashboard);
   const [status, setStatus] = useState<'connecting' | 'live' | 'stale'>(initialCachedLive ? 'live' : 'connecting');
   const [error, setError] = useState<string | null>(null);
@@ -583,6 +586,12 @@ function App() {
   const pollMs = Number(import.meta.env.VITE_POLL_MS || 15000);
 
   useEffect(() => { document.documentElement.dataset.theme = dark ? 'dark' : 'light'; }, [dark]);
+
+  useEffect(() => {
+    const onHashChange = () => setTab(window.location.hash === '#otc-import' ? 'importer' : 'intelligence');
+    window.addEventListener('hashchange', onHashChange);
+    return () => window.removeEventListener('hashchange', onHashChange);
+  }, []);
 
   useEffect(() => {
     if (status !== 'live') return;
@@ -726,13 +735,13 @@ function App() {
             <h1>{heroTitles[tab]}</h1>
             <p>{heroDescriptions[tab]}</p>
           </div>
-          {tab !== 'otc' && <div className="sync-box">
+          {tab !== 'otc' && tab !== 'importer' && <div className="sync-box">
             <span>Network</span><b>{data.network}</b>
             <span>Updated</span><b>{new Date(data.updatedAt).toLocaleTimeString()}</b>
           </div>}
         </section>
 
-        {tab !== 'otc' && <>
+        {tab !== 'otc' && tab !== 'importer' && <>
           <form className="searchbar" onSubmit={onSearch}>
             <Search size={21} />
             <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search public block hash or transaction ID" aria-label="Search public block hash or transaction ID" />
@@ -740,8 +749,8 @@ function App() {
           </form>
           {searchError && <div className="inline-error">{searchError}</div>}
         </>}
-        {tab !== 'otc' && status === 'stale' && <div className="demo-banner"><b>Live refresh delayed.</b> Showing the last good public mainnet snapshot while the API retries. {error && <span>{error}</span>}</div>}
-        {tab !== 'otc' && status === 'connecting' && <div className="demo-banner"><b>Connecting to ZKas mainnet.</b> Waiting for the first public API snapshot. {error && <span>{error}</span>}</div>}
+        {tab !== 'otc' && tab !== 'importer' && status === 'stale' && <div className="demo-banner"><b>Live refresh delayed.</b> Showing the last good public mainnet snapshot while the API retries. {error && <span>{error}</span>}</div>}
+        {tab !== 'otc' && tab !== 'importer' && status === 'connecting' && <div className="demo-banner"><b>Connecting to ZKas mainnet.</b> Waiting for the first public API snapshot. {error && <span>{error}</span>}</div>}
 
         {tab === 'intelligence' && (
           <IntelligenceHome data={data} txValues={txValues} pulseTimes={pulseTimes} onReference={() => setTab('reference')} />
@@ -752,13 +761,14 @@ function App() {
         {tab === 'nodes' && <NodesPage data={data} />}
         {tab === 'events' && <EventsPage data={data} history={history} />}
         {tab === 'otc' && <OtcMarketPage />}
+        {tab === 'importer' && <OtcScreenshotImporter />}
         {tab === 'history' && <HistoryPage data={data} history={history} range={historyRange} onRange={setHistoryRange} />}
         {tab === 'supply' && <SupplyPrivacyPage data={data} history={history} range={historyRange} onRange={setHistoryRange} />}
         {tab === 'reference' && <ReferencePage data={data} txs={txs} onSelect={(value) => void doSearch(value)} />}
       </main>
 
       <footer>
-        <div className="footer-brand"><ShieldCheck size={17} /> ZKAS Stream <span>v0.7.0</span></div>
+        <div className="footer-brand"><ShieldCheck size={17} /> ZKAS Stream <span>v0.8.0</span></div>
         <div>Merged-mining, network & OTC intelligence • Public display • Private API credentials remain server-side</div>
       </footer>
 

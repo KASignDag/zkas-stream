@@ -476,6 +476,42 @@ footer { width: min(1320px, calc(100% - 40px)); margin: 0 auto; padding: 22px 0 
   .solo-reward-strip > div:last-child { border-bottom: 0; }
 }
 
+/* v0.8 — private screenshot trade importer */
+.importer-page { max-width: 1180px; margin: 0 auto; }
+.importer-step { display: grid; gap: 15px; }
+.importer-step-head { display: flex; gap: 12px; align-items: flex-start; }
+.importer-step-head > span { width: 30px; height: 30px; flex: 0 0 30px; display: grid; place-items: center; border-radius: 9px; background: var(--accent-soft); color: var(--accent); font-weight: 900; }
+.importer-step-head h2 { margin: 1px 0 4px; font-size: 18px; }
+.importer-step-head p { margin: 0; color: var(--muted); font-size: 11px; line-height: 1.5; }
+.importer-secret { max-width: 520px; display: flex; align-items: center; gap: 10px; padding: 0 12px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface-2); }
+.importer-secret svg { color: var(--accent); }
+.importer-secret input { width: 100%; padding: 12px 0; border: 0; outline: 0; background: transparent; color: var(--text); }
+.importer-drop { min-height: 150px; display: grid; place-items: center; align-content: center; gap: 7px; border: 1px dashed color-mix(in srgb, var(--accent) 38%, var(--border)); border-radius: 12px; background: var(--surface-2); cursor: pointer; text-align: center; }
+.importer-drop svg { color: var(--accent); }
+.importer-drop b { font-size: 14px; }
+.importer-drop span { color: var(--muted); font-size: 10px; }
+.importer-drop input { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
+.importer-primary { width: fit-content; display: inline-flex; align-items: center; justify-content: center; gap: 8px; border: 0; border-radius: 9px; background: var(--accent); color: white; padding: 11px 15px; font-size: 11px; font-weight: 850; cursor: pointer; }
+.importer-primary:disabled { opacity: .45; cursor: not-allowed; }
+.importer-table-wrap { overflow-x: auto; border: 1px solid var(--border); border-radius: 11px; }
+.importer-table { min-width: 980px; }
+.importer-table input, .importer-table select { width: 100%; min-width: 112px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface-2); color: var(--text); padding: 9px 10px; outline: none; }
+.importer-table input[type="datetime-local"] { min-width: 190px; }
+.importer-table input:focus, .importer-table select:focus { border-color: var(--accent); }
+.importer-actions { display: flex; align-items: center; gap: 14px; }
+.importer-actions .text-btn { display: inline-flex; align-items: center; gap: 6px; }
+.importer-actions > span { margin-left: auto; color: var(--muted); font-size: 10px; }
+.importer-message { display: flex; gap: 10px; align-items: flex-start; padding: 13px 15px; border: 1px solid var(--border); border-radius: 11px; background: var(--surface); font-size: 11px; line-height: 1.5; }
+.importer-message.success { color: var(--accent); border-color: color-mix(in srgb, var(--accent) 30%, var(--border)); }
+.importer-message.error { color: var(--danger); border-color: color-mix(in srgb, var(--danger) 30%, var(--border)); }
+.importer-ocr summary { cursor: pointer; color: var(--accent); font-size: 11px; font-weight: 800; }
+.importer-ocr pre { max-height: 280px; overflow: auto; margin: 14px 0 0; padding: 13px; border-radius: 9px; background: var(--surface-2); color: var(--muted); white-space: pre-wrap; font-size: 10px; line-height: 1.45; }
+@media (max-width: 700px) {
+  .importer-actions { align-items: stretch; flex-direction: column; }
+  .importer-actions > span { margin-left: 0; }
+  .importer-primary { width: 100%; }
+}
+
 
 /* v0.6.10 — compact native vs merged mining visibility */
 .mining-visibility-panel { margin-top: 14px; padding-top: 16px; padding-bottom: 14px; }
