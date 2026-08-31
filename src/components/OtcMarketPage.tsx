@@ -63,7 +63,7 @@ export function OtcMarketPage() {
   const [feed, setFeed] = useState<OtcTradeFeed | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
-  const [range, setRange] = useState<Range>('1D');
+  const [range, setRange] = useState<Range>('7D');
   const [kasUsd, setKasUsd] = useState<number | null>(null);
 
   useEffect(() => {
