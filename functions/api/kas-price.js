@@ -29,6 +29,26 @@ const quoteSources = [
       };
     },
   },
+  {
+    name: 'KuCoin KAS/USDT',
+    url: 'https://api.kucoin.com/api/v1/market/orderbook/level1?symbol=KAS-USDT',
+    read(payload) {
+      return {
+        priceUsd: Number(payload?.data?.price),
+        updatedAt: Number(payload?.data?.time) || Date.now(),
+      };
+    },
+  },
+  {
+    name: 'Gate.io KAS/USDT',
+    url: 'https://api.gateio.ws/api/v4/spot/tickers?currency_pair=KAS_USDT',
+    read(payload) {
+      return {
+        priceUsd: Number(payload?.[0]?.last),
+        updatedAt: Date.now(),
+      };
+    },
+  },
 ];
 
 function json(body, status = 200, cacheControl) {
@@ -44,15 +64,21 @@ function json(body, status = 200, cacheControl) {
 }
 
 async function fetchQuote(source) {
-  const response = await fetch(source.url, {
-    headers: { Accept: 'application/json' },
-    cf: { cacheEverything: true, cacheTtl: 60 },
-  });
-  if (!response.ok) throw new Error(`${source.name} quote unavailable`);
+  let response;
+  try {
+    response = await fetch(source.url, {
+      headers: { Accept: 'application/json' },
+      cf: { cacheEverything: true, cacheTtl: 60 },
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'fetch failed';
+    throw new Error(`${source.name}: ${message}`);
+  }
+  if (!response.ok) throw new Error(`${source.name}: HTTP ${response.status}`);
 
   const quote = source.read(await response.json());
   if (!Number.isFinite(quote.priceUsd) || quote.priceUsd <= 0) {
-    throw new Error(`${source.name} returned an invalid quote`);
+    throw new Error(`${source.name}: invalid quote`);
   }
 
   return {
@@ -66,9 +92,17 @@ export async function onRequestGet(context) {
   const cache = caches.default;
   const cacheUrl = new URL('/__cache/kas-usd-last-good', context.request.url);
   const cacheKey = new Request(cacheUrl.toString(), { method: 'GET' });
+  const providerErrors = [];
 
   try {
-    const quote = await Promise.any(quoteSources.map(fetchQuote));
+    const quote = await Promise.any(quoteSources.map(async (source) => {
+      try {
+        return await fetchQuote(source);
+      } catch (error) {
+        providerErrors.push(error instanceof Error ? error.message : `${source.name}: failed`);
+        throw error;
+      }
+    }));
     const cachedResponse = json(quote, 200, 'public, max-age=604800');
     context.waitUntil(cache.put(cacheKey, cachedResponse));
     return json(quote);
@@ -86,5 +120,5 @@ export async function onRequestGet(context) {
     // If the edge cache is unavailable, return the normal temporary error below.
   }
 
-  return json({ error: 'quote_unavailable' }, 502);
+  return json({ error: 'quote_unavailable', providers: providerErrors }, 502);
 }
