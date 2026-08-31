@@ -186,7 +186,7 @@ export function OtcMarketPage() {
         </div>
         <div className="table-scroll">
           <table>
-            <thead><tr><th>Date & time</th><th>Side</th><th>ZKAS amount</th><th>Price (KAS per ZKAS)</th><th>Total</th></tr></thead>
+            <thead><tr><th>Date & time</th><th>Side</th><th>ZKAS amount</th><th>Price (KAS per ZKAS)</th><th>Est. USD per ZKAS</th><th>Total</th></tr></thead>
             <tbody>
               {[...filteredTrades].reverse().map((trade, index) => (
                 <tr key={`${trade.timestamp ?? 'undated'}-${index}`}>
@@ -194,10 +194,11 @@ export function OtcMarketPage() {
                   <td><span className={`otc-side ${trade.side}`}>{trade.side === 'unknown' ? 'Trade' : trade.side}</span></td>
                   <td>{trade.zkasAmount === null ? '—' : amountFormat.format(trade.zkasAmount)}</td>
                   <td>{priceText(trade.priceKas)}</td>
+                  <td>{usdPriceText(trade.priceKas !== null && kasUsd !== null ? trade.priceKas * kasUsd : null) ?? '—'}</td>
                   <td>{trade.totalKas === null ? '—' : `${amountFormat.format(trade.totalKas)} KAS`}</td>
                 </tr>
               ))}
-              {!filteredTrades.length && <tr><td colSpan={5} className="empty-cell">The chart is ready. Completed trades will appear here after Ronnie’s private API is connected.</td></tr>}
+              {!filteredTrades.length && <tr><td colSpan={6} className="empty-cell">The chart is ready. Completed trades will appear here after Ronnie’s private API is connected.</td></tr>}
             </tbody>
           </table>
         </div>
