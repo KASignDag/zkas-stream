@@ -59,6 +59,7 @@ button { color: inherit; }
 .header-actions { display: flex; align-items: center; gap: 8px; }
 .icon-btn { width: 40px; height: 40px; display: grid; place-items: center; border: 1px solid var(--border); border-radius: 10px; background: var(--surface); cursor: pointer; }
 .icon-btn:hover { border-color: var(--accent); }
+.header-discord { color: var(--accent); text-decoration: none; }
 .mobile-menu { display: none; }
 .discord-nav-link { display: none; }
 .live-pill, .live-mini { display: inline-flex; align-items: center; gap: 7px; font-size: 10px; font-weight: 900; letter-spacing: 1.1px; color: var(--accent); background: var(--accent-soft); border: 1px solid color-mix(in srgb, var(--accent) 25%, var(--border)); border-radius: 999px; padding: 7px 9px; white-space: nowrap; }
