@@ -257,6 +257,27 @@ function OtcPriceChart({ trades }: { trades: OtcTrade[] }) {
   });
   const xLabels = [coordinates[0], coordinates[Math.floor((coordinates.length - 1) / 2)], coordinates.at(-1)!];
   const plotRight = width - right;
+  const dayGroups = coordinates.reduce<Array<{ key: string; start: number; end: number }>>((groups, point, index) => {
+    if (point.trade.timestamp === null) return groups;
+    const date = new Date(point.trade.timestamp);
+    const key = `${date.getFullYear()}-${date.getMonth()}-${date.getDate()}`;
+    const current = groups.at(-1);
+    if (current?.key === key) {
+      current.end = index;
+    } else {
+      groups.push({ key, start: index, end: index });
+    }
+    return groups;
+  }, []);
+  const dayBands = dayGroups.map((group, index) => {
+    const first = coordinates[group.start];
+    const last = coordinates[group.end];
+    const previous = coordinates[group.start - 1];
+    const next = coordinates[group.end + 1];
+    const startX = previous ? (previous.x + first.x) / 2 : left;
+    const endX = next ? (last.x + next.x) / 2 : plotRight;
+    return { ...group, index, startX, endX };
+  });
 
   return (
     <div className="otc-chart-wrap" ref={scrollRef}>
@@ -264,6 +285,12 @@ function OtcPriceChart({ trades }: { trades: OtcTrade[] }) {
         <defs>
           <linearGradient id="otc-area" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="currentColor" stopOpacity=".22" /><stop offset="100%" stopColor="currentColor" stopOpacity="0" /></linearGradient>
         </defs>
+        {dayBands.map((day) => day.index % 2 === 1 && (
+          <rect key={`day-band-${day.key}`} className="otc-day-band" x={day.startX} y={top} width={Math.max(0, day.endX - day.startX)} height={height - top - bottom} />
+        ))}
+        {dayBands.slice(1).map((day) => (
+          <line key={`day-separator-${day.key}`} className="otc-day-separator" x1={day.startX} x2={day.startX} y1={top} y2={height - bottom} />
+        ))}
         {grid.map((line) => <g key={line.y}><line className="otc-grid" x1={left} x2={plotRight} y1={line.y} y2={line.y} /><text className="otc-axis-label" x={plotRight + 10} y={line.y + 4} textAnchor="start">{priceText(line.value)}</text></g>)}
         <path className="otc-area" d={areaPath} />
         <path className="otc-line" d={path} />

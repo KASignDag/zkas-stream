@@ -601,6 +601,8 @@ footer { width: min(1320px, calc(100% - 40px)); margin: 0 auto; padding: 22px 0 
 .otc-chart-wrap { width: 100%; padding: 4px 12px 8px; overflow-x: auto; overflow-y: hidden; scrollbar-width: thin; scrollbar-color: var(--border) transparent; }
 .otc-chart { width: 100%; height: auto; min-height: 300px; display: block; color: var(--accent); overflow: visible; }
 .otc-grid { stroke: var(--border); stroke-width: 1; stroke-dasharray: 3 5; }
+.otc-day-band { fill: color-mix(in srgb, var(--accent) 5%, transparent); }
+.otc-day-separator { stroke: color-mix(in srgb, var(--accent) 24%, var(--border)); stroke-width: 1; }
 .otc-axis-label { fill: var(--muted); font-size: 10px; font-family: Inter, ui-sans-serif, system-ui, sans-serif; }
 .otc-area { fill: url(#otc-area); }
 .otc-line { fill: none; stroke: var(--accent); stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; }
