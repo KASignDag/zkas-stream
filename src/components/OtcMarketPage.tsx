@@ -20,6 +20,7 @@ const tradeTableRangeMs: Record<Exclude<TradeTableRange, 'ALL'>, number> = {
 
 const amountFormat = new Intl.NumberFormat('en-US', { maximumFractionDigits: 2 });
 const compactFormat = new Intl.NumberFormat('en-US', { notation: 'compact', maximumFractionDigits: 2 });
+const tradesPerPage = 20;
 
 function priceText(value: number | null) {
   if (value === null || !Number.isFinite(value)) return '—';
@@ -89,6 +90,7 @@ export function OtcMarketPage({ circulatingSupply }: { circulatingSupply: number
   const [loading, setLoading] = useState(true);
   const [range, setRange] = useState<Range>('7D');
   const [tradeTableRange, setTradeTableRange] = useState<TradeTableRange>('1D');
+  const [tradeTablePage, setTradeTablePage] = useState(0);
   const [kasUsd, setKasUsd] = useState<number | null>(null);
 
   useEffect(() => {
@@ -192,7 +194,13 @@ export function OtcMarketPage({ circulatingSupply }: { circulatingSupply: number
     const cutoff = newest - tradeTableRangeMs[tradeTableRange];
     return allTrades.filter((trade) => trade.timestamp === null || trade.timestamp >= cutoff);
   }, [allTrades, tradeTableRange]);
-  const visibleTableTrades = useMemo(() => [...tableTrades].reverse().slice(0, 20), [tableTrades]);
+  const orderedTableTrades = useMemo(() => [...tableTrades].reverse(), [tableTrades]);
+  const tradeTablePageCount = Math.max(1, Math.ceil(orderedTableTrades.length / tradesPerPage));
+  const activeTradeTablePage = Math.min(tradeTablePage, tradeTablePageCount - 1);
+  const visibleTableTrades = useMemo(() => {
+    const start = activeTradeTablePage * tradesPerPage;
+    return orderedTableTrades.slice(start, start + tradesPerPage);
+  }, [activeTradeTablePage, orderedTableTrades]);
   const state = statusCopy(feed, error, loading);
   const refreshLabel = feed?.source === 'screenshot-import' ? '30 sec data check' : '30 sec refresh';
 
@@ -259,13 +267,13 @@ export function OtcMarketPage({ circulatingSupply }: { circulatingSupply: number
           <div><span className="panel-icon"><CalendarDays size={20} /></span><div><h2>Completed trades</h2><p>Showing the newest 20 trades. All recorded trades remain stored.</p></div></div>
           <div className="history-range-tabs" aria-label="Completed trades time range">
             {(['1D', '3D', '7D', 'ALL'] as TradeTableRange[]).map((item) => (
-              <button key={item} className={tradeTableRange === item ? 'active' : ''} onClick={() => setTradeTableRange(item)}>{item}</button>
+              <button key={item} className={tradeTableRange === item ? 'active' : ''} onClick={() => { setTradeTableRange(item); setTradeTablePage(0); }}>{item}</button>
             ))}
           </div>
         </div>
         <div className="otc-table-summary">
           <span>{tradeTableRangeLabel(tradeTableRange)}</span>
-          <span>{amountFormat.format(visibleTableTrades.length)} of {amountFormat.format(tableTrades.length)} matching trades shown</span>
+          <span>Page {activeTradeTablePage + 1} of {tradeTablePageCount} · {amountFormat.format(tableTrades.length)} matching trades</span>
         </div>
         <div className="table-scroll">
           <table>
@@ -284,6 +292,11 @@ export function OtcMarketPage({ circulatingSupply }: { circulatingSupply: number
               {!tableTrades.length && <tr><td colSpan={6} className="empty-cell">No completed trades were recorded in this time range.</td></tr>}
             </tbody>
           </table>
+        </div>
+        <div className="otc-table-pagination" aria-label="Completed trades pages">
+          <button disabled={activeTradeTablePage === 0} onClick={() => setTradeTablePage((page) => Math.max(0, page - 1))}>Previous</button>
+          <span>Trades {orderedTableTrades.length ? activeTradeTablePage * tradesPerPage + 1 : 0}–{Math.min((activeTradeTablePage + 1) * tradesPerPage, orderedTableTrades.length)} of {amountFormat.format(orderedTableTrades.length)}</span>
+          <button disabled={activeTradeTablePage >= tradeTablePageCount - 1} onClick={() => setTradeTablePage((page) => Math.min(tradeTablePageCount - 1, page + 1))}>Next</button>
         </div>
       </section>
     </div>
