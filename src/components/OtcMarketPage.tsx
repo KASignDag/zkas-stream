@@ -332,6 +332,11 @@ function OtcPriceChart({ trades }: { trades: OtcTrade[] }) {
   const xFor = (_point: typeof points[number], index: number) => left + index * pointGap;
   const yFor = (value: number) => top + ((max - value) / Math.max(max - min, Number.EPSILON)) * (height - top - bottom);
   const coordinates = points.map((point, index) => ({ ...point, x: xFor(point, index), y: yFor(point.value) }));
+  const coloredSegments = coordinates.slice(0, -1).map((from, index) => {
+    const to = coordinates[index + 1];
+    const direction = to.value > from.value ? 'up' : to.value < from.value ? 'down' : 'flat';
+    return { from, to, direction };
+  });
   const path = coordinates.map((point, index) => `${index ? 'L' : 'M'} ${point.x.toFixed(2)} ${point.y.toFixed(2)}`).join(' ');
   const areaPath = `${path} L ${coordinates.at(-1)?.x ?? left} ${height - bottom} L ${coordinates[0]?.x ?? left} ${height - bottom} Z`;
   const latest = coordinates.at(-1)!;
@@ -377,7 +382,9 @@ function OtcPriceChart({ trades }: { trades: OtcTrade[] }) {
         ))}
         {grid.map((line) => <g key={line.y}><line className="otc-grid" x1={left} x2={plotRight} y1={line.y} y2={line.y} /><text className="otc-axis-label" x={plotRight + 10} y={line.y + 4} textAnchor="start">{priceText(line.value)}</text></g>)}
         <path className="otc-area" d={areaPath} />
-        <path className="otc-line" d={path} />
+        {coloredSegments.map((segment, index) => (
+          <line key={`trade-segment-${index}`} className={`otc-segment ${segment.direction}`} x1={segment.from.x} y1={segment.from.y} x2={segment.to.x} y2={segment.to.y} />
+        ))}
         <line className="otc-current-line" x1={left} x2={width - 18} y1={latest.y} y2={latest.y} />
         <rect className="otc-current-tag" x={plotRight + 6} y={latest.y - 16} width={right - 8} height={32} rx="8" />
         <text className="otc-current-text" x={plotRight + 14} y={latest.y + 5}>{priceText(latest.value)}</text>
