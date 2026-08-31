@@ -3,12 +3,19 @@ import { Activity, CalendarDays, CircleDollarSign, Clock3, Coins, RefreshCw, Tre
 import { fetchKasUsd, fetchOtcTrades, type OtcTrade, type OtcTradeFeed } from '../otc';
 
 type Range = '1D' | '7D' | '14D' | '30D' | 'ALL';
+type TradeTableRange = '1D' | '3D' | '7D' | 'ALL';
 
 const rangeMs: Record<Exclude<Range, 'ALL'>, number> = {
   '1D': 24 * 60 * 60 * 1000,
   '7D': 7 * 24 * 60 * 60 * 1000,
   '14D': 14 * 24 * 60 * 60 * 1000,
   '30D': 30 * 24 * 60 * 60 * 1000,
+};
+
+const tradeTableRangeMs: Record<Exclude<TradeTableRange, 'ALL'>, number> = {
+  '1D': 24 * 60 * 60 * 1000,
+  '3D': 3 * 24 * 60 * 60 * 1000,
+  '7D': 7 * 24 * 60 * 60 * 1000,
 };
 
 const amountFormat = new Intl.NumberFormat('en-US', { maximumFractionDigits: 2 });
@@ -55,6 +62,13 @@ function rangeLabel(range: Range) {
   return 'All recorded trades';
 }
 
+function tradeTableRangeLabel(range: TradeTableRange) {
+  if (range === '1D') return 'Past 24 hours';
+  if (range === '3D') return 'Past 3 days';
+  if (range === '7D') return 'Past 7 days';
+  return 'All recorded trades';
+}
+
 function changePercent(first: number | null, last: number | null) {
   if (first === null || last === null || first === 0) return null;
   return ((last - first) / Math.abs(first)) * 100;
@@ -74,6 +88,7 @@ export function OtcMarketPage({ circulatingSupply }: { circulatingSupply: number
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [range, setRange] = useState<Range>('7D');
+  const [tradeTableRange, setTradeTableRange] = useState<TradeTableRange>('1D');
   const [kasUsd, setKasUsd] = useState<number | null>(null);
 
   useEffect(() => {
@@ -169,6 +184,15 @@ export function OtcMarketPage({ circulatingSupply }: { circulatingSupply: number
       .sort((a, b) => (b.totalKas as number) - (a.totalKas as number) || (b.timestamp ?? 0) - (a.timestamp ?? 0))
       .slice(0, 10);
   }, [allTrades]);
+  const tableTrades = useMemo(() => {
+    if (tradeTableRange === 'ALL') return allTrades;
+    const timed = allTrades.filter((trade) => trade.timestamp !== null);
+    if (!timed.length) return allTrades;
+    const newest = Math.max(...timed.map((trade) => trade.timestamp as number));
+    const cutoff = newest - tradeTableRangeMs[tradeTableRange];
+    return allTrades.filter((trade) => trade.timestamp === null || trade.timestamp >= cutoff);
+  }, [allTrades, tradeTableRange]);
+  const visibleTableTrades = useMemo(() => [...tableTrades].reverse().slice(0, 20), [tableTrades]);
   const state = statusCopy(feed, error, loading);
   const refreshLabel = feed?.source === 'screenshot-import' ? '30 sec data check' : '30 sec refresh';
 
@@ -231,15 +255,23 @@ export function OtcMarketPage({ circulatingSupply }: { circulatingSupply: number
       </section>
 
       <section className="panel table-panel otc-trades-panel">
-        <div className="panel-head">
-          <div><span className="panel-icon"><CalendarDays size={20} /></span><h2>Completed trades</h2></div>
-          <span className="range-chip">{rangeLabel(range).toUpperCase()}</span>
+        <div className="panel-head otc-trades-head">
+          <div><span className="panel-icon"><CalendarDays size={20} /></span><div><h2>Completed trades</h2><p>Showing the newest 20 trades. All recorded trades remain stored.</p></div></div>
+          <div className="history-range-tabs" aria-label="Completed trades time range">
+            {(['1D', '3D', '7D', 'ALL'] as TradeTableRange[]).map((item) => (
+              <button key={item} className={tradeTableRange === item ? 'active' : ''} onClick={() => setTradeTableRange(item)}>{item}</button>
+            ))}
+          </div>
+        </div>
+        <div className="otc-table-summary">
+          <span>{tradeTableRangeLabel(tradeTableRange)}</span>
+          <span>{amountFormat.format(visibleTableTrades.length)} of {amountFormat.format(tableTrades.length)} matching trades shown</span>
         </div>
         <div className="table-scroll">
           <table>
             <thead><tr><th>Date & time</th><th>Side</th><th>ZKAS amount</th><th>Price (KAS per ZKAS)</th><th>Est. USD per ZKAS</th><th>Total</th></tr></thead>
             <tbody>
-              {[...filteredTrades].reverse().map((trade, index) => (
+              {visibleTableTrades.map((trade, index) => (
                 <tr key={`${trade.timestamp ?? 'undated'}-${index}`}>
                   <td>{dateText(trade.timestamp)}</td>
                   <td><span className={`otc-side ${trade.side}`}>{trade.side === 'unknown' ? 'Trade' : trade.side}</span></td>
@@ -249,7 +281,7 @@ export function OtcMarketPage({ circulatingSupply }: { circulatingSupply: number
                   <td>{trade.totalKas === null ? '—' : `${amountFormat.format(trade.totalKas)} KAS`}</td>
                 </tr>
               ))}
-              {!filteredTrades.length && <tr><td colSpan={6} className="empty-cell">The chart is ready. Completed trades will appear here after Ronnie’s private API is connected.</td></tr>}
+              {!tableTrades.length && <tr><td colSpan={6} className="empty-cell">No completed trades were recorded in this time range.</td></tr>}
             </tbody>
           </table>
         </div>
