@@ -2,11 +2,12 @@ import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { Activity, CalendarDays, Clock3, Coins, RefreshCw, TrendingUp } from 'lucide-react';
 import { fetchKasUsd, fetchOtcTrades, type OtcTrade, type OtcTradeFeed } from '../otc';
 
-type Range = '1D' | '7D' | '30D' | 'ALL';
+type Range = '1D' | '7D' | '14D' | '30D' | 'ALL';
 
 const rangeMs: Record<Exclude<Range, 'ALL'>, number> = {
   '1D': 24 * 60 * 60 * 1000,
   '7D': 7 * 24 * 60 * 60 * 1000,
+  '14D': 14 * 24 * 60 * 60 * 1000,
   '30D': 30 * 24 * 60 * 60 * 1000,
 };
 
@@ -39,6 +40,7 @@ function dateText(timestamp: number | null, approximate = false) {
 function rangeLabel(range: Range) {
   if (range === '1D') return 'Past 24 hours';
   if (range === '7D') return 'Past 7 days';
+  if (range === '14D') return 'Past 14 days';
   if (range === '30D') return 'Past 30 days';
   return 'All recorded trades';
 }
@@ -61,7 +63,7 @@ export function OtcMarketPage() {
   const [feed, setFeed] = useState<OtcTradeFeed | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
-  const [range, setRange] = useState<Range>('30D');
+  const [range, setRange] = useState<Range>('1D');
   const [kasUsd, setKasUsd] = useState<number | null>(null);
 
   useEffect(() => {
@@ -170,7 +172,7 @@ export function OtcMarketPage() {
             <p>Each point shows the price of one ZKAS, quoted in KAS.</p>
           </div>
           <div className="segmented" aria-label="OTC chart time range">
-            {(['1D', '7D', '30D', 'ALL'] as Range[]).map((item) => (
+            {(['1D', '7D', '14D', '30D', 'ALL'] as Range[]).map((item) => (
               <button key={item} className={range === item ? 'on' : ''} onClick={() => setRange(item)}>{item}</button>
             ))}
           </div>
