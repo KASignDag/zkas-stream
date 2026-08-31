@@ -595,7 +595,7 @@ footer { width: min(1320px, calc(100% - 40px)); margin: 0 auto; padding: 22px 0 
 .spinning { animation: otc-spin 1s linear infinite; }
 @keyframes otc-spin { to { transform: rotate(360deg); } }
 
-.otc-summary-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
+.otc-summary-grid { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 12px; }
 .otc-summary { min-height: 128px; }
 .otc-summary .metric-value.positive { color: var(--accent); }
 .otc-summary .metric-value.negative { color: var(--danger); }
