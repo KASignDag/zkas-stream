@@ -47,7 +47,6 @@ async function fetchQuote(source) {
   const response = await fetch(source.url, {
     headers: { Accept: 'application/json' },
     cf: { cacheEverything: true, cacheTtl: 60 },
-    signal: AbortSignal.timeout(3500),
   });
   if (!response.ok) throw new Error(`${source.name} quote unavailable`);
 
@@ -68,15 +67,13 @@ export async function onRequestGet(context) {
   const cacheUrl = new URL('/__cache/kas-usd-last-good', context.request.url);
   const cacheKey = new Request(cacheUrl.toString(), { method: 'GET' });
 
-  for (const source of quoteSources) {
-    try {
-      const quote = await fetchQuote(source);
-      const cachedResponse = json(quote, 200, 'public, max-age=604800');
-      context.waitUntil(cache.put(cacheKey, cachedResponse));
-      return json(quote);
-    } catch {
-      // Try the next public quote provider before falling back to the last good price.
-    }
+  try {
+    const quote = await Promise.any(quoteSources.map(fetchQuote));
+    const cachedResponse = json(quote, 200, 'public, max-age=604800');
+    context.waitUntil(cache.put(cacheKey, cachedResponse));
+    return json(quote);
+  } catch {
+    // All public quote providers failed, so try the last good edge-cached price.
   }
 
   try {
