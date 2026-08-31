@@ -616,6 +616,10 @@ footer { width: min(1320px, calc(100% - 40px)); margin: 0 auto; padding: 22px 0 
 .otc-axis-label { fill: var(--muted); font-size: 10px; font-family: Inter, ui-sans-serif, system-ui, sans-serif; }
 .otc-area { fill: url(#otc-area); }
 .otc-line { fill: none; stroke: var(--accent); stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; }
+.otc-segment { fill: none; stroke-width: 3; stroke-linecap: round; }
+.otc-segment.up { stroke: #159a7e; }
+.otc-segment.down { stroke: #d9534f; }
+.otc-segment.flat { stroke: color-mix(in srgb, var(--muted) 72%, var(--border)); }
 .otc-current-line { stroke: var(--accent); stroke-width: 1; stroke-dasharray: 5 5; opacity: .72; }
 .otc-current-tag { fill: var(--accent); }
 .otc-current-text { fill: #fff; font-size: 10px; font-weight: 850; font-family: Inter, ui-sans-serif, system-ui, sans-serif; }
