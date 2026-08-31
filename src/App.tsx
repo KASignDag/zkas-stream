@@ -745,12 +745,14 @@ function App() {
             <button key={id} className={tab === id ? 'active' : ''} onClick={() => { navigateToTab(id); setMenuOpen(false); }}>{label}</button>
           ))}
           <a className="discord-nav-link" href="https://discord.gg/kJCYVtGEe" target="_blank" rel="noreferrer" onClick={() => setMenuOpen(false)}><MessageCircle size={17} /> Join Discord</a>
+          <a className="x-nav-link" href="https://x.com/zkas_x" target="_blank" rel="noreferrer" onClick={() => setMenuOpen(false)}><span className="x-mark" aria-hidden="true">X</span> Follow @zkas_x</a>
         </nav>
 
         <div className="header-actions">
           <span className="public-pill"><Globe2 size={14} /> PUBLIC ONLY</span>
           <span className={`live-pill ${status}`}><i />{status === 'live' ? 'MAINNET LIVE' : status === 'stale' ? 'LIVE · RETRYING' : 'CONNECTING'}</span>
           <a className="icon-btn header-discord" href="https://discord.gg/kJCYVtGEe" target="_blank" rel="noreferrer" aria-label="Join ZKAS Discord" title="Join ZKAS Discord"><MessageCircle size={19} /></a>
+          <a className="icon-btn header-x" href="https://x.com/zkas_x" target="_blank" rel="noreferrer" aria-label="Follow ZKAS on X" title="Follow @zkas_x on X"><span className="x-mark" aria-hidden="true">X</span></a>
           <button className="icon-btn" onClick={() => setDark((v) => !v)} aria-label="Toggle theme">{dark ? <Sun size={18} /> : <Moon size={18} />}</button>
           <button className="icon-btn mobile-menu" onClick={() => setMenuOpen((v) => !v)} aria-label="Open navigation">{menuOpen ? <X size={20} /> : <Menu size={20} />}</button>
         </div>
@@ -798,7 +800,10 @@ function App() {
       <footer>
         <div className="footer-brand"><ShieldCheck size={17} /> ZKAS Stream <span>v0.8.0</span></div>
         <div>Merged-mining, network & OTC intelligence • Public display • Private API credentials remain server-side</div>
-        <a className="footer-discord" href="https://discord.gg/kJCYVtGEe" target="_blank" rel="noreferrer"><MessageCircle size={15} /> Join ZKAS Discord</a>
+        <div className="footer-socials">
+          <a className="footer-social" href="https://x.com/zkas_x" target="_blank" rel="noreferrer"><span className="x-mark" aria-hidden="true">X</span> Follow @zkas_x</a>
+          <a className="footer-social" href="https://discord.gg/kJCYVtGEe" target="_blank" rel="noreferrer"><MessageCircle size={15} /> Join ZKAS Discord</a>
+        </div>
       </footer>
 
       {detail && <DetailDrawer detail={detail} onClose={() => setDetail(null)} />}
