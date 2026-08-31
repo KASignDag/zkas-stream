@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { Activity, CalendarDays, CircleDollarSign, Clock3, Coins, RefreshCw, TrendingUp } from 'lucide-react';
+import { Activity, CalendarDays, CircleDollarSign, Clock3, Coins, RefreshCw, TrendingUp, Trophy } from 'lucide-react';
 import { fetchKasUsd, fetchOtcTrades, type OtcTrade, type OtcTradeFeed } from '../otc';
 
 type Range = '1D' | '7D' | '14D' | '30D' | 'ALL';
@@ -24,6 +24,11 @@ function usdPriceText(value: number | null) {
   if (value === null || !Number.isFinite(value)) return null;
   const digits = value < 0.01 ? 6 : value < 1 ? 4 : 2;
   return `$${value.toLocaleString('en-US', { minimumFractionDigits: digits, maximumFractionDigits: digits })}`;
+}
+
+function usdValueText(value: number | null) {
+  if (value === null || !Number.isFinite(value)) return '—';
+  return `$${value.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
 function marketCapText(value: number | null, unit: 'USD' | 'KAS') {
@@ -158,6 +163,12 @@ export function OtcMarketPage({ circulatingSupply }: { circulatingSupply: number
   const marketCapUsd = marketCapKas !== null && kasUsd !== null ? marketCapKas * kasUsd : null;
   const zkasVolume = filteredTrades.reduce((sum, trade) => sum + (trade.zkasAmount ?? 0), 0);
   const kasVolume = filteredTrades.reduce((sum, trade) => sum + (trade.totalKas ?? 0), 0);
+  const topBuys = useMemo(() => {
+    return allTrades
+      .filter((trade) => trade.side === 'buy' && trade.totalKas !== null && trade.totalKas > 0)
+      .sort((a, b) => (b.totalKas as number) - (a.totalKas as number) || (b.timestamp ?? 0) - (a.timestamp ?? 0))
+      .slice(0, 10);
+  }, [allTrades]);
   const state = statusCopy(feed, error, loading);
   const refreshLabel = feed?.source === 'screenshot-import' ? '30 sec data check' : '30 sec refresh';
 
@@ -192,6 +203,31 @@ export function OtcMarketPage({ circulatingSupply }: { circulatingSupply: number
         </div>
         <OtcPriceChart trades={pricedTrades} />
         <div className="otc-legend"><span><i className="buy" /> Buy</span><span><i className="sell" /> Sell</span><span><i className="unknown" /> Unclassified trade</span></div>
+      </section>
+
+      <section className="panel table-panel otc-top-buys-panel">
+        <div className="panel-head otc-ranking-head">
+          <div><span className="panel-icon"><Trophy size={20} /></span><div><h2>Top 10 largest completed buys</h2><p>Ranked by the total KAS paid across all recorded trades.</p></div></div>
+          <span className="range-chip">ALL TIME</span>
+        </div>
+        <div className="table-scroll">
+          <table>
+            <thead><tr><th>Rank</th><th>Date & time</th><th>ZKAS bought</th><th>Price (KAS per ZKAS)</th><th>Total paid</th><th>Est. USD value</th></tr></thead>
+            <tbody>
+              {topBuys.map((trade, index) => (
+                <tr key={`top-buy-${trade.timestamp ?? 'undated'}-${index}`}>
+                  <td><span className={`otc-rank otc-rank-${index + 1}`}>#{index + 1}</span></td>
+                  <td>{dateText(trade.timestamp)}</td>
+                  <td>{trade.zkasAmount === null ? '—' : amountFormat.format(trade.zkasAmount)}</td>
+                  <td>{priceText(trade.priceKas)}</td>
+                  <td><b>{amountFormat.format(trade.totalKas as number)} KAS</b></td>
+                  <td>{usdValueText(kasUsd === null ? null : (trade.totalKas as number) * kasUsd)}</td>
+                </tr>
+              ))}
+              {!topBuys.length && <tr><td colSpan={6} className="empty-cell">Completed buy trades will appear here as they are published.</td></tr>}
+            </tbody>
+          </table>
+        </div>
       </section>
 
       <section className="panel table-panel otc-trades-panel">

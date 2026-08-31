@@ -633,6 +633,15 @@ footer { width: min(1320px, calc(100% - 40px)); margin: 0 auto; padding: 22px 0 
 .otc-legend i.unknown { background: var(--accent-2); }
 
 .otc-trades-panel { margin-top: 0; }
+.otc-top-buys-panel { margin-top: 0; border-color: color-mix(in srgb, var(--accent) 22%, var(--border)); }
+.otc-ranking-head > div { align-items: flex-start; }
+.otc-ranking-head .panel-icon { margin-top: 1px; color: #c78b2d; }
+.otc-ranking-head h2 { margin: 0; }
+.otc-ranking-head p { margin: 4px 0 0; color: var(--muted); font-size: 10px; line-height: 1.45; }
+.otc-rank { display: inline-flex; min-width: 31px; justify-content: center; padding: 4px 7px; border-radius: 7px; background: var(--surface-3); color: var(--muted); font-size: 10px; font-weight: 900; }
+.otc-rank-1 { color: #8b640f; background: color-mix(in srgb, #f2c94c 24%, var(--surface)); }
+.otc-rank-2 { color: #68727a; background: color-mix(in srgb, #b8c2cc 26%, var(--surface)); }
+.otc-rank-3 { color: #915b2a; background: color-mix(in srgb, #c98b55 22%, var(--surface)); }
 .otc-side { display: inline-flex; min-width: 46px; justify-content: center; padding: 4px 7px; border-radius: 7px; font-size: 10px; font-weight: 900; text-transform: uppercase; }
 .otc-side.buy { color: var(--accent); background: var(--accent-soft); }
 .otc-side.sell { color: #b46919; background: #fff0dc; }
