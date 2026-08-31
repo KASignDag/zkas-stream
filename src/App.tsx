@@ -788,7 +788,7 @@ function App() {
         {tab === 'health' && <NetworkHealthPage data={data} diffValues={diffValues} txValues={txValues} pulseTimes={pulseTimes} onOpenNodes={() => navigateToTab('nodes')} />}
         {tab === 'nodes' && <NodesPage data={data} />}
         {tab === 'events' && <EventsPage data={data} history={history} />}
-        {tab === 'otc' && <OtcMarketPage />}
+        {tab === 'otc' && <OtcMarketPage circulatingSupply={data.supply} />}
         {tab === 'importer' && <OtcScreenshotImporter />}
         {tab === 'history' && <HistoryPage data={data} history={history} range={historyRange} onRange={setHistoryRange} />}
         {tab === 'supply' && <SupplyPrivacyPage data={data} history={history} range={historyRange} onRange={setHistoryRange} />}
