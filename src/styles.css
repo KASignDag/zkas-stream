@@ -401,6 +401,7 @@ footer { width: min(1320px, calc(100% - 40px)); margin: 0 auto; padding: 22px 0 
 .history-range-tabs button { border: 0; border-radius: 7px; background: transparent; color: var(--muted); padding: 8px 11px; font-size: 10px; font-weight: 850; letter-spacing: .7px; cursor: pointer; }
 .history-range-tabs button:hover { color: var(--accent); }
 .history-range-tabs button.active { background: var(--surface); color: var(--accent); box-shadow: 0 1px 5px rgba(16, 35, 29, .08); }
+.otc-table-summary { display: flex; justify-content: space-between; gap: 16px; padding: 0 2px 12px; color: var(--muted); font-size: 11px; font-weight: 750; }
 .history-metric { min-height: 142px; display: flex; flex-direction: column; justify-content: space-between; }
 .history-metric-label { display: flex; align-items: center; gap: 8px; color: var(--accent); font-size: 12px; }
 .history-metric-label span { display: inline-flex; }
@@ -413,6 +414,7 @@ footer { width: min(1320px, calc(100% - 40px)); margin: 0 auto; padding: 22px 0 
   .history-toolbar { align-items: flex-start; flex-direction: column; }
   .history-range-tabs { width: 100%; }
   .history-range-tabs button { flex: 1; }
+  .otc-table-summary { align-items: flex-start; flex-direction: column; gap: 4px; }
 }
 
 @media (max-width: 520px) {
@@ -633,6 +635,11 @@ footer { width: min(1320px, calc(100% - 40px)); margin: 0 auto; padding: 22px 0 
 .otc-legend i.unknown { background: var(--accent-2); }
 
 .otc-trades-panel { margin-top: 0; }
+.otc-trades-head { align-items: flex-start; }
+.otc-trades-head .panel-icon { margin-top: 1px; }
+.otc-trades-head h2 { margin: 0; }
+.otc-trades-head p { margin: 4px 0 0; color: var(--muted); font-size: 10px; line-height: 1.45; }
+.otc-trades-panel .otc-table-summary { padding-inline: 19px; }
 .otc-top-buys-panel { margin-top: 0; border-color: color-mix(in srgb, var(--accent) 22%, var(--border)); }
 .otc-ranking-head > div { align-items: flex-start; }
 .otc-ranking-head .panel-icon { margin-top: 1px; color: #c78b2d; }
@@ -660,6 +667,7 @@ footer { width: min(1320px, calc(100% - 40px)); margin: 0 auto; padding: 22px 0 
   .otc-chart-wrap { overflow-x: auto; padding: 0 4px; }
   .otc-chart { width: 820px; min-height: 300px; }
   .otc-chart-empty { margin: 14px 16px 2px; min-height: 260px; }
+  .otc-trades-head { flex-direction: column; }
 }
 @media (max-width: 480px) {
   .otc-summary-grid { grid-template-columns: 1fr 1fr; gap: 9px; }
