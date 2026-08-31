@@ -13,6 +13,7 @@ import {
   History,
   LockKeyhole,
   Menu,
+  MessageCircle,
   Moon,
   Network,
   Search,
@@ -743,6 +744,7 @@ function App() {
           {nav.map(([id, label]) => (
             <button key={id} className={tab === id ? 'active' : ''} onClick={() => { navigateToTab(id); setMenuOpen(false); }}>{label}</button>
           ))}
+          <a className="discord-nav-link" href="https://discord.gg/kJCYVtGEe" target="_blank" rel="noreferrer" onClick={() => setMenuOpen(false)}><MessageCircle size={17} /> Join Discord</a>
         </nav>
 
         <div className="header-actions">
@@ -795,6 +797,7 @@ function App() {
       <footer>
         <div className="footer-brand"><ShieldCheck size={17} /> ZKAS Stream <span>v0.8.0</span></div>
         <div>Merged-mining, network & OTC intelligence • Public display • Private API credentials remain server-side</div>
+        <a className="footer-discord" href="https://discord.gg/kJCYVtGEe" target="_blank" rel="noreferrer"><MessageCircle size={15} /> Join ZKAS Discord</a>
       </footer>
 
       {detail && <DetailDrawer detail={detail} onClose={() => setDetail(null)} />}
