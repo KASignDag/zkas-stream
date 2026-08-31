@@ -127,12 +127,15 @@ export function OtcMarketPage({ circulatingSupply }: { circulatingSupply: number
   }, []);
 
   const allTrades = useMemo(() => {
-    return [...(feed?.trades ?? [])].sort((a, b) => {
-      if (a.timestamp === null && b.timestamp === null) return 0;
-      if (a.timestamp === null) return 1;
-      if (b.timestamp === null) return -1;
-      return a.timestamp - b.timestamp;
-    });
+    return (feed?.trades ?? [])
+      .map((trade, sourceIndex) => ({ trade, sourceIndex }))
+      .sort((a, b) => {
+        if (a.trade.timestamp === null && b.trade.timestamp === null) return b.sourceIndex - a.sourceIndex;
+        if (a.trade.timestamp === null) return 1;
+        if (b.trade.timestamp === null) return -1;
+        return a.trade.timestamp - b.trade.timestamp || b.sourceIndex - a.sourceIndex;
+      })
+      .map(({ trade }) => trade);
   }, [feed?.trades]);
 
   const filteredTrades = useMemo(() => {
