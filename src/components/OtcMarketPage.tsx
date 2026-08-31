@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { Activity, CalendarDays, Clock3, Coins, RefreshCw, TrendingUp } from 'lucide-react';
+import { Activity, CalendarDays, CircleDollarSign, Clock3, Coins, RefreshCw, TrendingUp } from 'lucide-react';
 import { fetchKasUsd, fetchOtcTrades, type OtcTrade, type OtcTradeFeed } from '../otc';
 
 type Range = '1D' | '7D' | '14D' | '30D' | 'ALL';
@@ -24,6 +24,12 @@ function usdPriceText(value: number | null) {
   if (value === null || !Number.isFinite(value)) return null;
   const digits = value < 0.01 ? 6 : value < 1 ? 4 : 2;
   return `$${value.toLocaleString('en-US', { minimumFractionDigits: digits, maximumFractionDigits: digits })}`;
+}
+
+function marketCapText(value: number | null, unit: 'USD' | 'KAS') {
+  if (value === null || !Number.isFinite(value)) return '—';
+  const formatted = compactFormat.format(value);
+  return unit === 'USD' ? `≈ $${formatted}` : `${formatted} KAS`;
 }
 
 function dateText(timestamp: number | null) {
@@ -58,7 +64,7 @@ function statusCopy(feed: OtcTradeFeed | null, error: string | null, loading: bo
   return { tone: 'error', title: 'OTC feed temporarily unavailable', detail: error || feed?.message || 'The last successful trade data will remain visible while the connection retries.' };
 }
 
-export function OtcMarketPage() {
+export function OtcMarketPage({ circulatingSupply }: { circulatingSupply: number | null }) {
   const [feed, setFeed] = useState<OtcTradeFeed | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -139,10 +145,14 @@ export function OtcMarketPage() {
   }, [allTrades, range]);
 
   const pricedTrades = filteredTrades.filter((trade) => trade.priceKas !== null);
+  const allPricedTrades = allTrades.filter((trade) => trade.priceKas !== null);
   const firstPrice = pricedTrades.length ? pricedTrades[0].priceKas : null;
   const lastPrice = pricedTrades.length ? pricedTrades[pricedTrades.length - 1].priceKas : null;
+  const latestMarketPrice = allPricedTrades.length ? allPricedTrades[allPricedTrades.length - 1].priceKas : null;
   const change = changePercent(firstPrice, lastPrice);
   const zkasUsd = lastPrice !== null && kasUsd !== null ? lastPrice * kasUsd : null;
+  const marketCapKas = latestMarketPrice !== null && circulatingSupply !== null ? latestMarketPrice * circulatingSupply : null;
+  const marketCapUsd = marketCapKas !== null && kasUsd !== null ? marketCapKas * kasUsd : null;
   const zkasVolume = filteredTrades.reduce((sum, trade) => sum + (trade.zkasAmount ?? 0), 0);
   const kasVolume = filteredTrades.reduce((sum, trade) => sum + (trade.totalKas ?? 0), 0);
   const state = statusCopy(feed, error, loading);
@@ -159,6 +169,7 @@ export function OtcMarketPage() {
       <section className="otc-summary-grid">
         <OtcSummary icon={<TrendingUp size={18} />} label="Latest ZKAS price" value={priceText(lastPrice)} detail={usdPriceText(zkasUsd) ? `≈ ${usdPriceText(zkasUsd)} USD per ZKAS` : 'ZKAS/KAS · KAS per ZKAS'} />
         <OtcSummary icon={<Activity size={18} />} label={`${range} price change`} value={change === null ? '—' : `${change >= 0 ? '+' : ''}${change.toFixed(2)}%`} detail={rangeLabel(range)} tone={change === null ? undefined : change >= 0 ? 'positive' : 'negative'} />
+        <OtcSummary icon={<CircleDollarSign size={18} />} label="Estimated market cap" value={marketCapText(marketCapUsd, 'USD')} detail={marketCapKas === null ? 'Waiting for live price and supply' : `${marketCapText(marketCapKas, 'KAS')} · ${compactFormat.format(circulatingSupply as number)} circulating`} />
         <OtcSummary icon={<Coins size={18} />} label="ZKAS volume" value={zkasVolume ? compactFormat.format(zkasVolume) : '—'} detail={`${amountFormat.format(kasVolume)} KAS exchanged`} />
         <OtcSummary icon={<Clock3 size={18} />} label="Completed trades" value={filteredTrades.length ? amountFormat.format(filteredTrades.length) : '—'} detail={rangeLabel(range)} />
       </section>
