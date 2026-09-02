@@ -2,6 +2,7 @@ import { FormEvent, type ReactNode, useEffect, useMemo, useRef, useState } from 
 import {
   Activity,
   Boxes,
+  ChevronDown,
   CircleDollarSign,
   Clock3,
   Coins,
@@ -11,6 +12,7 @@ import {
   Globe2,
   Hash,
   History,
+  Link2,
   LockKeyhole,
   Menu,
   MessageCircle,
@@ -772,6 +774,17 @@ function App() {
             <a href="https://discord.gg/kJCYVtGEe" target="_blank" rel="noreferrer" aria-label="Join ZKAS Discord"><MessageCircle size={17} /><span>Discord</span></a>
             <a href="https://t.me/zkasofficial" target="_blank" rel="noreferrer" aria-label="Join ZKAS Telegram"><Send size={17} /><span>Telegram</span></a>
             <a href="https://x.com/zkas_x" target="_blank" rel="noreferrer" aria-label="Follow ZKAS on X"><span className="x-mark" aria-hidden="true">X</span><span>@zkas_x</span></a>
+            <details className="desktop-resources">
+              <summary><Link2 size={17} /><span>Resources</span><ChevronDown size={14} className="resources-chevron" /></summary>
+              <div className="desktop-resources-menu">
+                <a href="https://zkas.info" target="_blank" rel="noreferrer"><span>ZKAS website</span><small>zkas.info</small></a>
+                <a href="https://services.zkas.info" target="_blank" rel="noreferrer"><span>Services index</span><small>services.zkas.info</small></a>
+                <a href="https://services.zkas.info/?filter=store" target="_blank" rel="noreferrer"><span>Wallets</span><small>Available wallets</small></a>
+                <a href="https://explorer.zkas.info" target="_blank" rel="noreferrer"><span>Block explorer</span><small>explorer.zkas.info</small></a>
+                <a href="https://github.com/firecash/zkas-rusty" target="_blank" rel="noreferrer"><span>Core source</span><small>GitHub repository</small></a>
+                <a href="https://zkas.info/whitepaper.html" target="_blank" rel="noreferrer"><span>Whitepaper</span><small>Project documentation</small></a>
+              </div>
+            </details>
           </div>}
           {tab !== 'otc' && tab !== 'importer' && <div className="sync-box">
             <span>Network</span><b>{data.network}</b>
