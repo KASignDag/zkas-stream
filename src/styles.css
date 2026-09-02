@@ -76,7 +76,8 @@ main { width: min(1320px, calc(100% - 40px)); margin: 0 auto; padding: 36px 0 58
 .hero-strip h1 { margin: 6px 0 7px; font-size: clamp(28px, 4vw, 44px); line-height: 1.05; letter-spacing: -1.6px; }
 .hero-strip p { margin: 0; color: var(--muted); max-width: 760px; }
 .eyebrow { display: flex; align-items: center; gap: 9px; text-transform: uppercase; letter-spacing: 1.5px; font-size: 11px; font-weight: 900; color: var(--accent); }
-.desktop-social-links { align-self: flex-start; display: flex; align-items: center; gap: 8px; flex-shrink: 0; margin-top: 22px; }
+.hero-tools { align-self: flex-start; display: flex; flex-direction: column; align-items: flex-end; gap: 8px; flex-shrink: 0; margin-top: 22px; }
+.desktop-social-links { display: flex; align-items: center; gap: 8px; }
 .desktop-social-links > a, .desktop-resources > summary { min-height: 38px; display: inline-flex; align-items: center; gap: 7px; padding: 0 13px; border: 1px solid var(--border); border-radius: 10px; color: var(--accent); background: var(--surface); font-size: 11px; font-weight: 850; letter-spacing: .45px; text-decoration: none; box-shadow: var(--shadow); }
 .desktop-social-links > a:hover, .desktop-resources > summary:hover { border-color: var(--accent); background: var(--accent-soft); transform: translateY(-1px); }
 .desktop-resources { position: relative; }
@@ -216,6 +217,7 @@ footer { width: min(1320px, calc(100% - 40px)); margin: 0 auto; padding: 22px 0 
   .two-col { grid-template-columns: 1fr; }
   .metric-grid, .mining-metrics { grid-template-columns: repeat(2, 1fr); }
   .hero-strip { align-items: flex-start; }
+  .hero-tools { display: none; }
   .desktop-social-links { display: none; }
   .sync-box { display: none; }
 }
