@@ -17,6 +17,7 @@ import {
   Moon,
   Network,
   Search,
+  Send,
   Server,
   ShieldCheck,
   Sun,
@@ -745,6 +746,7 @@ function App() {
             <button key={id} className={tab === id ? 'active' : ''} onClick={() => { navigateToTab(id); setMenuOpen(false); }}>{label}</button>
           ))}
           <a className="discord-nav-link" href="https://discord.gg/kJCYVtGEe" target="_blank" rel="noreferrer" onClick={() => setMenuOpen(false)}><MessageCircle size={17} /> Join Discord</a>
+          <a className="telegram-nav-link" href="https://t.me/zkasofficial" target="_blank" rel="noreferrer" onClick={() => setMenuOpen(false)}><Send size={17} /> Join Telegram</a>
           <a className="x-nav-link" href="https://x.com/zkas_x" target="_blank" rel="noreferrer" onClick={() => setMenuOpen(false)}><span className="x-mark" aria-hidden="true">X</span> Follow @zkas_x</a>
         </nav>
 
@@ -752,6 +754,7 @@ function App() {
           <span className="public-pill"><Globe2 size={14} /> PUBLIC ONLY</span>
           <span className={`live-pill ${status}`}><i />{status === 'live' ? 'MAINNET LIVE' : status === 'stale' ? 'LIVE · RETRYING' : 'CONNECTING'}</span>
           <a className="icon-btn header-discord" href="https://discord.gg/kJCYVtGEe" target="_blank" rel="noreferrer" aria-label="Join ZKAS Discord" title="Join ZKAS Discord"><MessageCircle size={19} /></a>
+          <a className="icon-btn header-telegram" href="https://t.me/zkasofficial" target="_blank" rel="noreferrer" aria-label="Join ZKAS Telegram" title="Join ZKAS Telegram"><Send size={18} /></a>
           <a className="icon-btn header-x" href="https://x.com/zkas_x" target="_blank" rel="noreferrer" aria-label="Follow ZKAS on X" title="Follow @zkas_x on X"><span className="x-mark" aria-hidden="true">X</span></a>
           <button className="icon-btn" onClick={() => setDark((v) => !v)} aria-label="Toggle theme">{dark ? <Sun size={18} /> : <Moon size={18} />}</button>
           <button className="icon-btn mobile-menu" onClick={() => setMenuOpen((v) => !v)} aria-label="Open navigation">{menuOpen ? <X size={20} /> : <Menu size={20} />}</button>
@@ -803,6 +806,7 @@ function App() {
         <div className="footer-socials">
           <a className="footer-social" href="https://x.com/zkas_x" target="_blank" rel="noreferrer"><span className="x-mark" aria-hidden="true">X</span> Follow @zkas_x</a>
           <a className="footer-social" href="https://discord.gg/kJCYVtGEe" target="_blank" rel="noreferrer"><MessageCircle size={15} /> Join ZKAS Discord</a>
+          <a className="footer-social" href="https://t.me/zkasofficial" target="_blank" rel="noreferrer"><Send size={15} /> Join ZKAS Telegram</a>
         </div>
       </footer>
 
