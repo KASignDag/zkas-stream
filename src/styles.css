@@ -77,8 +77,19 @@ main { width: min(1320px, calc(100% - 40px)); margin: 0 auto; padding: 36px 0 58
 .hero-strip p { margin: 0; color: var(--muted); max-width: 760px; }
 .eyebrow { display: flex; align-items: center; gap: 9px; text-transform: uppercase; letter-spacing: 1.5px; font-size: 11px; font-weight: 900; color: var(--accent); }
 .desktop-social-links { align-self: flex-start; display: flex; align-items: center; gap: 8px; flex-shrink: 0; margin-top: 22px; }
-.desktop-social-links a { min-height: 38px; display: inline-flex; align-items: center; gap: 7px; padding: 0 13px; border: 1px solid var(--border); border-radius: 10px; color: var(--accent); background: var(--surface); font-size: 11px; font-weight: 850; letter-spacing: .45px; text-decoration: none; box-shadow: var(--shadow); }
-.desktop-social-links a:hover { border-color: var(--accent); background: var(--accent-soft); transform: translateY(-1px); }
+.desktop-social-links > a, .desktop-resources > summary { min-height: 38px; display: inline-flex; align-items: center; gap: 7px; padding: 0 13px; border: 1px solid var(--border); border-radius: 10px; color: var(--accent); background: var(--surface); font-size: 11px; font-weight: 850; letter-spacing: .45px; text-decoration: none; box-shadow: var(--shadow); }
+.desktop-social-links > a:hover, .desktop-resources > summary:hover { border-color: var(--accent); background: var(--accent-soft); transform: translateY(-1px); }
+.desktop-resources { position: relative; }
+.desktop-resources > summary { list-style: none; cursor: pointer; user-select: none; }
+.desktop-resources > summary::-webkit-details-marker { display: none; }
+.resources-chevron { transition: transform .16s ease; }
+.desktop-resources[open] .resources-chevron { transform: rotate(180deg); }
+.desktop-resources-menu { position: absolute; z-index: 40; top: calc(100% + 9px); right: 0; width: 232px; display: grid; padding: 7px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface); box-shadow: 0 16px 42px rgba(16, 35, 29, .18); }
+.desktop-resources-menu a { display: block; padding: 9px 10px; border-radius: 8px; color: var(--text); text-decoration: none; }
+.desktop-resources-menu a:hover { color: var(--accent); background: var(--accent-soft); }
+.desktop-resources-menu span, .desktop-resources-menu small { display: block; }
+.desktop-resources-menu span { font-size: 11px; font-weight: 850; }
+.desktop-resources-menu small { margin-top: 2px; color: var(--muted); font-size: 9px; }
 .sync-box { display: grid; grid-template-columns: auto auto; gap: 3px 16px; padding: 13px 16px; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; font-size: 11px; white-space: nowrap; }
 .sync-box span { color: var(--muted); }
 .sync-box b { text-align: right; }
