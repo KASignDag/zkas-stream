@@ -768,6 +768,11 @@ function App() {
             <h1>{heroTitles[tab]}</h1>
             <p>{heroDescriptions[tab]}</p>
           </div>
+          {tab === 'otc' && <div className="desktop-social-links" aria-label="ZKAS social media links">
+            <a href="https://discord.gg/kJCYVtGEe" target="_blank" rel="noreferrer" aria-label="Join ZKAS Discord"><MessageCircle size={17} /><span>Discord</span></a>
+            <a href="https://t.me/zkasofficial" target="_blank" rel="noreferrer" aria-label="Join ZKAS Telegram"><Send size={17} /><span>Telegram</span></a>
+            <a href="https://x.com/zkas_x" target="_blank" rel="noreferrer" aria-label="Follow ZKAS on X"><span className="x-mark" aria-hidden="true">X</span><span>@zkas_x</span></a>
+          </div>}
           {tab !== 'otc' && tab !== 'importer' && <div className="sync-box">
             <span>Network</span><b>{data.network}</b>
             <span>Updated</span><b>{new Date(data.updatedAt).toLocaleTimeString()}</b>
