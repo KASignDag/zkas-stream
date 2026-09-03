@@ -1,1961 +1,25 @@
-import { FormEvent, type ReactNode, useEffect, useMemo, useRef, useState } from 'react';
-import {
-  Activity,
-  Boxes,
-  ChevronDown,
-  CircleDollarSign,
-  Clock3,
-  Coins,
-  Database,
-  Gauge,
-  GitMerge,
-  Globe2,
-  Hash,
-  History,
-  Link2,
-  LockKeyhole,
-  Menu,
-  MessageCircle,
-  Moon,
-  Network,
-  Play,
-  Search,
-  Send,
-  Server,
-  ShieldCheck,
-  Sun,
-  TimerReset,
-  TrendingUp,
-  Waves,
-  X,
-  Zap,
-} from 'lucide-react';
-import {
-  fetchDashboard,
-  fetchMiningDistribution,
-  searchChain,
-  type BlockRow,
-  type DashboardData,
-  type MiningDistributionData,
-  type PublicNodeRow,
-  type TxRow,
-} from './api';
-import { MetricCard } from './components/MetricCard';
-import { OtcMarketPage } from './components/OtcMarketPage';
-import { OtcScreenshotImporter } from './components/OtcScreenshotImporter';
-import { SparkChart } from './components/SparkChart';
-import { VideosPage } from './components/VideosPage';
-
-type Tab = 'intelligence' | 'merged' | 'health' | 'nodes' | 'events' | 'otc' | 'importer' | 'history' | 'supply' | 'reference' | 'videos';
-
-const tabHashes: Record<Tab, string> = {
-  intelligence: '',
-  merged: 'merged-mining',
-  health: 'network-health',
-  nodes: 'nodes',
-  events: 'events',
-  otc: 'otc',
-  importer: 'otc-import',
-  history: 'history',
-  supply: 'supply-privacy',
-  reference: 'reference',
-  videos: 'videos',
-};
-
-function tabFromHash(hash: string): Tab {
-  const route = hash.replace(/^#\/?/, '').toLowerCase();
-  return (Object.entries(tabHashes).find(([, value]) => value === route)?.[0] as Tab | undefined) ?? 'intelligence';
-}
-type Detail = { type: 'block' | 'transaction' | 'privacy'; query: string; data: unknown };
-
-const fmt = new Intl.NumberFormat('en-US', { maximumFractionDigits: 2 });
-const compact = new Intl.NumberFormat('en-US', { notation: 'compact', maximumFractionDigits: 2 });
-
-const MINER_REWARD_SHARE = 0.95;
-const DEVELOPMENT_SHARE = 0.05;
-
-function minerPayout(gross: number | null) {
-  return gross === null ? null : gross * MINER_REWARD_SHARE;
-}
-
-function developmentAllocation(gross: number | null) {
-  return gross === null ? null : gross * DEVELOPMENT_SHARE;
-}
-
-function displayNumber(v: number | null, compactMode = false) {
-  if (v === null || !Number.isFinite(v)) return 'â€”';
-  return compactMode ? compact.format(v) : fmt.format(v);
-}
-
-function displayHashrate(v: number | null) {
-  if (v === null) return 'â€”';
-  const units = ['H/s', 'KH/s', 'MH/s', 'GH/s', 'TH/s', 'PH/s', 'EH/s'];
-  let n = v;
-  let i = 0;
-  while (Math.abs(n) >= 1000 && i < units.length - 1) { n /= 1000; i += 1; }
-  return `${fmt.format(n)} ${units[i]}`;
-}
-
-function age(ts: number) {
-  const s = Math.max(0, Math.floor((Date.now() - ts) / 1000));
-  if (s < 60) return `${s}s ago`;
-  if (s < 3600) return `${Math.floor(s / 60)}m ago`;
-  if (s < 86400) return `${Math.floor(s / 3600)}h ago`;
-  return `${Math.floor(s / 86400)}d ago`;
-}
-
-function duration(seconds: number | null) {
-  if (seconds === null) return 'â€”';
-  if (seconds < 60) return `${Math.floor(seconds)}s`;
-  if (seconds < 3600) return `${Math.floor(seconds / 60)}m`;
-  if (seconds < 86400) return `${Math.floor(seconds / 3600)}h ${Math.floor((seconds % 3600) / 60)}m`;
-  return `${Math.floor(seconds / 86400)}d ${Math.floor((seconds % 86400) / 3600)}h`;
-}
-
-function short(value: string, n = 10) {
-  return value.length > n * 2 ? `${value.slice(0, n)}â€¦${value.slice(-n)}` : value;
-}
-
-function countdown(seconds: number | null) {
-  if (seconds === null) return 'â€”';
-  const d = Math.floor(seconds / 86400);
-  const h = Math.floor((seconds % 86400) / 3600);
-  const m = Math.floor((seconds % 3600) / 60);
-  return `${d}d ${h}h ${m}m`;
-}
-
-function displayMiningEstimate(value: number | null, suffix = '') {
-  if (value === null || !Number.isFinite(value)) return 'â€”';
-  const abs = Math.abs(value);
-  let text: string;
-  if (abs > 0 && abs < 0.01) text = value.toFixed(4);
-  else if (abs < 1) text = value.toFixed(3);
-  else text = fmt.format(value);
-  return `${text}${suffix}`;
-}
-
-function displayMiningPercent(value: number | null) {
-  if (value === null || !Number.isFinite(value)) return 'â€”';
-  const abs = Math.abs(value);
-  if (abs > 0 && abs < 0.01) return `${value.toFixed(4)}%`;
-  if (abs < 1) return `${value.toFixed(3)}%`;
-  return `${fmt.format(value)}%`;
-}
-
-function objectEntries(data: unknown): Array<[string, string]> {
-  if (!data || typeof data !== 'object') return [['Result', String(data ?? 'â€”')]];
-  return Object.entries(data as Record<string, unknown>).slice(0, 24).map(([key, value]) => {
-    if (typeof value === 'string') return [key, value];
-    if (typeof value === 'number' || typeof value === 'boolean') return [key, String(value)];
-    return [key, JSON.stringify(value)];
-  });
-}
-
-
-const emptyDashboard: DashboardData = {
-  source: 'live',
-  updatedAt: Date.now(),
-  network: 'mainnet',
-  bps: null,
-  nodes: null,
-  mempool: null,
-  hashrate: null,
-  blockCount: null,
-  daaScore: null,
-  supply: null,
-  reward: null,
-  nextReward: null,
-  nextReductionSeconds: null,
-  txCount: null,
-  shieldedNotes: null,
-  nullifiers: null,
-  shieldedValue: null,
-  stateRoot: null,
-  priceUsd: null,
-  marketCapUsd: null,
-  merged: { scannedAt: null, peers: null, checked: null, reachable: null, found: null, attributionMatched: null, attributionUpdatedAt: null, ports: [], nodes: [] },
-  relay: { activePeers: null, mempoolSize: null, tipHashes: null, difficulty: null, blocksIngested: null, transactionsProcessed: null, databaseBlocks: null },
-  difficulty: null,
-  publicNodes: {
-    updatedAt: null,
-    totals: {
-      nodes: null,
-      peers: null,
-      countries: null,
-      located: null,
-      inbound: null,
-      outbound: null,
-      ipv4: null,
-      ipv6: null,
-      blocksRelayed: null,
-    },
-    countries: [],
-    nodes: [],
-  },
-  pulse: [],
-  chainWorkHistory: [],
-  blocks: [],
-};
-
-const LIVE_CACHE_KEY = 'zkas-stream:v033:last-live-dashboard';
-const MERGED_CACHE_KEY = 'zkas-stream:v033:last-completed-merged-scan';
-const ATTRIBUTION_CACHE_KEY = 'zkas-stream:v034:last-attribution-snapshot';
-const HISTORY_CACHE_KEY = 'zkas-stream:v040:history';
-const HISTORY_SAMPLE_MS = 5 * 60 * 1000;
-const HISTORY_RETENTION_MS = 30 * 24 * 60 * 60 * 1000;
-
-type HistoryRange = '1h' | '24h' | '7d' | '30d';
-type HistorySnapshot = {
-  t: number;
-  hashrate: number | null;
-  bps: number | null;
-  difficulty: number | null;
-  visibleNodes: number | null;
-  countries: number | null;
-  activePeers: number | null;
-  tipHashes: number | null;
-  mempool: number | null;
-  attributedBlocks: number | null;
-  attributionGroups: number | null;
-  weightedConfidencePct: number | null;
-  largestSharePct: number | null;
-  coLocatedPeers: number | null;
-  peersChecked: number | null;
-  coLocationPct: number | null;
-  supply?: number | null;
-  reward?: number | null;
-  nextReward?: number | null;
-  shieldedNotes?: number | null;
-  nullifiers?: number | null;
-  shieldedValue?: number | null;
-};
-
-function validNumber(value: number | null | undefined) {
-  return typeof value === 'number' && Number.isFinite(value) ? value : null;
-}
-
-function readHistory(): HistorySnapshot[] {
-  try {
-    const raw = window.localStorage.getItem(HISTORY_CACHE_KEY);
-    if (!raw) return [];
-    const parsed = JSON.parse(raw) as HistorySnapshot[];
-    if (!Array.isArray(parsed)) return [];
-    const cutoff = Date.now() - HISTORY_RETENTION_MS;
-    return parsed.filter((row) => row && Number.isFinite(row.t) && row.t >= cutoff);
-  } catch {
-    return [];
-  }
-}
-
-function makeHistorySnapshot(data: DashboardData): HistorySnapshot {
-  const groups = attributionGroups(data);
-  const attributedBlocks = data.merged.attributionMatched ?? (groups.reduce((sum, g) => sum + g.blocks, 0) || null);
-  const weightedConfidence = weightedAttributionConfidence(groups);
-  const topShare = fractionPercent(groups[0]?.share ?? null);
-  return {
-    t: Date.now(),
-    hashrate: validNumber(data.hashrate),
-    bps: validNumber(data.bps),
-    difficulty: validNumber(data.difficulty),
-    visibleNodes: validNumber(data.publicNodes.totals.nodes ?? data.nodes),
-    countries: validNumber(data.publicNodes.totals.countries),
-    activePeers: validNumber(data.relay.activePeers ?? data.nodes),
-    tipHashes: validNumber(data.relay.tipHashes),
-    mempool: validNumber(data.mempool),
-    attributedBlocks: validNumber(attributedBlocks),
-    attributionGroups: groups.length || null,
-    weightedConfidencePct: fractionPercent(weightedConfidence),
-    largestSharePct: topShare,
-    coLocatedPeers: validNumber(data.merged.found),
-    peersChecked: validNumber(data.merged.checked),
-    coLocationPct: pct(data.merged.found, data.merged.checked),
-    supply: validNumber(data.supply),
-    reward: validNumber(data.reward),
-    nextReward: validNumber(data.nextReward),
-    shieldedNotes: validNumber(data.shieldedNotes),
-    nullifiers: validNumber(data.nullifiers),
-    shieldedValue: validNumber(data.shieldedValue),
-  };
-}
-
-function appendHistorySnapshot(history: HistorySnapshot[], data: DashboardData): HistorySnapshot[] {
-  if (data.source !== 'live' || !data.network) return history;
-  const next = makeHistorySnapshot(data);
-  const cutoff = next.t - HISTORY_RETENTION_MS;
-  const kept = history.filter((row) => row.t >= cutoff);
-  const last = kept.at(-1);
-  let result: HistorySnapshot[];
-  // Keep the timestamp of the current 5-minute bucket stable while refreshing
-  // its values. Resetting the timestamp on every 15-second poll would prevent
-  // the bucket from ever reaching five minutes and history would remain stuck
-  // at one snapshot forever.
-  if (last && next.t - last.t < HISTORY_SAMPLE_MS) {
-    result = [...kept.slice(0, -1), { ...next, t: last.t }];
-  } else {
-    result = [...kept, next];
-  }
-  try { window.localStorage.setItem(HISTORY_CACHE_KEY, JSON.stringify(result)); } catch { /* optional history cache */ }
-  return result;
-}
-
-function rangeMs(range: HistoryRange) {
-  if (range === '1h') return 60 * 60 * 1000;
-  if (range === '24h') return 24 * 60 * 60 * 1000;
-  if (range === '7d') return 7 * 24 * 60 * 60 * 1000;
-  return 30 * 24 * 60 * 60 * 1000;
-}
-
-function deltaPercent(first: number | null, last: number | null) {
-  if (first === null || last === null || first === 0) return null;
-  return ((last - first) / Math.abs(first)) * 100;
-}
-
-function deltaAbsolute(first: number | null, last: number | null) {
-  if (first === null || last === null) return null;
-  return last - first;
-}
-
-function signed(value: number | null, suffix = '%') {
-  if (value === null || !Number.isFinite(value)) return 'Collecting history';
-  const prefix = value > 0 ? '+' : '';
-  return `${prefix}${fmt.format(value)}${suffix}`;
-}
-
-function dateStamp(ts: number | null) {
-  if (!ts) return 'Not started';
-  return new Date(ts).toLocaleString([], {
-    month: 'short',
-    day: 'numeric',
-    year: 'numeric',
-    hour: 'numeric',
-    minute: '2-digit',
-  });
-}
-
-type TimedValue = { time: number; value: number | null };
-
-function combinedChainSeries(
-  local: TimedValue[],
-  chain: TimedValue[],
-  cutoff: number,
-): TimedValue[] {
-  const chainRows = chain.filter((point) => point.time >= cutoff && point.value !== null);
-  if (!chainRows.length) return local.filter((point) => point.time >= cutoff && point.value !== null);
-
-  // The public chain-work endpoint reconstructs the recent work window directly
-  // from chain data. Use locally recorded points only BEFORE that backfill starts,
-  // then let the chain-derived bins own the overlapping recent period.
-  const chainStart = chainRows[0].time;
-  const localOlder = local.filter((point) => point.time >= cutoff && point.time < chainStart && point.value !== null);
-  return [...localOlder, ...chainRows].sort((a, b) => a.time - b.time);
-}
-
-function seriesDelta(series: TimedValue[]) {
-  if (series.length < 2) return null;
-  return deltaPercent(series[0].value, series.at(-1)?.value ?? null);
-}
-
-function seriesSpan(series: TimedValue[]) {
-  if (series.length < 2) return 0;
-  return Math.max(0, series.at(-1)!.time - series[0].time);
-}
-
-function readCachedLive(): DashboardData | null {
-  try {
-    const raw = window.sessionStorage.getItem(LIVE_CACHE_KEY);
-    if (!raw) return null;
-    const parsed = JSON.parse(raw) as DashboardData;
-    if (!parsed || parsed.source !== 'live' || !parsed.network) return null;
-    return parsed;
-  } catch {
-    return null;
-  }
-}
-
-function readCachedMerged(): DashboardData['merged'] | null {
-  try {
-    const raw = window.localStorage.getItem(MERGED_CACHE_KEY);
-    if (!raw) return null;
-    const parsed = JSON.parse(raw) as DashboardData['merged'];
-    if ((parsed.scannedAt ?? 0) <= 0 || (parsed.checked ?? 0) <= 0) return null;
-    return parsed;
-  } catch {
-    return null;
-  }
-}
-
-function hasCompletedMergedValue(value: DashboardData['merged']) {
-  return (value.scannedAt ?? 0) > 0 && (value.checked ?? 0) > 0;
-}
-
-function hasCompletedMergedScan(value: DashboardData) {
-  return hasCompletedMergedValue(value.merged);
-}
-
-function hasProbeNodeDetails(value: DashboardData['merged']) {
-  const found = value.found ?? 0;
-  if (found <= 0) return true;
-  return value.nodes.filter((node) => node.kaspaDetected).length >= found;
-}
-
-function hasAttributionValue(value: DashboardData['merged']) {
-  return (value.attributionMatched ?? 0) > 0 && value.nodes.some((node) =>
-    node.attributed && ((node.attributedBlocks ?? 0) > 0 || node.attributionShare !== null),
-  );
-}
-
-function readCachedAttribution(): DashboardData['merged'] | null {
-  try {
-    const raw = window.localStorage.getItem(ATTRIBUTION_CACHE_KEY);
-    if (!raw) return null;
-    const parsed = JSON.parse(raw) as DashboardData['merged'];
-    return hasAttributionValue(parsed) ? parsed : null;
-  } catch {
-    return null;
-  }
-}
-
-function blankIncompleteMerged(value: DashboardData['merged']): DashboardData['merged'] {
-  // Blank only the active peer-probe fields. Attribution is produced by a separate
-  // public block-observation pipeline and can remain valid while the probe scanner
-  // is warming up or restarting.
-  return {
-    ...value,
-    scannedAt: null,
-    checked: null,
-    reachable: null,
-    found: null,
-  };
-}
-
-function applyCachedAttribution(incoming: DashboardData['merged'], cached: DashboardData['merged']): DashboardData['merged'] {
-  const incomingById = new Map(incoming.nodes.map((node) => [node.id, node]));
-  const seen = new Set<string>();
-  const nodes = cached.nodes.map((old) => {
-    const current = incomingById.get(old.id);
-    seen.add(old.id);
-    if (!current) return old;
-    if (current.attributed) return current;
-    return {
-      ...current,
-      attributed: old.attributed,
-      attributedBlocks: old.attributedBlocks,
-      attributionConfidence: old.attributionConfidence,
-      attributionShare: old.attributionShare,
-      attributionAddresses: old.attributionAddresses ?? [],
-    };
-  });
-  for (const node of incoming.nodes) if (!seen.has(node.id)) nodes.push(node);
-  return {
-    ...incoming,
-    attributionMatched: incoming.attributionMatched && incoming.attributionMatched > 0 ? incoming.attributionMatched : cached.attributionMatched,
-    attributionUpdatedAt: incoming.attributionUpdatedAt && incoming.attributionUpdatedAt > 0 ? incoming.attributionUpdatedAt : cached.attributionUpdatedAt,
-    nodes,
-  };
-}
-
-function applyCachedScan(incoming: DashboardData['merged'], cached: DashboardData['merged']): DashboardData['merged'] {
-  const incomingById = new Map(incoming.nodes.map((node) => [node.id, node]));
-  const seen = new Set<string>();
-  const nodes = cached.nodes.map((old) => {
-    const current = incomingById.get(old.id);
-    seen.add(old.id);
-    if (!current) return old;
-    // Keep the freshest attribution/location data, but restore the last completed
-    // probe result. This also keeps geography/client views aligned with the last
-    // completed probe instead of briefly falling back to an empty current scan.
-    return {
-      ...old,
-      ...current,
-      checked: old.checked,
-      reachable: old.reachable,
-      kaspaDetected: old.kaspaDetected,
-      kaspaAddress: old.kaspaAddress,
-    };
-  });
-  for (const node of incoming.nodes) if (!seen.has(node.id)) nodes.push(node);
-  return {
-    ...incoming,
-    scannedAt: cached.scannedAt,
-    checked: cached.checked,
-    reachable: cached.reachable,
-    found: cached.found,
-    ports: incoming.ports.length ? incoming.ports : cached.ports,
-    nodes,
-  };
-}
-
-const rawInitialCachedLive = readCachedLive();
-const initialCachedMerged = readCachedMerged();
-const initialCachedLive = rawInitialCachedLive
-  ? {
-      ...rawInitialCachedLive,
-      merged: hasCompletedMergedScan(rawInitialCachedLive) && hasProbeNodeDetails(rawInitialCachedLive.merged)
-        ? rawInitialCachedLive.merged
-        : (initialCachedMerged ? applyCachedScan(rawInitialCachedLive.merged, initialCachedMerged) : blankIncompleteMerged(rawInitialCachedLive.merged)),
-    }
-  : null;
-
-function stabilizeLiveSnapshot(previous: DashboardData, incoming: DashboardData): DashboardData {
-  let next = incoming;
-
-  // Block attribution is produced by a separate public pipeline. Cache it
-  // independently so a short attribution refresh/reset cannot make the homepage
-  // and mining-share panel disagree with each other.
-  if (hasAttributionValue(incoming.merged)) {
-    try { window.localStorage.setItem(ATTRIBUTION_CACHE_KEY, JSON.stringify(incoming.merged)); } catch { /* optional cache */ }
-  } else if ((incoming.nodes ?? 0) > 0) {
-    const attributionFallback = hasAttributionValue(previous.merged) ? previous.merged : readCachedAttribution();
-    if (attributionFallback) next = { ...next, merged: applyCachedAttribution(next.merged, attributionFallback) };
-  }
-
-  // Peer probing and block attribution are separate signals. Persist completed
-  // probe results, but never let an incomplete scan replace the last completed
-  // probe geography/client view.
-  if (hasCompletedMergedValue(next.merged)) {
-    try { window.localStorage.setItem(MERGED_CACHE_KEY, JSON.stringify(next.merged)); } catch { /* optional cache */ }
-  } else if ((incoming.nodes ?? 0) > 0) {
-    const previousProbe = hasCompletedMergedScan(previous) && hasProbeNodeDetails(previous.merged) ? previous.merged : null;
-    const fallback = previousProbe ?? readCachedMerged() ?? (hasCompletedMergedScan(previous) ? previous.merged : null);
-    next = {
-      ...next,
-      merged: fallback ? applyCachedScan(next.merged, fallback) : blankIncompleteMerged(next.merged),
-    };
-  }
-
-  // The pulse/work-history cache can also be empty for a short period after an
-  // upstream restart. The tell is BPS=0 together with no hashrate estimate while
-  // the rest of the network is clearly online. Keep the last good short-term work
-  // signals until the public pulse history refills.
-  const pulseLooksUnseeded = incoming.bps === 0 && incoming.hashrate === null && (incoming.nodes ?? 0) > 0;
-  if (pulseLooksUnseeded && previous.bps !== null && previous.bps > 0 && previous.hashrate !== null) {
-    next = {
-      ...next,
-      bps: previous.bps,
-      hashrate: previous.hashrate,
-      pulse: previous.pulse.length ? previous.pulse : incoming.pulse,
-    };
-  }
-
-  // The convenience/reference endpoints are noncritical and can occasionally miss
-  // one poll while the core network endpoints remain live. Keep the last reported
-  // values instead of flashing rows of dashes in Reference.
-  next = {
-    ...next,
-    supply: next.supply ?? previous.supply,
-    reward: next.reward ?? previous.reward,
-    nextReward: next.nextReward ?? previous.nextReward,
-    nextReductionSeconds: next.nextReductionSeconds ?? previous.nextReductionSeconds,
-    txCount: next.txCount ?? previous.txCount,
-    shieldedNotes: next.shieldedNotes ?? previous.shieldedNotes,
-    nullifiers: next.nullifiers ?? previous.nullifiers,
-    shieldedValue: next.shieldedValue ?? previous.shieldedValue,
-    stateRoot: next.stateRoot ?? previous.stateRoot,
-    blockCount: next.blockCount ?? previous.blockCount,
-    daaScore: next.daaScore ?? previous.daaScore,
-    chainWorkHistory: next.chainWorkHistory?.length ? next.chainWorkHistory : (previous.chainWorkHistory ?? []),
-  };
-
-  return next;
-}
-
-const heroTitles: Record<Tab, string> = {
-  intelligence: 'Merged-mining & network intelligence',
-  merged: 'Mining & merged-mining intelligence',
-  health: 'Network health signals',
-  nodes: 'Public node view',
-  events: 'Live event intelligence',
-  otc: 'ZKAS OTC market price',
-  importer: 'OTC screenshot importer',
-  history: 'Historical intelligence',
-  supply: 'Supply & privacy intelligence',
-  reference: 'ZKas quick reference',
-  videos: 'ZKAS videos',
-};
-
-const heroDescriptions: Record<Tab, string> = {
-  intelligence: 'Public ZKas intelligence with a focus on Kaspa â†” ZKas merged mining, network work, peer signals and security context.',
-  merged: 'Public mining signals, producer distribution and practical solo merged-mining estimates for the ZKas network.',
-  health: 'Current public network capacity, consensus activity, peer reachability and relay health in one view.',
-  nodes: 'Privacy-aware observations of the public nodes currently visible to the ZKas network scanner.',
-  events: 'Recent public block and network activity, organized into stable signals instead of a reconstructed animated DAG.',
-  otc: 'Completed ZKAS OTC trades, actual traded prices and volumeâ€”prepared to update automatically from the private trade-log connection.',
-  importer: 'Privately read trade-log screenshots, review the detected facts and publish completed trades to the OTC chart.',
-  history: 'Chain-derived work history and observer history, kept separate so unavailable historical data is never invented.',
-  supply: 'Consensus supply, emission and aggregate shielded-activity intelligence without exposing individual holders.',
-  reference: 'Convenient public chain information and links to the official ZKas explorer.',
-  videos: 'Short videos about ZKAS speed, privacy and the network, collected in one growing library.',
-};
-
-function App() {
-  const [tab, setTab] = useState<Tab>(() => tabFromHash(window.location.hash));
-  const [data, setData] = useState<DashboardData>(initialCachedLive ?? emptyDashboard);
-  const [status, setStatus] = useState<'connecting' | 'live' | 'stale'>(initialCachedLive ? 'live' : 'connecting');
-  const [error, setError] = useState<string | null>(null);
-  const [dark, setDark] = useState(() => window.matchMedia?.('(prefers-color-scheme: dark)').matches ?? false);
-  const [menuOpen, setMenuOpen] = useState(false);
-  const [query, setQuery] = useState('');
-  const [detail, setDetail] = useState<Detail | null>(null);
-  const [searching, setSearching] = useState(false);
-  const [searchError, setSearchError] = useState<string | null>(null);
-  const [history, setHistory] = useState<HistorySnapshot[]>(() => readHistory());
-  const [historyRange, setHistoryRange] = useState<HistoryRange>('24h');
-  const abortRef = useRef<AbortController | null>(null);
-  const inFlightRef = useRef(false);
-  const hasLiveRef = useRef(Boolean(initialCachedLive));
-  const consecutiveFailuresRef = useRef(0);
-  const lastSuccessAtRef = useRef(initialCachedLive?.updatedAt ?? 0);
-
-  // The public pulse data is already binned at 15-second intervals. Polling all
-  // explorer endpoints every 5 seconds creates unnecessary load and can cause
-  // transient failures. A 15-second default keeps the dashboard fresh without
-  // hammering the public API.
-  const pollMs = Number(import.meta.env.VITE_POLL_MS || 15000);
-
-  useEffect(() => { document.documentElement.dataset.theme = dark ? 'dark' : 'light'; }, [dark]);
-
-  useEffect(() => {
-    const onHashChange = () => setTab(tabFromHash(window.location.hash));
-    window.addEventListener('hashchange', onHashChange);
-    return () => window.removeEventListener('hashchange', onHashChange);
-  }, []);
-
-  function navigateToTab(nextTab: Tab) {
-    setTab(nextTab);
-    const nextHash = tabHashes[nextTab];
-    if (nextHash) window.location.hash = nextHash;
-    else window.history.pushState(null, '', `${window.location.pathname}${window.location.search}`);
-  }
-
-  useEffect(() => {
-    if (status !== 'live') return;
-    setHistory((previous) => appendHistorySnapshot(previous, data));
-  }, [data, status]);
-
-  useEffect(() => {
-    let stopped = false;
-
-    async function refresh() {
-      // Never overlap a full dashboard refresh. Some public endpoints can take
-      // longer than one polling interval, and aborting an in-flight request was
-      // what made the UI flip between LIVE and DEMO.
-      if (inFlightRef.current) return;
-      inFlightRef.current = true;
-
-      const controller = new AbortController();
-      abortRef.current = controller;
-      try {
-        const live = await fetchDashboard(controller.signal);
-        if (!stopped) {
-          setData((previous: DashboardData) => {
-            const stable = stabilizeLiveSnapshot(previous, live);
-            try { window.sessionStorage.setItem(LIVE_CACHE_KEY, JSON.stringify(stable)); } catch { /* cache is optional */ }
-            return stable;
-          });
-          hasLiveRef.current = true;
-          consecutiveFailuresRef.current = 0;
-          lastSuccessAtRef.current = live.updatedAt;
-          setStatus('live');
-          setError(null);
-        }
-      } catch (e) {
-        if (controller.signal.aborted || stopped) return;
-        const message = e instanceof Error ? e.message : 'API unavailable';
-        setError(message);
-
-        // Never replace public-network data with fabricated/demo values.
-        // If we already have a live snapshot, keep it and mark it stale while
-        // the next refresh retries. Before the first successful snapshot, remain
-        // in CONNECTING state with blank metrics.
-        if (hasLiveRef.current) {
-          consecutiveFailuresRef.current += 1;
-          const lastGoodAge = Date.now() - lastSuccessAtRef.current;
-
-          // A single missed poll (or several short misses) is not an outage. Keep
-          // MAINNET LIVE and the last good values. Only mark the snapshot stale if
-          // the entire core API has failed repeatedly for at least two minutes.
-          if (consecutiveFailuresRef.current >= 8 && lastGoodAge >= 120_000) {
-            setStatus('stale');
-          } else {
-            setStatus('live');
-          }
-        } else {
-          setStatus('connecting');
-        }
-      } finally {
-        inFlightRef.current = false;
-      }
-    }
-
-    void refresh();
-    const id = window.setInterval(refresh, Math.max(10000, pollMs));
-    return () => {
-      stopped = true;
-      window.clearInterval(id);
-      abortRef.current?.abort();
-      inFlightRef.current = false;
-    };
-  }, [pollMs]);
-
-
-  const txs = useMemo(() => {
-    const rows: Array<TxRow & { blockHash: string; timestamp: number }> = [];
-    for (const block of data.blocks) {
-      for (const tx of block.txs) rows.push({ ...tx, blockHash: block.hash, timestamp: block.timestamp });
-    }
-    return rows.slice(0, 500);
-  }, [data.blocks]);
-
-  const pulseTimes = data.pulse.map((p) => p.time);
-  const diffValues = data.pulse.map((p) => p.difficulty);
-  const txValues = data.pulse.map((p) => p.txs);
-
-  async function doSearch(text = query) {
-    const q = text.trim();
-    if (!q) return;
-    setSearching(true);
-    setSearchError(null);
-    try {
-      const result = await searchChain(q);
-      setDetail(result);
-      setQuery(q);
-    } catch (e) {
-      setSearchError(e instanceof Error ? e.message : 'Search failed');
-    } finally {
-      setSearching(false);
-    }
-  }
-
-  function onSearch(e: FormEvent) { e.preventDefault(); void doSearch(); }
-
-  const nav: Array<[Tab, string]> = [
-    ['intelligence', 'Intelligence'],
-    ['merged', 'Merged Mining'],
-    ['health', 'Network Health'],
-    ['events', 'Events'],
-    ['otc', 'OTC Price'],
-    ['history', 'History'],
-    ['supply', 'Supply & Privacy'],
-    ['reference', 'Reference'],
-    ['videos', 'Videos'],
-  ];
-
-  return (
-    <div className="app-shell">
-      <header className="topbar">
-        <button className="brand" onClick={() => navigateToTab('intelligence')} aria-label="ZKAS Stream home">
-          <span className="brand-mark"><ShieldCheck size={22} /></span>
-          <span><b>ZKAS</b><em>.stream</em></span>
-          <small>INTELLIGENCE</small>
-        </button>
-
-        <nav className={`nav ${menuOpen ? 'open' : ''}`}>
-          {nav.map(([id, label]) => (
-            <button key={id} className={tab === id ? 'active' : ''} onClick={() => { navigateToTab(id); setMenuOpen(false); }}>{label}</button>
-          ))}
-          <a className="discord-nav-link" href="https://discord.gg/kJCYVtGEe" target="_blank" rel="noreferrer" onClick={() => setMenuOpen(false)}><MessageCircle size={17} /> Join Discord</a>
-          <a className="telegram-nav-link" href="https://t.me/zkasofficial" target="_blank" rel="noreferrer" onClick={() => setMenuOpen(false)}><Send size={17} /> Join Telegram</a>
-          <a className="x-nav-link" href="https://x.com/zkas_x" target="_blank" rel="noreferrer" onClick={() => setMenuOpen(false)}><span className="x-mark" aria-hidden="true">X</span> Follow @zkas_x</a>
-        </nav>
-
-        <div className="header-actions">
-          <span className="public-pill"><Globe2 size={14} /> PUBLIC ONLY</span>
-          <span className={`live-pill ${status}`}><i />{status === 'live' ? 'MAINNET LIVE' : status === 'stale' ? 'LIVE Â· RETRYING' : 'CONNECTING'}</span>
-          <a className="icon-btn header-discord" href="https://discord.gg/kJCYVtGEe" target="_blank" rel="noreferrer" aria-label="Join ZKAS Discord" title="Join ZKAS Discord"><MessageCircle size={19} /></a>
-          <a className="icon-btn header-telegram" href="https://t.me/zkasofficial" target="_blank" rel="noreferrer" aria-label="Join ZKAS Telegram" title="Join ZKAS Telegram"><Send size={18} /></a>
-          <a className="icon-btn header-x" href="https://x.com/zkas_x" target="_blank" rel="noreferrer" aria-label="Follow ZKAS on X" title="Follow @zkas_x on X"><span className="x-mark" aria-hidden="true">X</span></a>
-          <button className="icon-btn" onClick={() => setDark((v) => !v)} aria-label="Toggle theme">{dark ? <Sun size={18} /> : <Moon size={18} />}</button>
-          <button className="icon-btn mobile-menu" onClick={() => setMenuOpen((v) => !v)} aria-label="Open navigation">{menuOpen ? <X size={20} /> : <Menu size={20} />}</button>
-        </div>
-      </header>
-
-      <main>
-        <section className="hero-strip">
-          <div>
-            <div className="eyebrow"><span className="pulse-dot" /> ZKas public network intelligence</div>
-            <h1>{heroTitles[tab]}</h1>
-            <p>{heroDescriptions[tab]}</p>
-          </div>
-          <div className="hero-tools">
-            <div className="desktop-social-links" aria-label="ZKAS social media links">
-              <a href="https://discord.gg/kJCYVtGEe" target="_blank" rel="noreferrer" aria-label="Join ZKAS Discord"><MessageCircle size={17} /><span>Discord</span></a>
-              <a href="https://t.me/zkasofficial" target="_blank" rel="noreferrer" aria-label="Join ZKAS Telegram"><Send size={17} /><span>Telegram</span></a>
-              <a href="https://x.com/zkas_x" target="_blank" rel="noreferrer" aria-label="Follow ZKAS on X"><span className="x-mark" aria-hidden="true">X</span><span>@zkas_x</span></a>
-              <details className="desktop-resources">
-                <summary><Link2 size={17} /><span>Resources</span><ChevronDown size={14} className="resources-chevron" /></summary>
-                <div className="desktop-resources-menu">
-                  <a href="https://zkas.info" target="_blank" rel="noreferrer"><span>ZKAS website</span><small>zkas.info</small></a>
-                  <a href="https://services.zkas.info" target="_blank" rel="noreferrer"><span>Services index</span><small>services.zkas.info</small></a>
-                  <a href="https://services.zkas.info/?filter=store" target="_blank" rel="noreferrer"><span>Wallets</span><small>Available wallets</small></a>
-                  <a href="https://explorer.zkas.info" target="_blank" rel="noreferrer"><span>Block explorer</span><small>explorer.zkas.info</small></a>
-                  <a href="https://github.com/firecash/zkas-rusty" target="_blank" rel="noreferrer"><span>Core source</span><small>GitHub repository</small></a>
-                  <a href="https://zkas.info/whitepaper.html" target="_blank" rel="noreferrer"><span>Whitepaper</span><small>Project documentation</small></a>
-                </div>
-              </details>
-            </div>
-            {tab !== 'otc' && tab !== 'importer' && tab !== 'videos' && <div className="sync-box">
-              <span>Network</span><b>{data.network}</b>
-              <span>Updated</span><b>{new Date(data.updatedAt).toLocaleTimeString()}</b>
-            </div>}
-          </div>
-        </section>
-
-        {tab !== 'otc' && tab !== 'importer' && tab !== 'videos' && <>
-          <form className="searchbar" onSubmit={onSearch}>
-            <Search size={21} />
-            <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search public block hash or transaction ID" aria-label="Search public block hash or transaction ID" />
-            <button disabled={searching}>{searching ? 'Searchingâ€¦' : 'Search'}</button>
-          </form>
-          {searchError && <div className="inline-error">{searchError}</div>}
-        </>}
-        {tab !== 'otc' && tab !== 'importer' && tab !== 'videos' && status === 'stale' && <div className="demo-banner"><b>Live refresh delayed.</b> Showing the last good public mainnet snapshot while the API retries. {error && <span>{error}</span>}</div>}
-        {tab !== 'otc' && tab !== 'importer' && tab !== 'videos' && status === 'connecting' && <div className="demo-banner"><b>Connecting to ZKas mainnet.</b> Waiting for the first public API snapshot. {error && <span>{error}</span>}</div>}
-
-        {tab === 'intelligence' && (
-          <IntelligenceHome data={data} txValues={txValues} pulseTimes={pulseTimes} onReference={() => navigateToTab('reference')} onVideos={() => navigateToTab('videos')} />
-        )}
-
-        {tab === 'merged' && <MergedIntelligencePage data={data} />}
-        {tab === 'health' && <NetworkHealthPage data={data} diffValues={diffValues} txValues={txValues} pulseTimes={pulseTimes} onOpenNodes={() => navigateToTab('nodes')} />}
-        {tab === 'nodes' && <NodesPage data={data} />}
-        {tab === 'events' && <EventsPage data={data} history={history} />}
-        {tab === 'otc' && <OtcMarketPage circulatingSupply={data.supply} />}
-        {tab === 'importer' && <OtcScreenshotImporter />}
-        {tab === 'history' && <HistoryPage data={data} history={history} range={historyRange} onRange={setHistoryRange} />}
-        {tab === 'supply' && <SupplyPrivacyPage data={data} history={history} range={historyRange} onRange={setHistoryRange} />}
-        {tab === 'reference' && <ReferencePage data={data} txs={txs} onSelect={(value) => void doSearch(value)} />}
-        {tab === 'videos' && <VideosPage />}
-      </main>
-
-      <footer>
-        <div className="footer-brand"><ShieldCheck size={17} /> ZKAS Stream <span>v0.8.0</span></div>
-        <div>Merged-mining, network & OTC intelligence â€¢ Public display â€¢ Private API credentials remain server-side</div>
-        <div className="footer-socials">
-          <a className="footer-social" href="https://x.com/zkas_x" target="_blank" rel="noreferrer"><span className="x-mark" aria-hidden="true">X</span> Follow @zkas_x</a>
-          <a className="footer-social" href="https://discord.gg/kJCYVtGEe" target="_blank" rel="noreferrer"><MessageCircle size={15} /> Join ZKAS Discord</a>
-          <a className="footer-social" href="https://t.me/zkasofficial" target="_blank" rel="noreferrer"><Send size={15} /> Join ZKAS Telegram</a>
-        </div>
-      </footer>
-
-      {detail && <DetailDrawer detail={detail} onClose={() => setDetail(null)} />}
-    </div>
-  );
-}
-
-function pct(part: number | null, total: number | null) {
-  if (part === null || total === null || total <= 0) return null;
-  return Math.min(100, Math.max(0, (part / total) * 100));
-}
-
-function scanAge(ts: number | null) {
-  if (!ts) return 'Scanner warming up';
-  return age(ts < 10_000_000_000 ? ts * 1000 : ts);
-}
-
-function fractionPercent(value: number | null) {
-  if (value === null || !Number.isFinite(value)) return null;
-  return value <= 1.5 ? value * 100 : value;
-}
-
-type AttributionGroup = {
-  key: string;
-  addresses: string[];
-  blocks: number;
-  share: number | null;
-  confidence: number | null;
-  countries: string[];
-  networks: string[];
-  peerRecords: number;
-};
-
-function attributionGroups(data: DashboardData): AttributionGroup[] {
-  const groups = new Map<string, AttributionGroup>();
-  for (const node of data.merged.nodes) {
-    if (!node.attributed) continue;
-    const addresses = (node.attributionAddresses ?? []).map((a) => a.address).filter(Boolean).sort();
-    const fallback = `${node.attributedBlocks ?? 'x'}|${node.attributionShare ?? 'x'}|${node.attributionConfidence ?? 'x'}`;
-    const key = addresses.length ? addresses.join('|') : fallback;
-    const country = node.countryName || node.countryCode || 'Unknown';
-    const network = node.network || 'Unknown';
-    const existing = groups.get(key);
-    if (existing) {
-      existing.peerRecords += 1;
-      if (!existing.countries.includes(country)) existing.countries.push(country);
-      if (!existing.networks.includes(network)) existing.networks.push(network);
-      existing.blocks = Math.max(existing.blocks, node.attributedBlocks ?? 0);
-      if (node.attributionShare !== null) existing.share = Math.max(existing.share ?? 0, node.attributionShare);
-      if (node.attributionConfidence !== null) existing.confidence = Math.max(existing.confidence ?? 0, node.attributionConfidence);
-    } else {
-      groups.set(key, {
-        key,
-        addresses,
-        blocks: node.attributedBlocks ?? 0,
-        share: node.attributionShare,
-        confidence: node.attributionConfidence,
-        countries: [country],
-        networks: [network],
-        peerRecords: 1,
-      });
-    }
-  }
-  return [...groups.values()].sort((a, b) => (b.share ?? 0) - (a.share ?? 0) || b.blocks - a.blocks);
-}
-
-function weightedAttributionConfidence(groups: AttributionGroup[]) {
-  const rows = groups.filter((g) => g.blocks > 0 && g.confidence !== null);
-  const total = rows.reduce((sum, g) => sum + g.blocks, 0);
-  if (!total) return null;
-  return rows.reduce((sum, g) => sum + g.blocks * (g.confidence ?? 0), 0) / total;
-}
-
-function attributionLabel(group: AttributionGroup, index: number) {
-  const country = group.countries.length === 1 ? group.countries[0] : `${group.countries.length} locations`;
-  return `${country} Â· Source ${index + 1}`;
-}
-
-function IntelligenceHome({ data, txValues, pulseTimes, onReference, onVideos }: { data: DashboardData; txValues: Array<number | null>; pulseTimes: number[]; onReference: () => void; onVideos: () => void }) {
-  const groups = attributionGroups(data);
-  const attributedBlocks = data.merged.attributionMatched ?? (groups.reduce((sum, g) => sum + g.blocks, 0) || null);
-  const weightedConfidence = weightedAttributionConfidence(groups);
-  const topShare = fractionPercent(groups[0]?.share ?? null);
-  const mergeRate = pct(data.merged.found, data.merged.checked);
-  const attributionActive = (attributedBlocks ?? 0) > 0 && groups.length > 0;
-  const countries = data.publicNodes.totals.countries;
-  return (
-    <>
-      <section className="intel-hero-grid">
-        <section className="panel intelligence-primary attribution-primary">
-          <div className="panel-head">
-            <div><span className="panel-icon"><GitMerge size={22} /></span><h2>Observed merged-mining attribution</h2></div>
-            <span className={`security-chip ${attributionActive ? 'good' : ''}`}><i />{attributionActive ? 'BLOCK ATTRIBUTION ACTIVE' : 'WAITING FOR ATTRIBUTION'}</span>
-          </div>
-          <div className="attribution-flow">
-            <div className="chain kas"><span>KASPA</span><b>Parent proof-of-work</b></div>
-            <div className="merge-arrow"><Zap size={25} /><span>AuxPoW</span></div>
-            <div className="chain zkas"><span>ZKAS</span><b>Observed child blocks</b></div>
-            <div className="attribution-arrow">â†’</div>
-            <div className="chain attribution"><span>PUBLIC PIPELINE</span><b>Attribution groups</b></div>
-          </div>
-          <div className="intel-stat-row attribution-stat-row">
-            <div><span>Attributed blocks</span><b>{displayNumber(attributedBlocks, true)}</b></div>
-            <div><span>Unique attribution groups</span><b>{displayNumber(groups.length || null)}</b></div>
-            <div><span>Weighted confidence</span><b>{weightedConfidence === null ? 'â€”' : `${fmt.format(fractionPercent(weightedConfidence) ?? 0)}%`}</b></div>
-            <div><span>Largest observed share</span><b>{topShare === null ? 'â€”' : `${fmt.format(topShare)}%`}</b></div>
-          </div>
-          <div className="attribution-mini-list">
-            {groups.slice(0, 4).map((group, index) => {
-              const share = fractionPercent(group.share) ?? 0;
-              const confidence = fractionPercent(group.confidence);
-              return <div className="attribution-mini" key={group.key}>
-                <div><span>{attributionLabel(group, index)}</span><b>{fmt.format(share)}%</b></div>
-                <i><span style={{ width: `${Math.max(1, Math.min(100, share))}%` }} /></i>
-                <small>{displayNumber(group.blocks, true)} blocks Â· {confidence === null ? 'confidence unavailable' : `${fmt.format(confidence)}% confidence`}</small>
-              </div>;
-            })}
-            {!groups.length && <div className="empty-mini">Waiting for public block-attribution data.</div>}
-          </div>
-          <p className="source-note"><ShieldCheck size={15} /> Shares are deduplicated by public Kaspa payout attribution so duplicate peer rows are not counted twice. Confidence is the API-reported attribution confidence.</p>
-        </section>
-
-        <section className="panel signal-board">
-          <div className="panel-head"><div><span className="panel-icon"><Activity size={20} /></span><h2>Live network signals</h2></div><span className="live-mini"><i /> PUBLIC</span></div>
-          <div className="signal-list">
-            <Signal label="Block flow" value={data.bps === null ? 'â€”' : `${fmt.format(data.bps)} BPS`} note="15-minute observed rate" />
-            <Signal label="Network work" value={displayHashrate(data.hashrate)} note="public consensus estimate" />
-            <Signal label="Visible peers" value={displayNumber(data.relay.activePeers ?? data.nodes)} note={`${displayNumber(countries)} countries in public view`} />
-            <Signal label="Attributed blocks" value={displayNumber(attributedBlocks, true)} note={`${displayNumber(groups.length || null)} unique attribution groups`} />
-            <Signal label="Attribution updated" value={scanAge(data.merged.attributionUpdatedAt)} note="public attribution pipeline" />
-          </div>
-        </section>
-      </section>
-
-      <section className="metric-grid intel-metrics">
-        <MetricCard icon={<Gauge size={19} />} label="Hashrate" value={displayHashrate(data.hashrate)} sub="Network work estimate" accent />
-        <MetricCard icon={<Activity size={19} />} label="BPS" value={displayNumber(data.bps)} sub="15m observed" />
-        <MetricCard icon={<Gauge size={19} />} label="Difficulty" value={displayNumber(data.difficulty, true)} sub="Consensus difficulty" />
-        <MetricCard icon={<Network size={19} />} label="Visible nodes" value={displayNumber(data.publicNodes.totals.nodes ?? data.nodes)} sub="Explorer vantage point" />
-        <MetricCard icon={<GitMerge size={19} />} label="Co-located peers" value={displayNumber(data.merged.found)} sub="Last completed probe" />
-        <MetricCard icon={<Network size={19} />} label="Peers checked" value={displayNumber(data.merged.checked)} sub="Co-location probe" />
-        <MetricCard icon={<Zap size={19} />} label="Observable co-location" value={mergeRate === null ? 'â€”' : `${fmt.format(mergeRate)}%`} sub="Probe signal, not mining share" />
-        <MetricCard icon={<Clock3 size={19} />} label="Last probe" value={scanAge(data.merged.scannedAt)} sub="Public co-location scanner" />
-      </section>
-
-      <AttributionBreakdown data={data} limit={8} />
-
-      <section className="two-col intel-charts">
-        <div className="panel"><div className="panel-head"><div><span className="panel-icon"><Waves size={20} /></span><h2>Transaction activity</h2></div><span className="range-chip">15M</span></div><SparkChart values={txValues} labels={pulseTimes} /></div>
-        <MergedCountryBreakdown data={data} />
-      </section>
-
-      <section className="panel latest-video-strip">
-        <div className="latest-video-icon"><Play size={24} fill="currentColor" /></div>
-        <div>
-          <span className="eyebrow">LATEST ZKAS VIDEO Â· 15 SEC</span>
-          <h2>Private by default. Built for speed.</h2>
-          <p>Watch the new ZKAS speed and privacy comparison, then find future releases in the video library.</p>
-        </div>
-        <button className="primary-link" onClick={onVideos}>Watch video â†’</button>
-      </section>
-
-      <section className="panel reference-strip">
-        <div>
-          <span className="eyebrow">ALL-IN-ONE REFERENCE</span>
-          <h2>Need chain details too?</h2>
-          <p>Supply, reward schedule, shielded activity, latest blocks and transactions stay here as supporting information. For deep block-by-block exploration, the official ZKas explorer remains the specialist tool.</p>
-        </div>
-        <div className="reference-actions">
-          <button className="primary-link" onClick={onReference}>Open quick reference â†’</button>
-          <a className="secondary-link" href="https://explorer.zkas.info" target="_blank" rel="noreferrer">Official explorer â†—</a>
-        </div>
-      </section>
-    </>
-  );
-}
-
-function AttributionBreakdown({ data, limit }: { data: DashboardData; limit?: number }) {
-  const groups = attributionGroups(data);
-  const visible = typeof limit === 'number' ? groups.slice(0, limit) : groups;
-  const matched = data.merged.attributionMatched ?? (groups.reduce((sum, g) => sum + g.blocks, 0) || null);
-  return (
-    <section className="panel attribution-breakdown">
-      <div className="panel-head">
-        <div><span className="panel-icon"><GitMerge size={20} /></span><h2>Observed mining-share attribution</h2></div>
-        <span className="range-chip">{matched === null ? 'WAITING' : `${compact.format(matched)} BLOCKS`}</span>
-      </div>
-      <div className="attribution-bars">
-        {visible.map((group, index) => {
-          const share = fractionPercent(group.share) ?? 0;
-          const confidence = fractionPercent(group.confidence);
-          const address = group.addresses[0];
-          return <div className="attribution-row" key={group.key}>
-            <div className="attribution-row-head">
-              <div><b>{attributionLabel(group, index)}</b><span>{address ? short(address, 9) : 'Payout address unavailable'}</span></div>
-              <div className="attribution-numbers"><b>{fmt.format(share)}%</b><span>{displayNumber(group.blocks, true)} blocks</span></div>
-            </div>
-            <div className="attribution-track"><i style={{ width: `${Math.max(0.5, Math.min(100, share))}%` }} /></div>
-            <div className="attribution-meta"><span>Confidence {confidence === null ? 'â€”' : `${fmt.format(confidence)}%`}</span><span>{group.peerRecords > 1 ? `${group.peerRecords} peer records deduplicated` : '1 peer record'}</span><span>{group.networks[0] || 'Masked network unavailable'}</span></div>
-          </div>;
-        })}
-        {!visible.length && <div className="empty-mini">No public block-attribution groups are currently available.</div>}
-      </div>
-      <p className="source-note"><ShieldCheck size={15} /> â€œShareâ€ is the public attribution pipelineâ€™s observed share of matched merge-mined blocks, not total ZKas network hashrate. Duplicate peer rows with the same payout attribution are deduplicated here.</p>
-    </section>
-  );
-}
-
-function Signal({ label, value, note }: { label: string; value: string; note: string }) {
-  return <div className="signal-row"><span>{label}</span><div><b>{value}</b><small>{note}</small></div></div>;
-}
-
-function MergedCountryBreakdown({ data }: { data: DashboardData }) {
-  const counts = new Map<string, number>();
-  data.merged.nodes.filter((n) => n.kaspaDetected).forEach((n) => {
-    const name = n.countryName || n.countryCode || 'Unknown';
-    counts.set(name, (counts.get(name) || 0) + 1);
-  });
-  const rows = [...counts.entries()].sort((a, b) => b[1] - a[1]).slice(0, 8);
-  const total = rows.reduce((sum, [, count]) => sum + count, 0);
-  return (
-    <section className="panel merged-country">
-      <div className="panel-head"><div><span className="panel-icon"><Globe2 size={20} /></span><h2>Kaspa co-location geography</h2></div><span className="range-chip">OBSERVED</span></div>
-      <div className="country-bars">
-        {rows.map(([name, count]) => <div className="country-bar" key={name}><div><span>{name}</span><b>{count}</b></div><i style={{ width: total ? `${Math.max(5, count / total * 100)}%` : '0%' }} /></div>)}
-        {!rows.length && <div className="empty-mini">Waiting for the next completed public co-location scan.</div>}
-      </div>
-    </section>
-  );
-}
-
-type SoloHashUnit = 'GH/s' | 'TH/s' | 'PH/s';
-
-const SOLO_HASH_SCALES: Record<SoloHashUnit, number> = {
-  'GH/s': 1e9,
-  'TH/s': 1e12,
-  'PH/s': 1e15,
-};
-
-function NativeMergedVisibility({ matched }: { matched: number | null }) {
-  return (
-    <section className="panel mining-visibility-panel">
-      <div className="panel-head">
-        <div><span className="panel-icon"><GitMerge size={20} /></span><h2>Native vs merged visibility</h2></div>
-        <span className="range-chip">PUBLIC LIMITS</span>
-      </div>
-      <div className="mining-visibility-grid">
-        <div><span>Native ZKas mining</span><b>Supported</b><small>Native kHeavyHash remains consensus-valid.</small></div>
-        <div><span>AuxPoW merged mining</span><b>Supported</b><small>Kaspa parent proof-of-work can secure ZKas.</small></div>
-        <div><span>Observed merged attribution</span><b>{displayNumber(matched, true)}</b><small>Matched blocks in the public attribution pipeline.</small></div>
-        <div><span>Solo miner count</span><b>Not public</b><small>Unique native miners cannot be enumerated reliably.</small></div>
-      </div>
-      <p className="source-note"><ShieldCheck size={15} /> The current public explorer API does not expose an authoritative per-block native-vs-AuxPoW classification, so ZKAS.stream does not invent a native block share or a solo-miner count.</p>
-    </section>
-  );
-}
-
-
-type MiningDistributionWindow = '1h' | '6h' | '12h';
-
-function producerLabel(row: MiningDistributionData['producers'][number]) {
-  if (row.name) return row.name;
-  if (row.address) return short(row.address, 10);
-  return 'Unidentified producer';
-}
-
-function MiningDistributionPanel({ data }: { data: DashboardData }) {
-  const [windowRange, setWindowRange] = useState<MiningDistributionWindow>('1h');
-  const [distribution, setDistribution] = useState<MiningDistributionData | null>(null);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    const controller = new AbortController();
-    let stopped = false;
-    const load = async () => {
-      try {
-        const next = await fetchMiningDistribution(windowRange, controller.signal);
-        if (!stopped) setDistribution(next);
-      } catch {
-        if (!stopped) setDistribution(null);
-      } finally {
-        if (!stopped) setLoading(false);
-      }
-    };
-    setLoading(true);
-    load();
-    const timer = window.setInterval(load, 30_000);
-    return () => { stopped = true; controller.abort(); window.clearInterval(timer); };
-  }, [windowRange]);
-
-  const official = distribution?.source === 'official' && distribution.producers.length > 0;
-  const rows = official ? distribution.producers.slice(0, 6) : [];
-  const networkHashrate = distribution?.networkHashrate ?? data.hashrate;
-  const windowText = distribution?.windowSeconds !== null && distribution?.windowSeconds !== undefined
-    ? duration(distribution.windowSeconds)
-    : windowRange === '1h' ? '60 min' : windowRange === '6h' ? '6 hours' : '12 hours';
-
-  return (
-    <section className="panel mining-distribution-panel">
-      <div className="panel-head mining-distribution-head">
-        <div><span className="panel-icon"><Network size={20} /></span><h2>Mining producer & hashrate distribution</h2></div>
-        <div className="distribution-range-tabs" role="group" aria-label="Hashrate distribution range">
-          {(['1h', '6h', '12h'] as MiningDistributionWindow[]).map((range) => (
-            <button key={range} type="button" className={windowRange === range ? 'active' : ''} onClick={() => setWindowRange(range)}>{range}</button>
-          ))}
-        </div>
-      </div>
-      <p className="distribution-intro">Observed block-producer share from public coinbase attribution. Named pools remain named; unidentified payout addresses remain unidentified.</p>
-
-      {official ? <>
-        <div className="distribution-summary-grid">
-          <div><span>Blocks measured</span><b>{displayNumber(distribution.blocksMeasured, true)}</b><small>whole DAG, not just the chain</small></div>
-          <div><span>Producers</span><b>{displayNumber(distribution.producerCount)}</b><small>{distribution.distinctAddresses ?? distribution.producerCount} payout addresses</small></div>
-          <div><span>Largest</span><b>{displayMiningPercent(distribution.largestSharePercent)}</b><small>{producerLabel(distribution.producers[0])}</small></div>
-          <div><span>Network hashrate</span><b>{displayHashrate(networkHashrate)}</b><small>consensus work estimate</small></div>
-          <div><span>Window</span><b>{windowText}</b><small>{distribution.majorityCount === null ? 'majority unavailable' : `${distribution.majorityCount} producer${distribution.majorityCount === 1 ? '' : 's'} to majority`}</small></div>
-        </div>
-        <div className="distribution-bars">
-          {rows.map((row, index) => {
-            const share = row.sharePercent ?? 0;
-            return <div className="distribution-row" key={row.key}>
-              <div className="distribution-row-label">
-                <span className="distribution-rank">{index + 1}</span>
-                <div><b>{producerLabel(row)}</b><small>{row.source === 'tag' ? 'named itself in its coinbase' : row.source === 'known' ? 'published payout address' : row.source === 'derived' ? 'linked via merge-mining proof' : 'no self-declared name'}{row.addresses && row.addresses > 1 ? ` Â· ${row.addresses} addresses` : ''}</small></div>
-              </div>
-              <div className="distribution-row-value"><b>{displayMiningPercent(row.sharePercent)}</b><small>{row.blocks === null ? 'block count unavailable' : `${displayNumber(row.blocks, true)} blocks`}</small></div>
-              <i className="distribution-track"><span style={{ width: `${Math.max(1.5, Math.min(100, share))}%` }} /></i>
-            </div>;
-          })}
-          {distribution.producers.length > rows.length && <div className="distribution-tail">+ {distribution.producers.length - rows.length} additional observed producers</div>}
-        </div>
-        <p className="source-note"><ShieldCheck size={15} /> Distribution is inferred from the producer/payout identity each observed block publicly names in its coinbase. This measures block-production share over the selected window; it does not enumerate individual ASICs or prove how many people operate behind a pool.</p>
-      </> : <div className="distribution-unavailable">
-        <Network size={24} />
-        <div><b>{loading ? 'Loading public producer distributionâ€¦' : 'Official miner-distribution feed is temporarily unavailable'}</b><span>ZKAS.stream keeps the rest of the merged-mining and solo intelligence live while the explorer feed retries.</span></div>
-      </div>}
-    </section>
-  );
-}
-
-function SoloMiningIntelligence({ data }: { data: DashboardData }) {
-  const [minerHashrate, setMinerHashrate] = useState('1');
-  const [hashUnit, setHashUnit] = useState<SoloHashUnit>('TH/s');
-
-  const entered = Number(minerHashrate);
-  const minerHps = Number.isFinite(entered) && entered > 0 ? entered * SOLO_HASH_SCALES[hashUnit] : null;
-  const networkHps = data.hashrate !== null && data.hashrate > 0 ? data.hashrate : null;
-  const liveBps = data.bps !== null && data.bps > 0 ? data.bps : null;
-  const grossReward = validNumber(data.reward);
-  const payout = minerPayout(grossReward);
-  const nextPayout = minerPayout(validNumber(data.nextReward));
-
-  const shareFraction = minerHps !== null && networkHps !== null ? Math.min(1, minerHps / networkHps) : null;
-  const sharePct = shareFraction === null ? null : shareFraction * 100;
-  const expectedBlocksDay = shareFraction !== null && liveBps !== null ? shareFraction * liveBps * 86400 : null;
-  const expectedSeconds = expectedBlocksDay !== null && expectedBlocksDay > 0 ? 86400 / expectedBlocksDay : null;
-  const chance24h = expectedBlocksDay === null ? null : (1 - Math.exp(-expectedBlocksDay)) * 100;
-  const chance7d = expectedBlocksDay === null ? null : (1 - Math.exp(-expectedBlocksDay * 7)) * 100;
-  const expectedPayoutDay = expectedBlocksDay !== null && payout !== null ? expectedBlocksDay * payout : null;
-
-  return (
-    <section className="solo-mining-section">
-      <section className="panel solo-mining-panel">
-        <div className="panel-head">
-          <div><span className="panel-icon"><Gauge size={20} /></span><h2>Solo mining intelligence</h2></div>
-          <span className="range-chip">LOCAL CALCULATOR</span>
-        </div>
-        <p className="solo-intro">Estimate solo-mining odds from the live public ZKas network conditions. Enter only hashrate; the calculator runs in this browser and does not connect to a wallet, worker or miner.</p>
-
-        <div className="solo-controls">
-          <label>
-            <span>Your hashrate</span>
-            <div className="solo-input-wrap">
-              <input inputMode="decimal" type="number" min="0" step="any" value={minerHashrate} onChange={(e) => setMinerHashrate(e.target.value)} aria-label="Your mining hashrate" />
-              <select value={hashUnit} onChange={(e) => setHashUnit(e.target.value as SoloHashUnit)} aria-label="Hashrate unit">
-                <option>GH/s</option><option>TH/s</option><option>PH/s</option>
-              </select>
-            </div>
-          </label>
-          <div className="solo-live-condition"><span>Network hashrate</span><b>{displayHashrate(networkHps)}</b><small>public consensus work estimate</small></div>
-          <div className="solo-live-condition"><span>Block flow</span><b>{liveBps === null ? 'â€”' : `${fmt.format(liveBps)} BPS`}</b><small>observed public rate</small></div>
-          <div className="solo-live-condition"><span>Difficulty</span><b>{displayNumber(data.difficulty, true)}</b><small>current consensus target difficulty</small></div>
-          <div className="solo-live-condition"><span>Current miner payout</span><b>{payout === null ? 'â€”' : `${fmt.format(payout)} ZKAS`}</b><small>95% of gross block emission</small></div>
-        </div>
-
-        <div className="solo-result-grid">
-          <div><span>Estimated network share</span><b>{displayMiningPercent(sharePct)}</b><small>chosen hashrate Ã· network estimate</small></div>
-          <div><span>Average time to a block</span><b>{expectedSeconds === null ? 'â€”' : duration(expectedSeconds)}</b><small>statistical average, not a countdown</small></div>
-          <div><span>Expected blocks / day</span><b>{displayMiningEstimate(expectedBlocksDay)}</b><small>long-run expectation</small></div>
-          <div><span>Chance â‰¥1 block in 24h</span><b>{displayMiningPercent(chance24h)}</b><small>Poisson estimate</small></div>
-          <div><span>Chance â‰¥1 block in 7d</span><b>{displayMiningPercent(chance7d)}</b><small>Poisson estimate</small></div>
-          <div><span>Expected ZKAS / day</span><b>{displayMiningEstimate(expectedPayoutDay, ' ZKAS')}</b><small>probability-weighted, not guaranteed</small></div>
-        </div>
-
-        <div className="solo-reward-strip">
-          <div><span>Gross block emission</span><b>{grossReward === null ? 'â€”' : `${fmt.format(grossReward)} ZKAS`}</b></div>
-          <div><span>Miner payout (95%)</span><b>{payout === null ? 'â€”' : `${fmt.format(payout)} ZKAS`}</b></div>
-          <div><span>Development allocation (5%)</span><b>{grossReward === null ? 'â€”' : `${fmt.format(developmentAllocation(grossReward) ?? 0)} ZKAS`}</b></div>
-          <div><span>Next miner payout</span><b>{nextPayout === null ? 'â€”' : `${fmt.format(nextPayout)} ZKAS`}</b><small>{data.nextReductionSeconds === null ? 'schedule unavailable' : `in ${countdown(data.nextReductionSeconds)}`}</small></div>
-        </div>
-
-        <p className="source-note"><ShieldCheck size={15} /> Solo estimates use the public network hashrate and observed BPS currently shown by ZKAS.stream. Mining luck is random: an average time of 3 days can still produce a block sooner, much later, or not at all during that period.</p>
-      </section>
-
-      <section className="two-col solo-info-row">
-        <section className="panel solo-mode-panel">
-          <div className="panel-head"><div><span className="panel-icon"><GitMerge size={20} /></span><h2>Solo, solo-merged and pool mining</h2></div></div>
-          <div className="solo-mode-grid">
-            <div><b>Solo ZKas</b><span>Your own node/Stratum stack submits work. You receive the miner payout only when your own hashrate finds a valid ZKas block.</span></div>
-            <div><b>Solo merged mining</b><span>Your own stack also uses Kaspa parent proof-of-work for ZKas AuxPoW. The same hashing work can participate in both chains while each chain still has its own validity target and reward event.</span></div>
-            <div><b>Pool mining</b><span>A pool aggregates many miners and usually pays smaller, smoother rewards according to its payout method, fees and thresholds.</span></div>
-          </div>
-          <p className="source-note"><ShieldCheck size={15} /> Public payout attribution does not reliably identify whether a source is a solo miner, private group or public pool unless that identity is independently known.</p>
-        </section>
-
-        <section className="panel solo-checklist-panel">
-          <div className="panel-head"><div><span className="panel-icon"><Server size={20} /></span><h2>Solo-mining readiness</h2></div><span className="range-chip">CHECKLIST</span></div>
-          <div className="solo-checklist">
-            <div><i>1</i><span><b>Synced ZKas node</b><small>Consensus and RPC must stay current before work is served or blocks are submitted.</small></span></div>
-            <div><i>2</i><span><b>Kaspa parent-work source</b><small>Required when you want the merged-mining / AuxPoW path rather than ZKas-only work.</small></span></div>
-            <div><i>3</i><span><b>Stratum bridge or solo gateway</b><small>ASICs need a mining endpoint that converts node work into the protocol the miner understands.</small></span></div>
-            <div><i>4</i><span><b>Payout addresses configured</b><small>Verify both ZKas and Kaspa destinations before leaving a solo stack unattended.</small></span></div>
-            <div><i>5</i><span><b>Healthy share flow</b><small>Accepted shares should continue increasing; invalid and stale shares should stay low.</small></span></div>
-            <div><i>6</i><span><b>Block submission + uptime monitoring</b><small>Watch submission errors, node sync, bridge health and miner connectivityâ€”not just displayed hashrate.</small></span></div>
-          </div>
-        </section>
-      </section>
-    </section>
-  );
-}
-
-function MergedIntelligencePage({ data }: { data: DashboardData }) {
-  const groups = attributionGroups(data);
-  const ratio = pct(data.merged.found, data.merged.checked);
-  const weightedConfidence = weightedAttributionConfidence(groups);
-  const topShare = fractionPercent(groups[0]?.share ?? null);
-  const matched = data.merged.attributionMatched ?? (groups.reduce((sum, g) => sum + g.blocks, 0) || null);
-  const mergedNodes = data.merged.nodes.filter((n) => n.kaspaDetected);
-  return (
-    <section className="page-stack">
-      <div className="privacy-callout"><GitMerge size={21} /><div><b>Merged-mining evidence + solo estimates, kept separate</b><span>Block attribution links observed merge-mined blocks to Kaspa payout attribution; the peer co-location probe is supporting evidence. The solo calculator is probability math based on the hashrate you enter and live public network estimatesâ€”it does not identify or monitor any specific miner.</span></div></div>
-      <div className="metric-grid mining-metrics attribution-metrics">
-        <MetricCard icon={<Boxes size={19} />} label="Attributed blocks" value={displayNumber(matched, true)} sub="Deduplicated public pipeline" accent />
-        <MetricCard icon={<GitMerge size={19} />} label="Attribution groups" value={displayNumber(groups.length || null)} sub="Unique payout groupings" />
-        <MetricCard icon={<ShieldCheck size={19} />} label="Weighted confidence" value={weightedConfidence === null ? 'â€”' : `${fmt.format(fractionPercent(weightedConfidence) ?? 0)}%`} sub="Block-weighted API confidence" />
-        <MetricCard icon={<Zap size={19} />} label="Largest observed share" value={topShare === null ? 'â€”' : `${fmt.format(topShare)}%`} sub="Of attributed blocks" />
-      </div>
-      <NativeMergedVisibility matched={matched} />
-      <MiningDistributionPanel data={data} />
-      <SoloMiningIntelligence data={data} />
-      <AttributionBreakdown data={data} />
-      <MergedPanel data={data} />
-      <div className="metric-grid mining-metrics co-location-metrics">
-        <MetricCard icon={<GitMerge size={19} />} label="Co-located peers" value={displayNumber(data.merged.found)} sub="Kaspa node detected in last probe" />
-        <MetricCard icon={<Network size={19} />} label="Peers checked" value={displayNumber(data.merged.checked)} sub={`of ${displayNumber(data.merged.peers)} visible peers`} />
-        <MetricCard icon={<Zap size={19} />} label="Observable co-location" value={ratio === null ? 'â€”' : `${fmt.format(ratio)}%`} sub="Probe signal, not block share" />
-        <MetricCard icon={<Clock3 size={19} />} label="Last completed probe" value={scanAge(data.merged.scannedAt)} sub="Public scanner cadence" />
-      </div>
-      <section className="two-col"><MergedCountryBreakdown data={data} /><MergedClientSummary nodes={mergedNodes} /></section>
-      <MergedPeersTable nodes={data.merged.nodes} ports={data.merged.ports} />
-    </section>
-  );
-}
-
-function MergedClientSummary({ nodes }: { nodes: DashboardData['merged']['nodes'] }) {
-  const groups = new Map<string, number>();
-  nodes.forEach((n) => groups.set(n.userAgent || 'Unknown client', (groups.get(n.userAgent || 'Unknown client') || 0) + 1));
-  const rows = [...groups.entries()].sort((a, b) => b[1] - a[1]);
-  return (
-    <section className="panel table-panel">
-      <div className="panel-head"><div><span className="panel-icon"><Server size={20} /></span><h2>Co-located peer clients</h2></div><span className="range-chip">PUBLIC</span></div>
-      <div className="table-scroll"><table><thead><tr><th>Client</th><th>Detected peers</th></tr></thead><tbody>
-        {rows.map(([client, count]) => <tr key={client}><td><code className="soft-code">{client}</code></td><td>{count}</td></tr>)}
-        {!rows.length && <tr><td colSpan={2} className="empty-cell">No client attribution available yet.</td></tr>}
-      </tbody></table></div>
-    </section>
-  );
-}
-
-function MergedPeersTable({ nodes, ports }: { nodes: DashboardData['merged']['nodes']; ports: number[] }) {
-  return (
-    <section className="panel table-panel expanded">
-      <div className="panel-head"><div><span className="panel-icon"><GitMerge size={20} /></span><h2>Visible co-location signals</h2></div><span className="privacy-chip"><ShieldCheck size={14} /> MASKED</span></div>
-      <div className="table-scroll"><table><thead><tr><th>Peer</th><th>Country</th><th>Masked net</th><th>Probe</th><th>Kaspa co-location</th><th>Attributed blocks</th><th>Share</th><th>Confidence</th><th>Payout attribution</th></tr></thead><tbody>
-        {nodes.map((n, i) => {
-          const share = fractionPercent(n.attributionShare);
-          const confidence = fractionPercent(n.attributionConfidence);
-          const payout = (n.attributionAddresses ?? [])[0]?.address;
-          return <tr key={`${n.id}-${i}`}><td><code className="soft-code">{short(n.id, 6)}</code></td><td>{n.countryName || n.countryCode || 'Unknown'}</td><td><code className="soft-code">{n.network || 'â€”'}</code></td><td><span className="pill">{n.checked === null ? 'Waiting' : n.checked ? 'Checked' : 'Pending'}</span></td><td><span className={`pill ${n.kaspaDetected ? 'positive-pill' : ''}`}>{n.kaspaDetected ? 'Observed' : 'â€”'}</span></td><td>{displayNumber(n.attributedBlocks, true)}</td><td>{share === null ? 'â€”' : `${fmt.format(share)}%`}</td><td>{confidence === null ? 'â€”' : `${fmt.format(confidence)}%`}</td><td><code className="soft-code">{payout ? short(payout, 8) : 'â€”'}</code></td></tr>;
-        })}
-        {!nodes.length && <tr><td colSpan={9} className="empty-cell">Waiting for public merged-mining data.</td></tr>}
-      </tbody></table></div>
-      <p className="table-footnote">Kaspa ports scanned by the peer-probe backend: {ports.length ? ports.join(', ') : 'not reported'}. Attribution values come from the separate public block-observation pipeline; identical payout attributions can appear on multiple peer rows and are deduplicated in the share charts above.</p>
-    </section>
-  );
-}
-
-function NetworkHealthPage({ data, diffValues, txValues, pulseTimes, onOpenNodes }: { data: DashboardData; diffValues: Array<number | null>; txValues: Array<number | null>; pulseTimes: number[]; onOpenNodes: () => void }) {
-  return (
-    <section className="page-stack">
-      <div className="privacy-callout"><Activity size={21} /><div><b>Observed health signals, not an authoritative global score</b><span>These metrics come from the public explorer vantage point and consensus data. They are intended to show changes and anomalies without claiming to see every node on the network.</span></div></div>
-      <div className="metric-grid nodes-metrics">
-        <MetricCard icon={<Activity size={19} />} label="BPS" value={displayNumber(data.bps)} sub="15m block flow" accent />
-        <MetricCard icon={<Gauge size={19} />} label="Hashrate" value={displayHashrate(data.hashrate)} sub="Consensus work estimate" />
-        <MetricCard icon={<Gauge size={19} />} label="Difficulty" value={displayNumber(data.difficulty, true)} sub="Current difficulty" />
-        <MetricCard icon={<Server size={19} />} label="Active peers" value={displayNumber(data.relay.activePeers ?? data.nodes)} sub="Public node metric" />
-        <MetricCard icon={<Boxes size={19} />} label="Tip hashes" value={displayNumber(data.relay.tipHashes)} sub="Consensus tips" />
-        <MetricCard icon={<Database size={19} />} label="Mempool" value={displayNumber(data.mempool)} sub="Transactions waiting" />
-        <MetricCard icon={<Globe2 size={19} />} label="Countries" value={displayNumber(data.publicNodes.totals.countries)} sub="Visible geography" />
-        <MetricCard icon={<Network size={19} />} label="Visible nodes" value={displayNumber(data.publicNodes.totals.nodes ?? data.nodes)} sub="Explorer vantage point" />
-      </div>
-      <section className="two-col">
-        <div className="panel"><div className="panel-head"><div><span className="panel-icon"><Gauge size={20} /></span><h2>Difficulty signal</h2></div><span className="range-chip">15M</span></div><SparkChart values={diffValues} labels={pulseTimes} height={240} /></div>
-        <div className="panel"><div className="panel-head"><div><span className="panel-icon"><Waves size={20} /></span><h2>Transaction signal</h2></div><span className="range-chip">15M</span></div><SparkChart values={txValues} labels={pulseTimes} height={240} /></div>
-      </section>
-      <PublicNodeSummary data={data} onOpen={onOpenNodes} />
-      <section className="two-col"><CountriesTable data={data} /><NodeClientSummary nodes={data.publicNodes.nodes} /></section>
-    </section>
-  );
-}
-
-
-type NetworkEvent = {
-  key: string;
-  title: string;
-  detail: string;
-  tone: 'info' | 'positive' | 'watch';
-};
-
-function percentMove(current: number | null, baseline: number | null) {
-  if (current === null || baseline === null || baseline === 0) return null;
-  return ((current - baseline) / baseline) * 100;
-}
-
-function signedPercent(value: number | null) {
-  if (value === null) return 'â€”';
-  return `${value >= 0 ? '+' : ''}${fmt.format(value)}%`;
-}
-
-function buildNetworkEvents(data: DashboardData, history: HistorySnapshot[]): NetworkEvent[] {
-  const now = Date.now();
-  const lastHour = history.filter((row) => row.t >= now - 60 * 60 * 1000).sort((a, b) => a.t - b.t);
-  const baseline = lastHour[0] ?? null;
-  const groups = attributionGroups(data);
-  const attributedNow = data.merged.attributionMatched ?? (groups.reduce((sum, row) => sum + row.blocks, 0) || null);
-  const topShareNow = fractionPercent(groups[0]?.share ?? null);
-  const currentNodes = validNumber(data.publicNodes.totals.nodes ?? data.nodes);
-  const hashrateMove = percentMove(validNumber(data.hashrate), baseline?.hashrate ?? null);
-  const nodeMove = baseline?.visibleNodes !== null && baseline?.visibleNodes !== undefined && currentNodes !== null
-    ? currentNodes - baseline.visibleNodes
-    : null;
-  const attributedMove = baseline?.attributedBlocks !== null && baseline?.attributedBlocks !== undefined && attributedNow !== null
-    ? attributedNow - baseline.attributedBlocks
-    : null;
-  const shareMove = baseline?.largestSharePct !== null && baseline?.largestSharePct !== undefined && topShareNow !== null
-    ? topShareNow - baseline.largestSharePct
-    : null;
-  const events: NetworkEvent[] = [];
-
-  if (data.nextReductionSeconds !== null && data.nextReductionSeconds <= 48 * 60 * 60) {
-    const nextMiner = minerPayout(data.nextReward);
-    events.push({
-      key: 'reward-step',
-      title: 'Emission step approaching',
-      detail: `${countdown(data.nextReductionSeconds)} until the next gross reward of ${data.nextReward === null ? 'â€”' : `${fmt.format(data.nextReward)} ZKAS`}${nextMiner === null ? '' : ` (${fmt.format(nextMiner)} ZKAS miner payout)`}.`,
-      tone: data.nextReductionSeconds <= 6 * 60 * 60 ? 'watch' : 'info',
-    });
-  }
-
-  if (hashrateMove !== null) {
-    events.push({
-      key: 'hashrate',
-      title: `Network work ${Math.abs(hashrateMove) < 1 ? 'holding steady' : hashrateMove > 0 ? 'increased' : 'decreased'}`,
-      detail: `${signedPercent(hashrateMove)} versus the earliest ZKAS.stream observer snapshot available in the last hour. Current estimate: ${displayHashrate(data.hashrate)}.`,
-      tone: Math.abs(hashrateMove) >= 10 ? 'watch' : Math.abs(hashrateMove) < 1 ? 'positive' : 'info',
-    });
-  }
-
-  if (nodeMove !== null) {
-    events.push({
-      key: 'nodes',
-      title: nodeMove === 0 ? 'Visible peer set unchanged' : `Visible nodes ${nodeMove > 0 ? 'increased' : 'decreased'}`,
-      detail: `${nodeMove > 0 ? '+' : ''}${nodeMove} from the earliest observer snapshot in the last hour; ${displayNumber(currentNodes)} visible now from the explorer vantage point.`,
-      tone: Math.abs(nodeMove) >= 6 ? 'watch' : nodeMove === 0 ? 'positive' : 'info',
-    });
-  }
-
-  if (attributedMove !== null) {
-    events.push({
-      key: 'attribution',
-      title: attributedMove > 0 ? 'New merge-mining attribution observed' : 'Attribution total unchanged',
-      detail: `${attributedMove > 0 ? '+' : ''}${displayNumber(attributedMove, true)} attributed blocks since the earliest observer snapshot in the last hour; ${displayNumber(attributedNow, true)} currently matched.`,
-      tone: attributedMove > 0 ? 'positive' : 'info',
-    });
-  }
-
-  if (shareMove !== null) {
-    events.push({
-      key: 'share',
-      title: 'Largest observed attribution share moved',
-      detail: `${shareMove >= 0 ? '+' : ''}${fmt.format(shareMove)} percentage points over the available last-hour observer window; largest observed share is ${topShareNow === null ? 'â€”' : `${fmt.format(topShareNow)}%`}.`,
-      tone: Math.abs(shareMove) >= 5 ? 'watch' : 'info',
-    });
-  }
-
-  const scanSeconds = data.merged.scannedAt
-    ? Math.max(0, Math.floor(Date.now() / 1000) - (data.merged.scannedAt > 10_000_000_000 ? Math.floor(data.merged.scannedAt / 1000) : data.merged.scannedAt))
-    : null;
-  if (scanSeconds !== null) {
-    events.push({
-      key: 'co-location',
-      title: scanSeconds > 20 * 60 ? 'Peer co-location scan is aging' : 'Peer co-location scan current',
-      detail: `${scanAge(data.merged.scannedAt)} Â· ${displayNumber(data.merged.found)} Kaspa co-located peers observed from ${displayNumber(data.merged.checked)} checked.`,
-      tone: scanSeconds > 20 * 60 ? 'watch' : 'positive',
-    });
-  }
-
-  const tipCount = data.relay.tipHashes;
-  if (tipCount !== null) {
-    events.push({
-      key: 'tips',
-      title: `${displayNumber(tipCount)} consensus tip${tipCount === 1 ? '' : 's'} visible`,
-      detail: 'BlockDAG tips are a live consensus metric; multiple tips are normal on a DAG and are not automatically an error.',
-      tone: 'info',
-    });
-  }
-
-  if (data.mempool !== null) {
-    events.push({
-      key: 'mempool',
-      title: data.mempool > 0 ? 'Transactions waiting in mempool' : 'Mempool currently clear',
-      detail: `${displayNumber(data.mempool)} transaction${data.mempool === 1 ? '' : 's'} waiting at the public explorer node.`,
-      tone: data.mempool > 25 ? 'watch' : 'info',
-    });
-  }
-
-  return events.slice(0, 8);
-}
-
-function EventsPage({ data, history }: { data: DashboardData; history: HistorySnapshot[] }) {
-  const events = useMemo(() => buildNetworkEvents(data, history), [data, history]);
-  const recentBlocks = data.blocks.slice(0, 8);
-
-  return (
-    <section className="page-stack">
-      <div className="privacy-callout">
-        <Activity size={21} />
-        <div>
-          <b>Live event intelligence â€” stable public signals only</b>
-          <span>
-            This page tracks consensus, block flow, peer changes, merged-mining attribution and ZKAS.stream observer events.
-            It intentionally does not reconstruct an animated live BlockDAG from intermittent block-relationship endpoints.
-          </span>
-        </div>
-      </div>
-
-      <section className="panel">
-        <div className="panel-head">
-          <div><span className="panel-icon"><Activity size={20} /></span><h2>Event intelligence</h2></div>
-          <span className="range-chip">LIVE + OBSERVED</span>
-        </div>
-        <p className="source-note" style={{ marginTop: 0 }}>
-          <ShieldCheck size={15} /> Events combine current consensus/public-API data with ZKAS.stream observer snapshots.
-          They describe observed changes, not authoritative network-wide incidents.
-        </p>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 12, marginTop: 16 }}>
-          {events.map((event) => <EventCard key={event.key} event={event} />)}
-          {!events.length && <div className="empty-mini">Collecting enough observer data to describe network changes.</div>}
-        </div>
-      </section>
-
-      <div className="metric-grid nodes-metrics">
-        <MetricCard icon={<Boxes size={19} />} label="Recent public blocks" value={displayNumber(data.blocks.length)} sub="Latest explorer snapshot" accent />
-        <MetricCard icon={<Network size={19} />} label="Consensus tips" value={displayNumber(data.relay.tipHashes)} sub="Current public node metric" />
-        <MetricCard icon={<Activity size={19} />} label="BPS" value={displayNumber(data.bps)} sub="15m observed block flow" />
-        <MetricCard icon={<Database size={19} />} label="Mempool" value={displayNumber(data.mempool)} sub="Transactions waiting" />
-      </div>
-
-      <section className="panel table-panel">
-        <div className="panel-head">
-          <div><span className="panel-icon"><Boxes size={20} /></span><h2>Recent public block activity</h2></div>
-          <span className="live-mini"><i /> LIVE SNAPSHOT</span>
-        </div>
-        <div className="table-scroll">
-          <table>
-            <thead><tr><th>Hash</th><th>Age</th><th>DAA</th><th>Blue score</th><th>Txs</th><th>Difficulty</th></tr></thead>
-            <tbody>
-              {recentBlocks.map((block, index) => (
-                <tr key={`${block.hash}-${index}`}>
-                  <td><code className="soft-code">{short(block.hash, 8)}</code></td>
-                  <td>{age(block.timestamp)}</td>
-                  <td>{displayNumber(block.daaScore, true)}</td>
-                  <td>{displayNumber(block.blueScore, true)}</td>
-                  <td><span className="pill">{block.txCount}</span></td>
-                  <td>{displayNumber(block.difficulty, true)}</td>
-                </tr>
-              ))}
-              {!recentBlocks.length && <tr><td colSpan={6} className="empty-cell">Waiting for recent public block data.</td></tr>}
-            </tbody>
-          </table>
-        </div>
-        <p className="table-footnote">
-          This is a stable recent-block snapshot, not a reconstructed live DAG. Parent relationships are intentionally omitted.
-        </p>
-      </section>
-    </section>
-  );
-}
-
-function EventCard({ event }: { event: NetworkEvent }) {
-  const tone = event.tone === 'watch'
-    ? { border: 'rgba(202, 139, 20, .35)', bg: 'rgba(202, 139, 20, .07)', dot: '#c58b18' }
-    : event.tone === 'positive'
-      ? { border: 'rgba(11, 158, 130, .35)', bg: 'rgba(11, 158, 130, .07)', dot: '#0b9e82' }
-      : { border: 'rgba(105, 92, 255, .28)', bg: 'rgba(105, 92, 255, .05)', dot: '#6d5dfc' };
-  return (
-    <div style={{ border: `1px solid ${tone.border}`, background: tone.bg, borderRadius: 16, padding: '15px 16px', minHeight: 112 }}>
-      <div style={{ display: 'flex', gap: 9, alignItems: 'center', marginBottom: 8 }}><i style={{ width: 8, height: 8, borderRadius: 999, background: tone.dot, display: 'block' }} /><b>{event.title}</b></div>
-      <span style={{ display: 'block', opacity: .72, lineHeight: 1.45, fontSize: 13 }}>{event.detail}</span>
-    </div>
-  );
-}
-
-function HistoryPage({ data, history, range, onRange }: { data: DashboardData; history: HistorySnapshot[]; range: HistoryRange; onRange: (range: HistoryRange) => void }) {
-  const cutoff = Date.now() - rangeMs(range);
-  const rows = history.filter((row) => row.t >= cutoff);
-  const first = rows[0] ?? null;
-  const last = rows.at(-1) ?? null;
-  const oldest = history[0]?.t ?? null;
-  const sampleSpan = first && last ? Math.max(0, last.t - first.t) : 0;
-  const pointsExpected = Math.max(1, Math.floor(rangeMs(range) / HISTORY_SAMPLE_MS));
-  const coverage = Math.min(100, (rows.length / pointsExpected) * 100);
-  const ranges: HistoryRange[] = ['1h', '24h', '7d', '30d'];
-
-  const chainWork = (data.chainWorkHistory ?? []).filter((point) => point.time >= cutoff);
-  const hashrateSeries = combinedChainSeries(
-    rows.map((row) => ({ time: row.t, value: row.hashrate })),
-    chainWork.map((point) => ({ time: point.time, value: point.hashrate })),
-    cutoff,
-  );
-  const difficultySeries = combinedChainSeries(
-    rows.map((row) => ({ time: row.t, value: row.difficulty })),
-    chainWork.map((point) => ({ time: point.time, value: point.difficulty })),
-    cutoff,
-  );
-
-  const hashrateDelta = seriesDelta(hashrateSeries);
-  const difficultyDelta = seriesDelta(difficultySeries);
-  const nodesDelta = deltaAbsolute(first?.visibleNodes ?? null, last?.visibleNodes ?? null);
-  const attributedDelta = deltaAbsolute(first?.attributedBlocks ?? null, last?.attributedBlocks ?? null);
-  const shareDelta = deltaAbsolute(first?.largestSharePct ?? null, last?.largestSharePct ?? null);
-  const coLocationDelta = deltaAbsolute(first?.coLocationPct ?? null, last?.coLocationPct ?? null);
-  const chainSpan = Math.max(seriesSpan(hashrateSeries), seriesSpan(difficultySeries));
-  const chainSamples = Math.max(hashrateSeries.length, difficultySeries.length);
-  const latestHashrate = hashrateSeries.at(-1)?.value ?? last?.hashrate ?? null;
-  const latestDifficulty = difficultySeries.at(-1)?.value ?? last?.difficulty ?? null;
-  const observerStarted = oldest ? dateStamp(oldest) : 'Not started';
-
-  return (
-    <section className="page-stack history-page">
-      <div className="privacy-callout"><History size={21} /><div><b>Historical intelligence, with source boundaries</b><span>Chain-reconstructable work data and observer-only network data are kept separate. ZKAS.stream never invents peer, geography, attribution or co-location history from before it was actually observed.</span></div></div>
-
-      <section className="two-col">
-        <div className="privacy-callout">
-          <TrendingUp size={21} />
-          <div><b>CHAIN BACKFILL Â· HASHRATE + DIFFICULTY</b><span>The public ZKas explorer reconstructs compact work-history bins from selected-parent chain data. The current public backend seeds up to the most recent 24 hours, so these two charts can fill immediately instead of starting from zero today.</span></div>
-        </div>
-        <div className="privacy-callout">
-          <Network size={21} />
-          <div><b>OBSERVER HISTORY Â· TRACKING BEGAN {observerStarted.toUpperCase()}</b><span>Visible nodes, countries, mining attribution, confidence and Kaspa co-location are observations from an explorer vantage point. Their history begins when ZKAS.stream recorded them and is not retroactively fabricated.</span></div>
-        </div>
-      </section>
-
-      <section className="panel history-toolbar">
-        <div>
-          <span className="eyebrow">TIME RANGE</span>
-          <h2>{range.toUpperCase()} intelligence</h2>
-          <p>
-            {rows.length >= 2 ? `${rows.length} observer snapshots Â· ${duration(sampleSpan / 1000)} observed span` : 'Observer history is still collecting.'}
-            {chainSamples >= 2 ? ` Â· ${chainSamples} chain-work samples Â· ${duration(chainSpan / 1000)} chain span` : ''}
-          </p>
-        </div>
-        <div className="history-range-tabs">
-          {ranges.map((value) => <button key={value} className={range === value ? 'active' : ''} onClick={() => onRange(value)}>{value.toUpperCase()}</button>)}
-        </div>
-      </section>
-
-      <div className="metric-grid history-metrics">
-        <HistoryMetric icon={<Gauge size={19} />} label="Hashrate" value={displayHashrate(latestHashrate)} delta={hashrateDelta === null ? 'Chain history loading' : `${signed(hashrateDelta)} Â· chain-derived`} />
-        <HistoryMetric icon={<Gauge size={19} />} label="Difficulty" value={displayNumber(latestDifficulty, true)} delta={difficultyDelta === null ? 'Chain history loading' : `${signed(difficultyDelta)} Â· chain-derived`} />
-        <HistoryMetric icon={<Network size={19} />} label="Visible nodes" value={displayNumber(last?.visibleNodes ?? null)} delta={signed(nodesDelta, '')} />
-        <HistoryMetric icon={<GitMerge size={19} />} label="Attributed blocks" value={displayNumber(last?.attributedBlocks ?? null, true)} delta={signed(attributedDelta, '')} />
-        <HistoryMetric icon={<TrendingUp size={19} />} label="Largest observed share" value={last?.largestSharePct === null || last?.largestSharePct === undefined ? 'â€”' : `${fmt.format(last.largestSharePct)}%`} delta={shareDelta === null ? 'Collecting observer history' : `${signed(shareDelta, '')} pts`} />
-        <HistoryMetric icon={<ShieldCheck size={19} />} label="Weighted confidence" value={last?.weightedConfidencePct === null || last?.weightedConfidencePct === undefined ? 'â€”' : `${fmt.format(last.weightedConfidencePct)}%`} delta="Observer-tracked attribution confidence" />
-        <HistoryMetric icon={<Zap size={19} />} label="Observable co-location" value={last?.coLocationPct === null || last?.coLocationPct === undefined ? 'â€”' : `${fmt.format(last.coLocationPct)}%`} delta={coLocationDelta === null ? 'Collecting observer history' : `${signed(coLocationDelta, '')} pts`} />
-        <HistoryMetric icon={<Server size={19} />} label="Co-located peers" value={displayNumber(last?.coLocatedPeers ?? null)} delta={last?.peersChecked ? `${displayNumber(last.coLocatedPeers)} of ${displayNumber(last.peersChecked)} checked Â· observer history` : 'Observer history'} />
-      </div>
-
-      <section className="two-col history-charts">
-        <HistoryChart title="Network hashrate Â· chain backfill" chip={range.toUpperCase()} values={hashrateSeries.map((point) => point.value)} labels={hashrateSeries.map((point) => point.time)} />
-        <HistoryChart title="Difficulty Â· chain backfill" chip={range.toUpperCase()} values={difficultySeries.map((point) => point.value)} labels={difficultySeries.map((point) => point.time)} />
-        <HistoryChart title="Visible nodes Â· observer history" chip={range.toUpperCase()} values={rows.map((row) => row.visibleNodes)} labels={rows.map((row) => row.t)} />
-        <HistoryChart title="Largest attributed share Â· observer history" chip={range.toUpperCase()} values={rows.map((row) => row.largestSharePct)} labels={rows.map((row) => row.t)} />
-        <HistoryChart title="Observable co-location Â· observer history" chip={range.toUpperCase()} values={rows.map((row) => row.coLocationPct)} labels={rows.map((row) => row.t)} />
-        <HistoryChart title="Attributed blocks Â· observer history" chip={range.toUpperCase()} values={rows.map((row) => row.attributedBlocks)} labels={rows.map((row) => row.t)} />
-      </section>
-
-      <section className="panel history-storage">
-        <div className="panel-head"><div><span className="panel-icon"><Database size={20} /></span><h2>History source status</h2></div><span className="range-chip">HYBRID</span></div>
-        <div className="merge-stats node-stats">
-          <div><span>Observer snapshots</span><b>{displayNumber(history.length)}</b></div>
-          <div><span>Observer tracking since</span><b>{oldest ? dateStamp(oldest) : 'Just started'}</b></div>
-          <div><span>Chain-work samples</span><b>{displayNumber((data.chainWorkHistory ?? []).length)}</b></div>
-          <div><span>Chain backfill span</span><b>{chainSpan > 0 ? duration(chainSpan / 1000) : 'Loading'}</b></div>
-          <div><span>Observer coverage</span><b>{rows.length ? `${fmt.format(coverage)}%` : '0%'}</b></div>
-          <div><span>Local retention</span><b>30 days</b></div>
-        </div>
-        <p className="source-note"><ShieldCheck size={15} /> Current public API limitation: chain-work backfill is available for roughly the last 24 hours, not mainnet day one. Extending trustworthy chain backfill to 7D/30D/launch requires a longer historical endpoint or archival backend. Observer-only metrics remain truthful from their recorded start date.</p>
-      </section>
-    </section>
-  );
-}
-
-function HistoryMetric({ icon, label, value, delta }: { icon: ReactNode; label: string; value: string; delta: string }) {
-  return (
-    <section className="panel history-metric">
-      <div className="history-metric-label"><span>{icon}</span><b>{label}</b></div>
-      <strong>{value}</strong>
-      <small>{delta}</small>
-    </section>
-  );
-}
-
-function HistoryChart({ title, chip, values, labels }: { title: string; chip: string; values: Array<number | null>; labels: number[] }) {
-  return (
-    <section className="panel">
-      <div className="panel-head"><div><span className="panel-icon"><TrendingUp size={20} /></span><h2>{title}</h2></div><span className="range-chip">{chip}</span></div>
-      <SparkChart values={values} labels={labels} height={230} />
-    </section>
-  );
-}
-
-function SupplyPrivacyPage({ data, history, range, onRange }: { data: DashboardData; history: HistorySnapshot[]; range: HistoryRange; onRange: (range: HistoryRange) => void }) {
-  const cutoff = Date.now() - rangeMs(range);
-  const rows = history.filter((row) => row.t >= cutoff);
-  const first = rows[0];
-  const last = rows.at(-1);
-  const ranges: HistoryRange[] = ['1h', '24h', '7d', '30d'];
-
-  const supplyDelta = first?.supply != null && last?.supply != null ? last.supply - first.supply : null;
-  const notesDelta = first?.shieldedNotes != null && last?.shieldedNotes != null && last.shieldedNotes >= first.shieldedNotes ? last.shieldedNotes - first.shieldedNotes : null;
-  const nullifierReset = first?.nullifiers != null && last?.nullifiers != null && last.nullifiers < first.nullifiers;
-  const nullifierDelta = first?.nullifiers != null && last?.nullifiers != null && !nullifierReset ? last.nullifiers - first.nullifiers : null;
-
-  return (
-    <section className="page-stack">
-      <div className="privacy-callout"><ShieldCheck size={21} /><div><b>Supply intelligence without a rich list</b><span>ZKas is shielded by design. This page reports public consensus supply, reward schedule and aggregate shielded-pool activity without claiming to identify holders, balances, senders, recipients or transfer amounts.</span></div></div>
-
-      <div className="history-range-tabs">
-        {ranges.map((item) => <button key={item} className={range === item ? 'on' : ''} onClick={() => onRange(item)}>{item.toUpperCase()}</button>)}
-      </div>
-
-      <div className="metric-grid nodes-metrics">
-        <MetricCard icon={<Coins size={19} />} label="Circulating supply" value={displayNumber(data.supply, true)} sub={supplyDelta === null ? 'Consensus-derived issued supply' : `${signed(supplyDelta, ' ZKAS')} in selected observer window`} />
-        <MetricCard icon={<CircleDollarSign size={19} />} label="Gross block emission" value={data.reward === null ? 'â€”' : `${displayNumber(data.reward)} ZKAS`} sub="Consensus emission per block" />
-        <MetricCard icon={<Coins size={19} />} label="Miner payout (95%)" value={minerPayout(data.reward) === null ? 'â€”' : `${displayNumber(minerPayout(data.reward))} ZKAS`} sub="Expected accepted-block miner credit" />
-        <MetricCard icon={<CircleDollarSign size={19} />} label="Development allocation (5%)" value={developmentAllocation(data.reward) === null ? 'â€”' : `${displayNumber(developmentAllocation(data.reward))} ZKAS`} sub="Per accepted block" />
-        <MetricCard icon={<TimerReset size={19} />} label="Next reduction" value={countdown(data.nextReductionSeconds)} sub={data.nextReward === null ? 'Consensus schedule' : `Next gross ${displayNumber(data.nextReward)} Â· miner ${displayNumber(minerPayout(data.nextReward))} ZKAS`} />
-        <MetricCard icon={<LockKeyhole size={19} />} label="Shielded notes" value={displayNumber(data.shieldedNotes, true)} sub={notesDelta === null ? 'Backend-observed aggregate' : `+${displayNumber(notesDelta, true)} in selected window`} />
-        <MetricCard icon={<LockKeyhole size={19} />} label="Nullifiers / spends" value={displayNumber(data.nullifiers, true)} sub={nullifierReset ? 'Backend counter reset observed' : nullifierDelta === null ? 'Backend-observed aggregate' : `+${displayNumber(nullifierDelta, true)} in selected window`} />
-        <MetricCard icon={<Database size={19} />} label="Cumulative shielded issuance" value={displayNumber(data.shieldedValue ?? data.supply, true)} sub="Consensus-derived aggregate Â· not wallet balances" />
-      </div>
-
-      <section className="two-col">
-        <div className="panel">
-          <div className="panel-head"><div><span className="panel-icon"><TrendingUp size={20} /></span><h2>Supply growth Â· observer history</h2></div><span className="range-chip">{range.toUpperCase()}</span></div>
-          <HistoryChart title="Circulating ZKAS" chip="CONSENSUS SUPPLY" values={rows.map((row) => row.supply ?? null)} labels={rows.map((row) => row.t)} />
-        </div>
-        <div className="panel">
-          <div className="panel-head"><div><span className="panel-icon"><LockKeyhole size={20} /></span><h2>Shielded activity Â· observer history</h2></div><span className="range-chip">{range.toUpperCase()}</span></div>
-          <HistoryChart title="Shielded notes" chip="AGGREGATE" values={rows.map((row) => row.shieldedNotes ?? null)} labels={rows.map((row) => row.t)} />
-          <HistoryChart title="Nullifiers / spends" chip="AGGREGATE" values={rows.map((row) => row.nullifiers ?? null)} labels={rows.map((row) => row.t)} />
-        </div>
-      </section>
-
-      <section className="panel">
-        <div className="panel-head"><div><span className="panel-icon"><TimerReset size={20} /></span><h2>Emission schedule</h2></div><span className="range-chip">CONSENSUS</span></div>
-        <div className="merge-stats node-stats">
-          <div><span>Gross block emission</span><b>{data.reward === null ? 'â€”' : `${displayNumber(data.reward)} ZKAS`}</b></div>
-          <div><span>Miner payout (95%)</span><b>{minerPayout(data.reward) === null ? 'â€”' : `${displayNumber(minerPayout(data.reward))} ZKAS`}</b></div>
-          <div><span>Development allocation (5%)</span><b>{developmentAllocation(data.reward) === null ? 'â€”' : `${displayNumber(developmentAllocation(data.reward))} ZKAS`}</b></div>
-          <div><span>Next gross emission</span><b>{data.nextReward === null ? 'â€”' : `${displayNumber(data.nextReward)} ZKAS`}</b></div>
-          <div><span>Next miner payout</span><b>{minerPayout(data.nextReward) === null ? 'â€”' : `${displayNumber(minerPayout(data.nextReward))} ZKAS`}</b></div>
-          <div><span>Next reduction</span><b>{countdown(data.nextReductionSeconds)}</b></div>
-          <div><span>DAA score</span><b>{displayNumber(data.daaScore, true)}</b></div>
-        </div>
-        <p className="source-note"><ShieldCheck size={15} /> No annualized inflation estimate is shown. Reward and reduction values come from the public ZKas consensus/explorer API.</p>
-      </section>
-
-      <div className="reference-callout">
-        <div><span className="eyebrow">PRIVACY BOUNDARY</span><h2>What this page intentionally cannot show</h2><p>Top holders, richest wallets, wallet concentration and individual address balances are not inferred. The public explorer backend does not expose a transparent rich-list dataset for the shielded-by-default chain.</p></div>
-      </div>
-    </section>
-  );
-}
-
-function ReferencePage({ data, txs, onSelect }: { data: DashboardData; txs: Array<TxRow & { blockHash: string; timestamp: number }>; onSelect: (value: string) => void }) {
-  const hasShielded = data.shieldedNotes !== null || data.nullifiers !== null || data.stateRoot !== null;
-  return (
-    <section className="page-stack">
-      <div className="reference-callout">
-        <div><span className="eyebrow">SUPPORTING REFERENCE</span><h2>Chain information in one place</h2><p>Useful ZKas chain facts stay here for convenience. ZKAS.stream does not try to duplicate every explorer feature.</p></div>
-        <a className="secondary-link" href="https://explorer.zkas.info" target="_blank" rel="noreferrer">Open official ZKas Explorer â†—</a>
-      </div>
-      <div className="metric-grid nodes-metrics">
-        {data.supply !== null && <MetricCard icon={<Coins size={19} />} label="Circulating" value={displayNumber(data.supply, true)} sub="ZKAS issued" />}
-        {data.reward !== null && <MetricCard icon={<CircleDollarSign size={19} />} label="Gross emission" value={`${displayNumber(data.reward)} ZKAS`} sub="Per block" />}
-        {data.reward !== null && <MetricCard icon={<Coins size={19} />} label="Miner payout" value={`${displayNumber(minerPayout(data.reward))} ZKAS`} sub="95% of gross emission" />}
-        {data.nextReductionSeconds !== null && <MetricCard icon={<TimerReset size={19} />} label="Next reduction" value={countdown(data.nextReductionSeconds)} sub={data.nextReward === null ? 'Consensus schedule' : `Next gross ${displayNumber(data.nextReward)} Â· miner ${displayNumber(minerPayout(data.nextReward))} ZKAS`} />}
-        {data.blockCount !== null && <MetricCard icon={<Boxes size={19} />} label="Blocks" value={displayNumber(data.blockCount, true)} sub="Observed chain total" />}
-        {data.txCount !== null && <MetricCard icon={<Activity size={19} />} label="Transactions" value={displayNumber(data.txCount, true)} sub="Public aggregate" />}
-        {data.shieldedNotes !== null && <MetricCard icon={<LockKeyhole size={19} />} label="Shielded notes" value={displayNumber(data.shieldedNotes, true)} sub="Notes minted" />}
-        {data.nullifiers !== null && <MetricCard icon={<LockKeyhole size={19} />} label="Nullifiers" value={displayNumber(data.nullifiers, true)} sub="Shielded spends" />}
-        {data.daaScore !== null && <MetricCard icon={<Boxes size={19} />} label="DAA score" value={displayNumber(data.daaScore, true)} sub="Consensus progress" />}
-      </div>
-      <p className="source-note"><ShieldCheck size={15} /> Reference cards appear only when the public API reports that field. Last good values are retained across short endpoint misses instead of flashing unavailable data.</p>
-      <section className="two-col tables-row"><BlocksTable blocks={data.blocks.slice(0, 10)} onSelect={onSelect} /><TransactionsTable txs={txs.slice(0, 10)} onSelect={onSelect} /></section>
-      {hasShielded && <ShieldedPanel data={data} />}
-    </section>
-  );
-}
-
-function PublicNodeSummary({ data, onOpen }: { data: DashboardData; onOpen?: () => void }) {
-  const t = data.publicNodes.totals;
-  return (
-    <section className="panel node-summary">
-      <div className="panel-head">
-        <div><span className="panel-icon"><Globe2 size={20} /></span><h2>Public node view</h2></div>
-        {onOpen && <button className="text-btn" onClick={onOpen}>View nodes â†’</button>}
-      </div>
-      <div className="merge-stats node-stats">
-        <div><span>Visible nodes</span><b>{displayNumber(t.nodes ?? data.nodes)}</b></div>
-        <div><span>Countries</span><b>{displayNumber(t.countries)}</b></div>
-        <div><span>Inbound</span><b>{displayNumber(t.inbound)}</b></div>
-        <div><span>Outbound</span><b>{displayNumber(t.outbound)}</b></div>
-      </div>
-      <p className="source-note"><ShieldCheck size={15} /> Node data is privacy-preserving: the ZKas API reports country and masked network information rather than publicizing exact peer addresses.</p>
-    </section>
-  );
-}
-
-function ShieldedPanel({ data }: { data: DashboardData }) {
-  return (
-    <div className="panel privacy-panel">
-      <div className="panel-head"><div><span className="panel-icon"><LockKeyhole size={20} /></span><h2>Shielded pool</h2></div><span className="privacy-chip"><ShieldCheck size={14} /> PRIVATE</span></div>
-      <div className="privacy-grid">
-        <div><span>Notes minted</span><b>{displayNumber(data.shieldedNotes, true)}</b></div>
-        <div><span>Nullifiers spent</span><b>{displayNumber(data.nullifiers, true)}</b></div>
-      </div>
-      <div className="state-root"><span>Shielded state root</span><code>{data.stateRoot ? short(data.stateRoot, 16) : 'â€”'}</code></div>
-      <p className="privacy-note"><ShieldCheck size={17} /> Sender, recipient and transfer amounts remain shielded by design. The explorer reports public consensus activity instead.</p>
-    </div>
-  );
-}
-
-function MergedPanel({ data }: { data: DashboardData }) {
-  const ratio = data.merged.checked && data.merged.found !== null ? Math.min(100, (data.merged.found / data.merged.checked) * 100) : null;
-  return (
-    <section className="panel merged-panel">
-      <div className="panel-head"><div><span className="panel-icon"><GitMerge size={20} /></span><h2>Peer co-location probe</h2></div><span className="range-chip">SUPPORTING SIGNAL</span></div>
-      <div className="merged-layout">
-        <div className="merge-visual"><div className="chain kas"><span>KASPA</span><b>Parent PoW</b></div><div className="merge-arrow"><Zap size={22} /><span>AuxPoW</span></div><div className="chain zkas"><span>ZKAS</span><b>Child block</b></div></div>
-        <div className="merge-stats">
-          <div><span>Peers checked</span><b>{displayNumber(data.merged.checked)}</b></div>
-          <div><span>Probe-reachable</span><b>{displayNumber(data.merged.reachable)}</b></div>
-          <div><span>Kaspa co-located</span><b>{displayNumber(data.merged.found)}</b></div>
-          <div><span>Observable co-location</span><b>{ratio === null ? 'â€”' : `${fmt.format(ratio)}%`}</b></div>
-        </div>
-      </div>
-      <p className="source-note">This peer probe is separate from block attribution. A failed probe is not proof of non-merged mining because firewalls and inbound-only peers can be unprobeable.</p>
-    </section>
-  );
-}
-
-function BlocksPage({ blocks, onSelect }: { blocks: BlockRow[]; onSelect: (hash: string) => void }) {
-  const [filter, setFilter] = useState('');
-  const visible = blocks.filter((b) => b.hash.toLowerCase().includes(filter.trim().toLowerCase()));
-  return (
-    <section className="page-stack">
-      <div className="page-tools"><div><b>{visible.length}</b><span> recent public blocks</span></div><input value={filter} onChange={(e) => setFilter(e.target.value)} placeholder="Filter recent hashes" /></div>
-      <BlocksTable blocks={visible} onSelect={onSelect} expanded />
-    </section>
-  );
-}
-
-function TransactionsPage({ txs, onSelect }: { txs: Array<TxRow & { blockHash: string; timestamp: number }>; onSelect: (id: string) => void }) {
-  const [mode, setMode] = useState<'all' | 'shielded' | 'coinbase'>('all');
-  const visible = txs.filter((t) => mode === 'all' || t.kind.toLowerCase() === mode);
-  return (
-    <section className="page-stack">
-      <div className="privacy-callout"><LockKeyhole size={21} /><div><b>Privacy-aware transaction view</b><span>Transaction IDs and public confirmation data are visible; sender, recipient and transferred amount remain shielded.</span></div></div>
-      <div className="page-tools"><div><b>{visible.length}</b><span> recent transactions</span></div><div className="segmented"><button className={mode === 'all' ? 'on' : ''} onClick={() => setMode('all')}>All</button><button className={mode === 'shielded' ? 'on' : ''} onClick={() => setMode('shielded')}>Shielded</button><button className={mode === 'coinbase' ? 'on' : ''} onClick={() => setMode('coinbase')}>Coinbase</button></div></div>
-      <TransactionsTable txs={visible} onSelect={onSelect} expanded />
-    </section>
-  );
-}
-
-function NodesPage({ data }: { data: DashboardData }) {
-  const t = data.publicNodes.totals;
-  const locatedPct = t.nodes && t.located !== null ? (t.located / t.nodes) * 100 : null;
-  return (
-    <section className="page-stack">
-      <div className="privacy-callout"><Globe2 size={21} /><div><b>Public network view, not a global crawler</b><span>This is the public peer view exposed by the ZKas explorer backend. Exact peer addresses are not displayed; country and masked network labels preserve operator privacy.</span></div></div>
-      <div className="metric-grid nodes-metrics">
-        <MetricCard icon={<Server size={19} />} label="Visible nodes" value={displayNumber(t.nodes ?? data.nodes)} sub="Explorer vantage point" accent />
-        <MetricCard icon={<Globe2 size={19} />} label="Countries" value={displayNumber(t.countries)} sub={locatedPct === null ? 'Location aggregate' : `${fmt.format(locatedPct)}% located`} />
-        <MetricCard icon={<Network size={19} />} label="Inbound" value={displayNumber(t.inbound)} sub="Observed connections" />
-        <MetricCard icon={<Network size={19} />} label="Outbound" value={displayNumber(t.outbound)} sub="Observed connections" />
-        <MetricCard icon={<Activity size={19} />} label="IPv4" value={displayNumber(t.ipv4)} sub="Visible peers" />
-        <MetricCard icon={<Activity size={19} />} label="IPv6" value={displayNumber(t.ipv6)} sub="Visible peers" />
-        <MetricCard icon={<Boxes size={19} />} label="Blocks relayed" value={displayNumber(t.blocksRelayed, true)} sub="First-delivered to vantage node" />
-        <MetricCard icon={<Clock3 size={19} />} label="Peer records" value={displayNumber(data.publicNodes.nodes.length)} sub="Privacy-safe rows" />
-      </div>
-      <section className="two-col node-columns">
-        <CountriesTable data={data} />
-        <NodeClientSummary nodes={data.publicNodes.nodes} />
-      </section>
-      <NodesTable nodes={data.publicNodes.nodes} />
-    </section>
-  );
-}
-
-function CountriesTable({ data }: { data: DashboardData }) {
-  return (
-    <section className="panel table-panel">
-      <div className="panel-head"><div><span className="panel-icon"><Globe2 size={20} /></span><h2>Country distribution</h2></div><span className="range-chip">PUBLIC</span></div>
-      <div className="table-scroll"><table><thead><tr><th>Country</th><th>Code</th><th>Nodes</th><th>Share</th></tr></thead><tbody>
-        {data.publicNodes.countries.map((c) => <tr key={`${c.code}-${c.name}`}><td>{c.name}</td><td><span className="pill">{c.code}</span></td><td>{c.count}</td><td>{c.percent === null ? 'â€”' : `${fmt.format(c.percent)}%`}</td></tr>)}
-        {!data.publicNodes.countries.length && <tr><td colSpan={4} className="empty-cell">Country aggregates are not available from this API response.</td></tr>}
-      </tbody></table></div>
-    </section>
-  );
-}
-
-function NodeClientSummary({ nodes }: { nodes: PublicNodeRow[] }) {
-  const groups = new Map<string, number>();
-  nodes.forEach((n) => groups.set(n.userAgent || 'Unknown client', (groups.get(n.userAgent || 'Unknown client') || 0) + 1));
-  const rows = [...groups.entries()].sort((a, b) => b[1] - a[1]);
-  return (
-    <section className="panel table-panel">
-      <div className="panel-head"><div><span className="panel-icon"><Server size={20} /></span><h2>Client versions</h2></div><span className="range-chip">PUBLIC</span></div>
-      <div className="table-scroll"><table><thead><tr><th>Client / user agent</th><th>Count</th></tr></thead><tbody>
-        {rows.map(([client, count]) => <tr key={client}><td><code className="soft-code">{client}</code></td><td>{count}</td></tr>)}
-        {!rows.length && <tr><td colSpan={2} className="empty-cell">Client-version aggregates are not available.</td></tr>}
-      </tbody></table></div>
-    </section>
-  );
-}
-
-function NodesTable({ nodes }: { nodes: PublicNodeRow[] }) {
-  return (
-    <section className="panel table-panel expanded">
-      <div className="panel-head"><div><span className="panel-icon"><Network size={20} /></span><h2>Visible public peers</h2></div><span className="privacy-chip"><ShieldCheck size={14} /> MASKED</span></div>
-      <div className="table-scroll"><table><thead><tr><th>Peer</th><th>Country</th><th>Network</th><th>Client</th><th>Direction</th><th>Protocol</th><th>Ping</th><th>Connected</th><th>Relayed</th></tr></thead><tbody>
-        {nodes.map((n, i) => <tr key={`${n.id}-${i}`}><td><code className="soft-code">{short(n.id, 6)}</code></td><td>{n.countryName || n.countryCode || 'Unknown'}</td><td><code className="soft-code">{n.network || 'â€”'}</code></td><td>{n.userAgent || 'â€”'}</td><td><span className="pill">{n.outbound === null ? 'â€”' : n.outbound ? 'Outbound' : 'Inbound'}</span></td><td>{displayNumber(n.protocolVersion)}</td><td>{n.pingMs === null ? 'â€”' : `${displayNumber(n.pingMs)} ms`}</td><td>{duration(n.connectedForSec)}</td><td>{displayNumber(n.blocksRelayed)}</td></tr>)}
-        {!nodes.length && <tr><td colSpan={9} className="empty-cell">No privacy-safe peer rows were returned.</td></tr>}
-      </tbody></table></div>
-      <p className="table-footnote">â€œRelayedâ€ means the peer was first to deliver a block to the explorer vantage node; it does not identify the miner that found that block.</p>
-    </section>
-  );
-}
-
-function MiningPage({ data, diffValues, pulseTimes }: { data: DashboardData; diffValues: Array<number | null>; pulseTimes: number[] }) {
-  return (
-    <section className="mining-layout page-stack">
-      <div className="privacy-callout"><GitMerge size={21} /><div><b>Public network mining only</b><span>This page has no connection to any personal miner, bridge, worker name, wallet, local node or Prometheus endpoint.</span></div></div>
-      <div className="metric-grid mining-metrics">
-        <MetricCard icon={<Gauge size={19} />} label="Network hashrate" value={displayHashrate(data.hashrate)} sub="Public network estimate" accent />
-        <MetricCard icon={<Activity size={19} />} label="BPS" value={displayNumber(data.bps)} sub="Block production" />
-        <MetricCard icon={<CircleDollarSign size={19} />} label="Miner payout" value={`${displayNumber(minerPayout(data.reward))} ZKAS`} sub="95% of gross block emission" />
-        <MetricCard icon={<GitMerge size={19} />} label="Co-located peers" value={displayNumber(data.merged.found)} sub="Kaspa node detected" />
-      </div>
-      <div className="panel"><div className="panel-head"><div><span className="panel-icon"><Gauge size={20} /></span><h2>Network difficulty</h2></div><span className="range-chip">15M</span></div><SparkChart values={diffValues} labels={pulseTimes} height={240} /></div>
-      <MergedPanel data={data} />
-    </section>
-  );
-}
-
-function BlocksTable({ blocks, onSelect, expanded = false }: { blocks: BlockRow[]; onSelect: (hash: string) => void; expanded?: boolean }) {
-  return (
-    <section className={`panel table-panel ${expanded ? 'expanded' : ''}`}>
-      <div className="panel-head"><div><span className="panel-icon"><Boxes size={20} /></span><h2>Blocks</h2></div><span className="live-mini"><i /> LIVE</span></div>
-      <div className="table-scroll"><table><thead><tr><th>Hash</th><th>Age</th><th>DAA</th><th>Blue score</th><th>Txs</th><th>Difficulty</th></tr></thead><tbody>
-        {blocks.map((b, i) => <tr key={`${b.hash}-${i}`}><td><button className="hash-link" onClick={() => onSelect(b.hash)}><Hash size={14} />{short(b.hash, 8)}</button></td><td>{age(b.timestamp)}</td><td>{displayNumber(b.daaScore, true)}</td><td>{displayNumber(b.blueScore, true)}</td><td><span className="pill">{b.txCount}</span></td><td>{displayNumber(b.difficulty, true)}</td></tr>)}
-        {!blocks.length && <tr><td colSpan={6} className="empty-cell">No recent public block data.</td></tr>}
-      </tbody></table></div>
-    </section>
-  );
-}
-
-function TransactionsTable({ txs, onSelect, expanded = false }: { txs: Array<TxRow & { blockHash: string; timestamp: number }>; onSelect: (id: string) => void; expanded?: boolean }) {
-  return (
-    <section className={`panel table-panel ${expanded ? 'expanded' : ''}`}>
-      <div className="panel-head"><div><span className="panel-icon"><LockKeyhole size={20} /></span><h2>Transactions</h2></div><span className="privacy-chip"><ShieldCheck size={14} /> PRIVACY-AWARE</span></div>
-      <div className="table-scroll"><table><thead><tr><th>Tx ID</th><th>Age</th><th>Type</th><th>Actions</th><th>Block</th></tr></thead><tbody>
-        {txs.map((tx, i) => <tr key={`${tx.id}-${i}`}><td><button className="hash-link" onClick={() => onSelect(tx.id)}><LockKeyhole size={14} />{short(tx.id, 8)}</button></td><td>{age(tx.timestamp)}</td><td><span className="shield-pill">{tx.kind}</span></td><td>{tx.shieldedActions ?? 'â€”'}</td><td><code className="soft-code">{short(tx.blockHash, 6)}</code></td></tr>)}
-        {!txs.length && <tr><td colSpan={5} className="empty-cell">No recent public transaction data.</td></tr>}
-      </tbody></table></div>
-    </section>
-  );
-}
-
-function DetailDrawer({ detail, onClose }: { detail: Detail; onClose: () => void }) {
-  return (
-    <div className="drawer-backdrop" onMouseDown={(e) => { if (e.currentTarget === e.target) onClose(); }}>
-      <aside className="drawer" role="dialog" aria-modal="true" aria-label="Search result">
-        <div className="drawer-head"><div><span className="eyebrow">{detail.type === 'privacy' ? 'Privacy notice' : `${detail.type} result`}</span><h2>{short(detail.query, 14)}</h2></div><button className="icon-btn" onClick={onClose} aria-label="Close"><X size={20} /></button></div>
-        {detail.type === 'privacy' ? <div className="privacy-result"><ShieldCheck size={34} /><h3>Address activity stays private</h3><p>{String((detail.data as { message?: string }).message || '')}</p></div> : <div className="detail-list">{objectEntries(detail.data).map(([key, value]) => <div key={key}><span>{key}</span><code>{value}</code></div>)}</div>}
-      </aside>
-    </div>
-  );
-}
-
-export default App;
+YªçŠx-®éÜj×¢ëiºÚ+Š§j[h‘éÜ¢éíßÏyí:-jZ.¶›­–)Ş³V–×÷'B²f÷&ÔWfVçBÂG—R&V7DæöFRÂW6TVffV7BÂW6TÖVÖòÂW6U&VbÂW6U7FFRÒg&öÒw&V7Bs°¦–×÷'B°¢7F—f—G’À¢&÷†W2À¢6†Wg&öäF÷vâÀ¢6—&6ÆTFöÆÆ%6–vâÀ¢6Æö6³2À¢6ö–ç2À¢FF&6RÀ¢vVvRÀ¢v—DÖW&vRÀ¢vÆö&S"À¢†6‚À¢†—7F÷'’À¢Æ–æ³"À¢Æö6´¶W–†öÆRÀ¢ÖVçRÀ¢ÖW76vT6—&6ÆRÀ¢ÖööâÀ¢æWGv÷&²À¢Æ’À¢6V&6‚À¢6VæBÀ¢6W'fW"À¢6†–VÆD6†V6²À¢7VâÀ¢F–ÖW%&W6WBÀ¢G&VæF–æuWÀ¢vfW2À¢‚À¢¦À§Òg&öÒvÇV6–FR×&V7Bs°¦–×÷'B°¢fWF6„F6†&ö&BÀ¢fWF6„Ö–æ–ætF—7G&–'WF–öâÀ¢6V&6„6†–âÀ¢G—R&Æö6µ&÷rÀ¢G—RF6†&ö&DFFÀ¢G—RÖ–æ–ætF—7G&–'WF–öäFFÀ¢G—RV&Æ–4æöFU&÷rÀ¢G—RG…&÷rÀ§Òg&öÒrâö’s°¦–×÷'B²ÖWG&–46&BÒg&öÒrâö6ö×öæVçG2ôÖWG&–46&Bs°¦–×÷'B²÷F4Ö&¶WEvRÒg&öÒrâö6ö×öæVçG2ô÷F4Ö&¶WEvRs°¦–×÷'B²÷F567&VVç6†÷D–×÷'FW"Òg&öÒrâö6ö×öæVçG2ô÷F567&VVç6†÷D–×÷'FW"s°¦–×÷'B²7&´6†'BÒg&öÒrâö6ö×öæVçG2õ7&´6†'Bs°¦–×÷'B²f–FV÷5vRÒg&öÒrâö6ö×öæVçG2õf–FV÷5vRs° §G—RF"Òv–çFVÆÆ–vVæ6RrÂvÖW&vVBrÂv†VÇF‚rÂvæöFW2rÂvWfVçG2rÂv÷F2rÂv–×÷'FW"rÂv†—7F÷'’rÂw7WÇ’rÂw&VfW&Væ6RrÂwf–FV÷2s° ¦6öç7BF$†6†W3¢&V6÷&CÅF"Â7G&–æsâÒ°¢–çFVÆÆ–vVæ6S¢rrÀ¢ÖW&vVC¢vÖW&vVBÖÖ–æ–ærrÀ¢†VÇFƒ¢væWGv÷&²Ö†VÇF‚rÀ¢æöFW3¢væöFW2rÀ¢WfVçG3¢vWfVçG2rÀ¢÷F3¢v÷F2rÀ¢–×÷'FW#¢v÷F2Ö–×÷'BrÀ¢†—7F÷'“¢v†—7F÷'’rÀ¢7WÇ“¢w7WÇ’×&—f7’rÀ¢&VfW&Væ6S¢w&VfW&Væ6RrÀ¢f–FV÷3¢wf–FV÷2rÀ§Ó° ¦gVæ7F–öâF$g&öÔ†6‚††6ƒ¢7G&–ær“¢F"°¢6öç7B&÷WFRÒ†6‚ç&WÆ6R‚õâ5ÂóòòÂrr’çFôÆ÷vW$66R‚“°¢&WGW&â„ö&¦V7BæVçG&–W2‡F$†6†W2’æf–æB‚…²ÂfÇVUÒ’ÓâfÇVRÓÓÒ&÷WFR“òå³Ò2F"ÂVæFVf–æVB’óòv–çFVÆÆ–vVæ6Rs°§Ğ§G—RFWF–ÂÒ²G—S¢v&Æö6²rÂwG&ç67F–öârÂw&—f7’s²VW'“¢7G&–æs²FF¢Væ¶æ÷vâÓ° ¦6öç7Bf×BÒæWr–çFÂäçVÖ&W$f÷&ÖB‚vVâÕU2rÂ²Ö†–×VÔg&7F–öäF–v—G3¢"Ò“°¦6öç7B6ö×7BÒæWr–çFÂäçVÖ&W$f÷&ÖB‚vVâÕU2rÂ²æ÷FF–öã¢v6ö×7BrÂÖ†–×VÔg&7F–öäF–v—G3¢"Ò“° ¦6öç7BÔ”äU%õ$Ut$Eõ4„$RÒã“S°¦6öç7BDUdTÄõÔTåEõ4„$RÒãS° ¦gVæ7F–öâÖ–æW%–÷WB†w&÷73¢çVÖ&W"ÂçVÆÂ’°¢&WGW&âw&÷72ÓÓÒçVÆÂòçVÆÂ¢w&÷72¢Ô”äU%õ$Ut$Eõ4„$S°§Ğ ¦gVæ7F–öâFWfVÆ÷ÖVçDÆÆö6F–öâ†w&÷73¢çVÖ&W"ÂçVÆÂ’°¢&WGW&âw&÷72ÓÓÒçVÆÂòçVÆÂ¢w&÷72¢DUdTÄõÔTåEõ4„$S°§Ğ ¦gVæ7F–öâF—7Æ”çVÖ&W"‡c¢çVÖ&W"ÂçVÆÂÂ6ö×7DÖöFRÒfÇ6R’°¢–b‡bÓÓÒçVÆÂÇÂçVÖ&W"æ—4f–æ—FR‡b’’&WGW&â~(	Bs°¢&WGW&â6ö×7DÖöFRò6ö×7Bæf÷&ÖB‡b’¢f×Bæf÷&ÖB‡b“°§Ğ ¦gVæ7F–öâF—7Æ”†6‡&FR‡c¢çVÖ&W"ÂçVÆÂ’°¢–b‡bÓÓÒçVÆÂ’&WGW&â~(	Bs°¢6öç7BVæ—G2Ò²t‚÷2rÂt´‚÷2rÂtÔ‚÷2rÂtt‚÷2rÂuD‚÷2rÂu‚÷2rÂtT‚÷2uÓ°¢ÆWBâÒc°¢ÆWB’Ò°¢v†–ÆR„ÖF‚æ'2†â’ãÒbb’ÂVæ—G2æÆVæwF‚Ò’²âóÒ²’³Ò²Ğ¢&WGW&âG¶f×Bæf÷&ÖB†â—ÒG·Væ—G5¶•×Ö°§Ğ ¦gVæ7F–öâvR‡G3¢çVÖ&W"’°¢6öç7B2ÒÖF‚æÖ‚ƒÂÖF‚æfÆö÷"‚„FFRææ÷r‚’ÒG2’ò’“°¢–b‡2Âc’&WGW&âG·7×2vö°¢–b‡2Â3c’&WGW&âG´ÖF‚æfÆö÷"‡2òc—ÖÒvö°¢–b‡2ÂƒcC’&WGW&âG´ÖF‚æfÆö÷"‡2ò3c—Ö‚vö°¢&WGW&âG´ÖF‚æfÆö÷"‡2òƒcC—ÖBvö°§Ğ ¦gVæ7F–öâGW&F–öâ‡6V6öæG3¢çVÖ&W"ÂçVÆÂ’°¢–b‡6V6öæG2ÓÓÒçVÆÂ’&WGW&â~(	Bs°¢–b‡6V6öæG2Âc’&WGW&âG´ÖF‚æfÆö÷"‡6V6öæG2—×6°¢–b‡6V6öæG2Â3c’&WGW&âG´ÖF‚æfÆö÷"‡6V6öæG2òc—ÖÖ°¢–b‡6V6öæG2ÂƒcC’&WGW&âG´ÖF‚æfÆö÷"‡6V6öæG2ò3c—Ö‚G´ÖF‚æfÆö÷"‚‡6V6öæG2R3c’òc—ÖÖ°¢&WGW&âG´ÖF‚æfÆö÷"‡6V6öæG2òƒcC—ÖBG´ÖF‚æfÆö÷"‚‡6V6öæG2RƒcC’ò3c—Ö†°§Ğ ¦gVæ7F–öâ6†÷'B‡fÇVS¢7G&–ærÂâÒ’°¢&WGW&âfÇVRæÆVæwF‚ââ¢"òG·fÇVRç6Æ–6RƒÂâ—Ş(
+bG·fÇVRç6Æ–6R‚Öâ—Ö¢fÇVS°§Ğ ¦gVæ7F–öâ6÷VçFF÷vâ‡6V6öæG3¢çVÖ&W"ÂçVÆÂ’°¢–b‡6V6öæG2ÓÓÒçVÆÂ’&WGW&â~(	Bs°¢6öç7BBÒÖF‚æfÆö÷"‡6V6öæG2òƒcC“°¢6öç7B‚ÒÖF‚æfÆö÷"‚‡6V6öæG2RƒcC’ò3c“°¢6öç7BÒÒÖF‚æfÆö÷"‚‡6V6öæG2R3c’òc“°¢&WGW&âG¶GÖBG¶‡Ö‚G¶×ÖÖ°§Ğ ¦gVæ7F–öâF—7Æ”Ö–æ–ætW7F–ÖFR‡fÇVS¢çVÖ&W"ÂçVÆÂÂ7Vff—‚Òrr’°¢–b‡fÇVRÓÓÒçVÆÂÇÂçVÖ&W"æ—4f–æ—FR‡fÇVR’’&WGW&â~(	Bs°¢6öç7B'2ÒÖF‚æ'2‡fÇVR“°¢ÆWBFW‡C¢7G&–æs°¢–b†'2âbb'2Âã’FW‡BÒfÇVRçFôf—†VBƒB“°¢VÇ6R–b†'2Â’FW‡BÒfÇVRçFôf—†VBƒ2“°¢VÇ6RFW‡BÒf×Bæf÷&ÖB‡fÇVR“°¢&WGW&âG·FW‡GÒG·7Vff—‡Ö°§Ğ ¦gVæ7F–öâF—7Æ”Ö–æ–æuW&6VçB‡fÇVS¢çVÖ&W"ÂçVÆÂ’°¢–b‡fÇVRÓÓÒçVÆÂÇÂçVÖ&W"æ—4f–æ—FR‡fÇVR’’&WGW&â~(	Bs°¢6öç7B'2ÒÖF‚æ'2‡fÇVR“°¢–b†'2âbb'2Âã’&WGW&âG·fÇVRçFôf—†VBƒB—ÒV°¢–b†'2Â’&WGW&âG·fÇVRçFôf—†VBƒ2—ÒV°¢&WGW&âG¶f×Bæf÷&ÖB‡fÇVR—ÒV°§Ğ ¦gVæ7F–öâö&¦V7DVçG&–W2†FF¢Væ¶æ÷vâ“¢'&“Å·7G&–ærÂ7G&–æuÓâ°¢–b‚FFÇÂG—VöbFFÓÒvö&¦V7Br’&WGW&âµ²u&W7VÇBrÂ7G&–ær†FFóò~(	Br•ÕÓ°¢&WGW&âö&¦V7BæVçG&–W2†FF2&V6÷&CÇ7G&–ærÂVæ¶æ÷vãâ’ç6Æ–6RƒÂ#B’æÖ‚…¶¶W’ÂfÇVUÒ’Óâ°¢–b‡G—VöbfÇVRÓÓÒw7G&–ærr’&WGW&â¶¶W’ÂfÇVUÓ°¢–b‡G—VöbfÇVRÓÓÒvçVÖ&W"rÇÂG—VöbfÇVRÓÓÒv&ööÆVâr’&WGW&â¶¶W’Â7G&–ær‡fÇVR•Ó°¢&WGW&â¶¶W’Â¥4ôâç7G&–æv–g’‡fÇVR•Ó°¢Ò“°§Ğ  ¦6öç7BV×G”F6†&ö&C¢F6†&ö&DFFÒ°¢6÷W&6S¢vÆ—fRrÀ¢WFFVDC¢FFRææ÷r‚’À¢æWGv÷&³¢vÖ–ææWBrÀ¢'3¢çVÆÂÀ¢æöFW3¢çVÆÂÀ¢ÖV×ööÃ¢çVÆÂÀ¢†6‡&FS¢çVÆÂÀ¢&Æö6´6÷VçC¢çVÆÂÀ¢F66÷&S¢çVÆÂÀ¢7WÇ“¢çVÆÂÀ¢&Wv&C¢çVÆÂÀ¢æW‡E&Wv&C¢çVÆÂÀ¢æW‡E&VGV7F–öå6V6öæG3¢çVÆÂÀ¢G„6÷VçC¢çVÆÂÀ¢6†–VÆFVDæ÷FW3¢çVÆÂÀ¢çVÆÆ–f–W'3¢çVÆÂÀ¢6†–VÆFVEfÇVS¢çVÆÂÀ¢7FFU&ö÷C¢çVÆÂÀ¢&–6UW6C¢çVÆÂÀ¢Ö&¶WD6W6C¢çVÆÂÀ¢ÖW&vVC¢²66ææVDC¢çVÆÂÂVW'3¢çVÆÂÂ6†V6¶VC¢çVÆÂÂ&V6†&ÆS¢çVÆÂÂf÷VæC¢çVÆÂÂGG&–'WF–öäÖF6†VC¢çVÆÂÂGG&–'WF–öåWFFVDC¢çVÆÂÂ÷'G3¢µÒÂæöFW3¢µÒÒÀ¢&VÆ“¢²7F—fUVW'3¢çVÆÂÂÖV×ööÅ6—¦S¢çVÆÂÂF—†6†W3¢çVÆÂÂF–ff–7VÇG“¢çVÆÂÂ&Æö6·4–ævW7FVC¢çVÆÂÂG&ç67F–öç5&ö6W76VC¢çVÆÂÂFF&6T&Æö6·3¢çVÆÂÒÀ¢F–ff–7VÇG“¢çVÆÂÀ¢V&Æ–4æöFW3¢°¢WFFVDC¢çVÆÂÀ¢F÷FÇ3¢°¢æöFW3¢çVÆÂÀ¢VW'3¢çVÆÂÀ¢6÷VçG&–W3¢çVÆÂÀ¢Æö6FVC¢çVÆÂÀ¢–æ&÷VæC¢çVÆÂÀ¢÷WF&÷VæC¢çVÆÂÀ¢—cC¢çVÆÂÀ¢—cc¢çVÆÂÀ¢&Æö6·5&VÆ–VC¢çVÆÂÀ¢ÒÀ¢6÷VçG&–W3¢µÒÀ¢æöFW3¢µÒÀ¢ÒÀ¢VÇ6S¢µÒÀ¢6†–åv÷&´†—7F÷'“¢µÒÀ¢&Æö6·3¢µÒÀ§Ó° ¦6öç7BÄ•dUô44„Uô´U’Òw¦¶2×7G&VÓ§c33¦Æ7BÖÆ—fRÖF6†&ö&Bs°¦6öç7BÔU$tTEô44„Uô´U’Òw¦¶2×7G&VÓ§c33¦Æ7BÖ6ö×ÆWFVBÖÖW&vVB×66âs°¦6öç7BEE$”%UD”ôåô44„Uô´U’Òw¦¶2×7G&VÓ§c3C¦Æ7BÖGG&–'WF–öâ×6æ6†÷Bs°¦6öç7B„•5Dõ%•ô44„Uô´U’Òw¦¶2×7G&VÓ§cC¦†—7F÷'’s°¦6öç7B„•5Dõ%•õ4ÕÄUôÕ2ÒR¢c¢°¦6öç7B„•5Dõ%•õ$UDTåD”ôåôÕ2Ò3¢#B¢c¢c¢° §G—R†—7F÷'•&ævRÒs‚rÂs#F‚rÂsvBrÂs3Bs°§G—R†—7F÷'•6æ6†÷BÒ°¢C¢çVÖ&W#°¢†6‡&FS¢çVÖ&W"ÂçVÆÃ°¢'3¢çVÖ&W"ÂçVÆÃ°¢F–ff–7VÇG“¢çVÖ&W"ÂçVÆÃ°¢f—6–&ÆTæöFW3¢çVÖ&W"ÂçVÆÃ°¢6÷VçG&–W3¢çVÖ&W"ÂçVÆÃ°¢7F—fUVW'3¢çVÖ&W"ÂçVÆÃ°¢F—†6†W3¢çVÖ&W"ÂçVÆÃ°¢ÖV×ööÃ¢çVÖ&W"ÂçVÆÃ°¢GG&–'WFVD&Æö6·3¢çVÖ&W"ÂçVÆÃ°¢GG&–'WF–öäw&÷W3¢çVÖ&W"ÂçVÆÃ°¢vV–v‡FVD6öæf–FVæ6U7C¢çVÖ&W"ÂçVÆÃ°¢Æ&vW7E6†&U7C¢çVÖ&W"ÂçVÆÃ°¢6ôÆö6FVEVW'3¢çVÖ&W"ÂçVÆÃ°¢VW'46†V6¶VC¢çVÖ&W"ÂçVÆÃ°¢6ôÆö6F–öå7C¢çVÖ&W"ÂçVÆÃ°¢7WÇ“ó¢çVÖ&W"ÂçVÆÃ°¢&Wv&Có¢çVÖ&W"ÂçVÆÃ°¢æW‡E&Wv&Có¢çVÖ&W"ÂçVÆÃ°¢6†–VÆFVDæ÷FW3ó¢çVÖ&W"ÂçVÆÃ°¢çVÆÆ–f–W'3ó¢çVÖ&W"ÂçVÆÃ°¢6†–VÆFVEfÇVSó¢çVÖ&W"ÂçVÆÃ°§Ó° ¦gVæ7F–öâfÆ–DçVÖ&W"‡fÇVS¢çVÖ&W"ÂçVÆÂÂVæFVf–æVB’°¢&WGW&âG—VöbfÇVRÓÓÒvçVÖ&W"rbbçVÖ&W"æ—4f–æ—FR‡fÇVR’òfÇVR¢çVÆÃ°§Ğ ¦gVæ7F–öâ&VD†—7F÷'’‚“¢†—7F÷'•6æ6†÷EµÒ°¢G'’°¢6öç7B&rÒv–æF÷ræÆö6Å7F÷&vRævWD—FVÒ„„•5Dõ%•ô44„Uô´U’“°¢–b‚&r’&WGW&âµÓ°¢6öç7B'6VBÒ¥4ôâç'6R‡&r’2†—7F÷'•6æ6†÷EµÓ°¢–b‚'&’æ—4'&’‡'6VB’’&WGW&âµÓ°¢6öç7B7WFöfbÒFFRææ÷r‚’Ò„•5Dõ%•õ$UDTåD”ôåôÕ3°¢&WGW&â'6VBæf–ÇFW"‚‡&÷r’Óâ&÷rbbçVÖ&W"æ—4f–æ—FR‡&÷rçB’bb&÷rçBãÒ7WFöfb“°¢Ò6F6‚°¢&WGW&âµÓ°¢Ğ§Ğ ¦gVæ7F–öâÖ¶T†—7F÷'•6æ6†÷B†FF¢F6†&ö&DFF“¢†—7F÷'•6æ6†÷B°¢6öç7Bw&÷W2ÒGG&–'WF–öäw&÷W2†FF“°¢6öç7BGG&–'WFVD&Æö6·2ÒFFæÖW&vVBæGG&–'WF–öäÖF6†VBóò†w&÷W2ç&VGV6R‚‡7VÒÂr’Óâ7VÒ²ræ&Æö6·2Â’ÇÂçVÆÂ“°¢6öç7BvV–v‡FVD6öæf–FVæ6RÒvV–v‡FVDGG&–'WF–öä6öæf–FVæ6R†w&÷W2“°¢6öç7BF÷6†&RÒg&7F–öåW&6VçB†w&÷W5³Óòç6†&RóòçVÆÂ“°¢&WGW&â°¢C¢FFRææ÷r‚’À¢†6‡&FS¢fÆ–DçVÖ&W"†FFæ†6‡&FR’À¢'3¢fÆ–DçVÖ&W"†FFæ'2’À¢F–ff–7VÇG“¢fÆ–DçVÖ&W"†FFæF–ff–7VÇG’’À¢f—6–&ÆTæöFW3¢fÆ–DçVÖ&W"†FFçV&Æ–4æöFW2çF÷FÇ2ææöFW2óòFFææöFW2’À¢6÷VçG&–W3¢fÆ–DçVÖ&W"†FFçV&Æ–4æöFW2çF÷FÇ2æ6÷VçG&–W2’À¢7F—fUVW'3¢fÆ–DçVÖ&W"†FFç&VÆ’æ7F—fUVW'2óòFFææöFW2’À¢F—†6†W3¢fÆ–DçVÖ&W"†FFç&VÆ’çF—†6†W2’À¢ÖV×ööÃ¢fÆ–DçVÖ&W"†FFæÖV×ööÂ’À¢GG&–'WFVD&Æö6·3¢fÆ–DçVÖ&W"†GG&–'WFVD&Æö6·2’À¢GG&–'WF–öäw&÷W3¢w&÷W2æÆVæwF‚ÇÂçVÆÂÀ¢vV–v‡FVD6öæf–FVæ6U7C¢g&7F–öåW&6VçB‡vV–v‡FVD6öæf–FVæ6R’À¢Æ&vW7E6†&U7C¢F÷6†&RÀ¢6ôÆö6FVEVW'3¢fÆ–DçVÖ&W"†FFæÖW&vVBæf÷VæB’À¢VW'46†V6¶VC¢fÆ–DçVÖ&W"†FFæÖW&vVBæ6†V6¶VB’À¢6ôÆö6F–öå7C¢7B†FFæÖW&vVBæf÷VæBÂFFæÖW&vVBæ6†V6¶VB’À¢7WÇ“¢fÆ–DçVÖ&W"†FFç7WÇ’’À¢&Wv&C¢fÆ–DçVÖ&W"†FFç&Wv&B’À¢æW‡E&Wv&C¢fÆ–DçVÖ&W"†FFææW‡E&Wv&B’À¢6†–VÆFVDæ÷FW3¢fÆ–DçVÖ&W"†FFç6†–VÆFVDæ÷FW2’À¢çVÆÆ–f–W'3¢fÆ–DçVÖ&W"†FFæçVÆÆ–f–W'2’À¢6†–VÆFVEfÇVS¢fÆ–DçVÖ&W"†FFç6†–VÆFVEfÇVR’À¢Ó°§Ğ ¦gVæ7F–öâVæD†—7F÷'•6æ6†÷B††—7F÷'“¢†—7F÷'•6æ6†÷EµÒÂFF¢F6†&ö&DFF“¢†—7F÷'•6æ6†÷EµÒ°¢–b†FFç6÷W&6RÓÒvÆ—fRrÇÂFFææWGv÷&²’&WGW&â†—7F÷'“°¢6öç7BæW‡BÒÖ¶T†—7F÷'•6æ6†÷B†FF“°¢6öç7B7WFöfbÒæW‡BçBÒ„•5Dõ%•õ$UDTåD”ôåôÕ3°¢6öç7B¶WBÒ†—7F÷'’æf–ÇFW"‚‡&÷r’Óâ&÷rçBãÒ7WFöfb“°¢6öç7BÆ7BÒ¶WBæB‚Ó“°¢ÆWB&W7VÇC¢†—7F÷'•6æ6†÷EµÓ°¢òò¶VWF†RF–ÖW7F×öbF†R7W'&VçBRÖÖ–çWFR'V6¶WB7F&ÆRv†–ÆR&Vg&W6†–æp¢òò—G2fÇVW2â&W6WGF–ærF†RF–ÖW7F×öâWfW'’R×6V6öæBöÆÂv÷VÆB&WfVç@¢òòF†R'V6¶WBg&öÒWfW"&V6†–ærf—fRÖ–çWFW2æB†—7F÷'’v÷VÆB&VÖ–â7GV6°¢òòBöæR6æ6†÷Bf÷&WfW"à¢–b†Æ7BbbæW‡BçBÒÆ7BçBÂ„•5Dõ%•õ4ÕÄUôÕ2’°¢&W7VÇBÒ²ââæ¶WBç6Æ–6RƒÂÓ’Â²ââææW‡BÂC¢Æ7BçBÕÓ°¢ÒVÇ6R°¢&W7VÇBÒ²ââæ¶WBÂæW‡EÓ°¢Ğ¢G'’²v–æF÷ræÆö6Å7F÷&vRç6WD—FVÒ„„•5Dõ%•ô44„Uô´U’Â¥4ôâç7G&–æv–g’‡&W7VÇB’“²Ò6F6‚²ò¢÷F–öæÂ†—7F÷'’66†R¢òĞ¢&WGW&â&W7VÇC°§Ğ ¦gVæ7F–öâ&ævT×2‡&ævS¢†—7F÷'•&ævR’°¢–b‡&ævRÓÓÒs‚r’&WGW&âc¢c¢°¢–b‡&ævRÓÓÒs#F‚r’&WGW&â#B¢c¢c¢°¢–b‡&ævRÓÓÒsvBr’&WGW&âr¢#B¢c¢c¢°¢&WGW&â3¢#B¢c¢c¢°§Ğ ¦gVæ7F–öâFVÇFW&6VçB†f—'7C¢çVÖ&W"ÂçVÆÂÂÆ7C¢çVÖ&W"ÂçVÆÂ’°¢–b†f—'7BÓÓÒçVÆÂÇÂÆ7BÓÓÒçVÆÂÇÂf—'7BÓÓÒ’&WGW&âçVÆÃ°¢&WGW&â‚†Æ7BÒf—'7B’òÖF‚æ'2†f—'7B’’¢°§Ğ ¦gVæ7F–öâFVÇF'6öÇWFR†f—'7C¢çVÖ&W"ÂçVÆÂÂÆ7C¢çVÖ&W"ÂçVÆÂ’°¢–b†f—'7BÓÓÒçVÆÂÇÂÆ7BÓÓÒçVÆÂ’&WGW&âçVÆÃ°¢&WGW&âÆ7BÒf—'7C°§Ğ ¦gVæ7F–öâ6–væVB‡fÇVS¢çVÖ&W"ÂçVÆÂÂ7Vff—‚ÒrRr’°¢–b‡fÇVRÓÓÒçVÆÂÇÂçVÖ&W"æ—4f–æ—FR‡fÇVR’’&WGW&ât6öÆÆV7F–ær†—7F÷'’s°¢6öç7B&Vf—‚ÒfÇVRâòr²r¢rs°¢&WGW&âG·&Vf—‡ÒG¶f×Bæf÷&ÖB‡fÇVR—ÒG·7Vff—‡Ö°§Ğ ¦gVæ7F–öâFFU7F×‡G3¢çVÖ&W"ÂçVÆÂ’°¢–b‚G2’&WGW&âtæ÷B7F'FVBs°¢&WGW&âæWrFFR‡G2’çFôÆö6ÆU7G&–ær…µÒÂ°¢ÖöçFƒ¢w6†÷'BrÀ¢F“¢vçVÖW&–2rÀ¢–V#¢vçVÖW&–2rÀ¢†÷W#¢vçVÖW&–2rÀ¢Ö–çWFS¢s"ÖF–v—BrÀ¢Ò“°§Ğ §G—RF–ÖVEfÇVRÒ²F–ÖS¢çVÖ&W#²fÇVS¢çVÖ&W"ÂçVÆÂÓ° ¦gVæ7F–öâ6öÖ&–æVD6†–å6W&–W2€¢Æö6Ã¢F–ÖVEfÇVUµÒÀ¢6†–ã¢F–ÖVEfÇVUµÒÀ¢7WFöfc¢çVÖ&W"À¢“¢F–ÖVEfÇVUµÒ°¢6öç7B6†–å&÷w2Ò6†–âæf–ÇFW"‚‡ö–çB’Óâö–çBçF–ÖRãÒ7WFöfbbbö–çBçfÇVRÓÒçVÆÂ“°¢–b‚6†–å&÷w2æÆVæwF‚’&WGW&âÆö6Âæf–ÇFW"‚‡ö–çB’Óâö–çBçF–ÖRãÒ7WFöfbbbö–çBçfÇVRÓÒçVÆÂ“° ¢òòF†RV&Æ–26†–â×v÷&²VæGö–çB&V6öç7G'V7G2F†R&V6VçBv÷&²v–æF÷rF—&V7FÇ¢òòg&öÒ6†–âFFâW6RÆö6ÆÇ’&V6÷&FVBö–çG2öæÇ’$Tdõ$RF†B&6¶f–ÆÂ7F'G2À¢òòF†VâÆWBF†R6†–âÖFW&—fVB&–ç2÷vâF†R÷fW&Æ–ær&V6VçBW&–öBà¢6öç7B6†–å7F'BÒ6†–å&÷w5³ÒçF–ÖS°¢6öç7BÆö6ÄöÆFW"ÒÆö6Âæf–ÇFW"‚‡ö–çB’Óâö–çBçF–ÖRãÒ7WFöfbbbö–çBçF–ÖRÂ6†–å7F'Bbbö–çBçfÇVRÓÒçVÆÂ“°¢&WGW&â²ââæÆö6ÄöÆFW"Âââæ6†–å&÷w5Òç6÷'B‚†Â"’ÓâçF–ÖRÒ"çF–ÖR“°§Ğ ¦gVæ7F–öâ6W&–W4FVÇF‡6W&–W3¢F–ÖVEfÇVUµÒ’°¢–b‡6W&–W2æÆVæwF‚Â"’&WGW&âçVÆÃ°¢&WGW&âFVÇFW&6VçB‡6W&–W5³ÒçfÇVRÂ6W&–W2æB‚Ó“òçfÇVRóòçVÆÂ“°§Ğ ¦gVæ7F–öâ6W&–W57â‡6W&–W3¢F–ÖVEfÇVUµÒ’°¢–b‡6W&–W2æÆVæwF‚Â"’&WGW&â°¢&WGW&âÖF‚æÖ‚ƒÂ6W&–W2æB‚Ó’çF–ÖRÒ6W&–W5³ÒçF–ÖR“°§Ğ ¦gVæ7F–öâ&VD66†VDÆ—fR‚“¢F6†&ö&DFFÂçVÆÂ°¢G'’°¢6öç7B&rÒv–æF÷rç6W76–öå7F÷&vRævWD—FVÒ„Ä•dUô44„Uô´U’“°¢–b‚&r’&WGW&âçVÆÃ°¢6öç7B'6VBÒ¥4ôâç'6R‡&r’2F6†&ö&DFF°¢–b‚'6VBÇÂ'6VBç6÷W&6RÓÒvÆ—fRrÇÂ'6VBææWGv÷&²’&WGW&âçVÆÃ°¢&WGW&â'6VC°¢Ò6F6‚°¢&WGW&âçVÆÃ°¢Ğ§Ğ ¦gVæ7F–öâ&VD66†VDÖW&vVB‚“¢F6†&ö&DFF²vÖW&vVBuÒÂçVÆÂ°¢G'’°¢6öç7B&rÒv–æF÷ræÆö6Å7F÷&vRævWD—FVÒ„ÔU$tTEô44„Uô´U’“°¢–b‚&r’&WGW&âçVÆÃ°¢6öç7B'6VBÒ¥4ôâç'6R‡&r’2F6†&ö&DFF²vÖW&vVBuÓ°¢–b‚‡'6VBç66ææVDBóò’ÃÒÇÂ‡'6VBæ6†V6¶VBóò’ÃÒ’&WGW&âçVÆÃ°¢&WGW&â'6VC°¢Ò6F6‚°¢&WGW&âçVÆÃ°¢Ğ§Ğ ¦gVæ7F–öâ†46ö×ÆWFVDÖW&vVEfÇVR‡fÇVS¢F6†&ö&DFF²vÖW&vVBuÒ’°¢&WGW&â‡fÇVRç66ææVDBóò’âbb‡fÇVRæ6†V6¶VBóò’â°§Ğ ¦gVæ7F–öâ†46ö×ÆWFVDÖW&vVE66â‡fÇVS¢F6†&ö&DFF’°¢&WGW&â†46ö×ÆWFVDÖW&vVEfÇVR‡fÇVRæÖW&vVB“°§Ğ ¦gVæ7F–öâ†5&ö&TæöFTFWF–Ç2‡fÇVS¢F6†&ö&DFF²vÖW&vVBuÒ’°¢6öç7Bf÷VæBÒfÇVRæf÷VæBóò°¢–b†f÷VæBÃÒ’&WGW&âG'VS°¢&WGW&âfÇVRææöFW2æf–ÇFW"‚†æöFR’ÓâæöFRæ¶7FWFV7FVB’æÆVæwF‚ãÒf÷VæC°§Ğ ¦gVæ7F–öâ†4GG&–'WF–öåfÇVR‡fÇVS¢F6†&ö&DFF²vÖW&vVBuÒ’°¢&WGW&â‡fÇVRæGG&–'WF–öäÖF6†VBóò’âbbfÇVRææöFW2ç6öÖR‚†æöFR’Óà¢æöFRæGG&–'WFVBbb‚†æöFRæGG&–'WFVD&Æö6·2óò’âÇÂæöFRæGG&–'WF–öå6†&RÓÒçVÆÂ’À¢“°§Ğ ¦gVæ7F–öâ&VD66†VDGG&–'WF–öâ‚“¢F6†&ö&DFF²vÖW&vVBuÒÂçVÆÂ°¢G'’°¢6öç7B&rÒv–æF÷ræÆö6Å7F÷&vRævWD—FVÒ„EE$”%UD”ôåô44„Uô´U’“°¢–b‚&r’&WGW&âçVÆÃ°¢6öç7B'6VBÒ¥4ôâç'6R‡&r’2F6†&ö&DFF²vÖW&vVBuÓ°¢&WGW&â†4GG&–'WF–öåfÇVR‡'6VB’ò'6VB¢çVÆÃ°¢Ò6F6‚°¢&WGW&âçVÆÃ°¢Ğ§Ğ ¦gVæ7F–öâ&Ææ´–æ6ö×ÆWFTÖW&vVB‡fÇVS¢F6†&ö&DFF²vÖW&vVBuÒ“¢F6†&ö&DFF²vÖW&vVBuÒ°¢òò&Ææ²öæÇ’F†R7F—fRVW"×&ö&Rf–VÆG2âGG&–'WF–öâ—2&öGV6VB'’6W&FP¢òòV&Æ–2&Æö6²Öö'6W'fF–öâ—VÆ–æRæB6â&VÖ–âfÆ–Bv†–ÆRF†R&ö&R66ææW ¢òò—2v&Ö–ærW÷"&W7F'F–ærà¢&WGW&â°¢ââçfÇVRÀ¢66ææVDC¢çVÆÂÀ¢6†V6¶VC¢çVÆÂÀ¢&V6†&ÆS¢çVÆÂÀ¢f÷VæC¢çVÆÂÀ¢Ó°§Ğ ¦gVæ7F–öâÇ”66†VDGG&–'WF–öâ†–æ6öÖ–æs¢F6†&ö&DFF²vÖW&vVBuÒÂ66†VC¢F6†&ö&DFF²vÖW&vVBuÒ“¢F6†&ö&DFF²vÖW&vVBuÒ°¢6öç7B–æ6öÖ–æt'”–BÒæWrÖ†–æ6öÖ–ærææöFW2æÖ‚†æöFR’Óâ¶æöFRæ–BÂæöFUÒ’“°¢6öç7B6VVâÒæWr6WCÇ7G&–æsâ‚“°¢6öç7BæöFW2Ò66†VBææöFW2æÖ‚†öÆB’Óâ°¢6öç7B7W'&VçBÒ–æ6öÖ–æt'”–BævWB†öÆBæ–B“°¢6VVâæFB†öÆBæ–B“°¢–b‚7W'&VçB’&WGW&âöÆC°¢–b†7W'&VçBæGG&–'WFVB’&WGW&â7W'&VçC°¢&WGW&â°¢ââæ7W'&VçBÀ¢GG&–'WFVC¢öÆBæGG&–'WFVBÀ¢GG&–'WFVD&Æö6·3¢öÆBæGG&–'WFVD&Æö6·2À¢GG&–'WF–öä6öæf–FVæ6S¢öÆBæGG&–'WF–öä6öæf–FVæ6RÀ¢GG&–'WF–öå6†&S¢öÆBæGG&–'WF–öå6†&RÀ¢GG&–'WF–öäFG&W76W3¢öÆBæGG&–'WF–öäFG&W76W2óòµÒÀ¢Ó°¢Ò“°¢f÷"†6öç7BæöFRöb–æ6öÖ–ærææöFW2’–b‚6VVâæ†2†æöFRæ–B’’æöFW2çW6‚†æöFR“°¢&WGW&â°¢ââæ–æ6öÖ–ærÀ¢GG&–'WF–öäÖF6†VC¢–æ6öÖ–æræGG&–'WF–öäÖF6†VBbb–æ6öÖ–æræGG&–'WF–öäÖF6†VBâò–æ6öÖ–æræGG&–'WF–öäÖF6†VB¢66†VBæGG&–'WF–öäÖF6†VBÀ¢GG&–'WF–öåWFFVDC¢–æ6öÖ–æræGG&–'WF–öåWFFVDBbb–æ6öÖ–æræGG&–'WF–öåWFFVDBâò–æ6öÖ–æræGG&–'WF–öåWFFVDB¢66†VBæGG&–'WF–öåWFFVDBÀ¢æöFW2À¢Ó°§Ğ ¦gVæ7F–öâÇ”66†VE66â†–æ6öÖ–æs¢F6†&ö&DFF²vÖW&vVBuÒÂ66†VC¢F6†&ö&DFF²vÖW&vVBuÒ“¢F6†&ö&DFF²vÖW&vVBuÒ°¢6öç7B–æ6öÖ–æt'”–BÒæWrÖ†–æ6öÖ–ærææöFW2æÖ‚†æöFR’Óâ¶æöFRæ–BÂæöFUÒ’“°¢6öç7B6VVâÒæWr6WCÇ7G&–æsâ‚“°¢6öç7BæöFW2Ò66†VBææöFW2æÖ‚†öÆB’Óâ°¢6öç7B7W'&VçBÒ–æ6öÖ–æt'”–BævWB†öÆBæ–B“°¢6VVâæFB†öÆBæ–B“°¢–b‚7W'&VçB’&WGW&âöÆC°¢òò¶VWF†Rg&W6†W7BGG&–'WF–öâöÆö6F–öâFFÂ'WB&W7F÷&RF†RÆ7B6ö×ÆWFV@¢òò&ö&R&W7VÇBâF†—2Ç6ò¶VW2vVöw&‡’ö6Æ–VçBf–Ww2Æ–væVBv—F‚F†RÆ7@¢òò6ö×ÆWFVB&ö&R–ç7FVBöb'&–VfÇ’fÆÆ–ær&6²FòâV×G’7W'&VçB66âà¢&WGW&â°¢ââæöÆBÀ¢ââæ7W'&VçBÀ¢6†V6¶VC¢öÆBæ6†V6¶VBÀ¢&V6†&ÆS¢öÆBç&V6†&ÆRÀ¢¶7FWFV7FVC¢öÆBæ¶7FWFV7FVBÀ¢¶7FG&W73¢öÆBæ¶7FG&W72À¢Ó°¢Ò“°¢f÷"†6öç7BæöFRöb–æ6öÖ–ærææöFW2’–b‚6VVâæ†2†æöFRæ–B’’æöFW2çW6‚†æöFR“°¢&WGW&â°¢ââæ–æ6öÖ–ærÀ¢66ææVDC¢66†VBç66ææVDBÀ¢6†V6¶VC¢66†VBæ6†V6¶VBÀ¢&V6†&ÆS¢66†VBç&V6†&ÆRÀ¢f÷VæC¢66†VBæf÷VæBÀ¢÷'G3¢–æ6öÖ–ærç÷'G2æÆVæwF‚ò–æ6öÖ–ærç÷'G2¢66†VBç÷'G2À¢æöFW2À¢Ó°§Ğ ¦6öç7B&t–æ—F–Ä66†VDÆ—fRÒ&VD66†VDÆ—fR‚“°¦6öç7B–æ—F–Ä66†VDÖW&vVBÒ&VD66†VDÖW&vVB‚“°¦6öç7B–æ—F–Ä66†VDÆ—fRÒ&t–æ—F–Ä66†VDÆ—fP¢ò°¢ââç&t–æ—F–Ä66†VDÆ—fRÀ¢ÖW&vVC¢†46ö×ÆWFVDÖW&vVE66â‡&t–æ—F–Ä66†VDÆ—fR’bb†5&ö&TæöFTFWF–Ç2‡&t–æ—F–Ä66†VDÆ—fRæÖW&vVB¢ò&t–æ—F–Ä66†VDÆ—fRæÖW&vV@¢¢†–æ—F–Ä66†VDÖW&vVBòÇ”66†VE66â‡&t–æ—F–Ä66†VDÆ—fRæÖW&vVBÂ–æ—F–Ä66†VDÖW&vVB’¢&Ææ´–æ6ö×ÆWFTÖW&vVB‡&t–æ—F–Ä66†VDÆ—fRæÖW&vVB’’À¢Ğ¢¢çVÆÃ° ¦gVæ7F–öâ7F&–Æ—¦TÆ—fU6æ6†÷B‡&Wf–÷W3¢F6†&ö&DFFÂ–æ6öÖ–æs¢F6†&ö&DFF“¢F6†&ö&DFF°¢ÆWBæW‡BÒ–æ6öÖ–æs° ¢òò&Æö6²GG&–'WF–öâ—2&öGV6VB'’6W&FRV&Æ–2—VÆ–æRâ66†R—@¢òò–æFWVæFVçFÇ’6ò6†÷'BGG&–'WF–öâ&Vg&W6‚÷&W6WB6ææ÷BÖ¶RF†R†öÖWvP¢òòæBÖ–æ–ær×6†&RæVÂF—6w&VRv—F‚V6‚÷F†W"à¢–b††4GG&–'WF–öåfÇVR†–æ6öÖ–æræÖW&vVB’’°¢G'’²v–æF÷ræÆö6Å7F÷&vRç6WD—FVÒ„EE$”%UD”ôåô44„Uô´U’Â¥4ôâç7G&–æv–g’†–æ6öÖ–æræÖW&vVB’“²Ò6F6‚²ò¢÷F–öæÂ66†R¢òĞ¢ÒVÇ6R–b‚†–æ6öÖ–ærææöFW2óò’â’°¢6öç7BGG&–'WF–öäfÆÆ&6²Ò†4GG&–'WF–öåfÇVR‡&Wf–÷W2æÖW&vVB’ò&Wf–÷W2æÖW&vVB¢&VD66†VDGG&–'WF–öâ‚“°¢–b†GG&–'WF–öäfÆÆ&6²’æW‡BÒ²ââææW‡BÂÖW&vVC¢Ç”66†VDGG&–'WF–öâ†æW‡BæÖW&vVBÂGG&–'WF–öäfÆÆ&6²’Ó°¢Ğ ¢òòVW"&ö&–æræB&Æö6²GG&–'WF–öâ&R6W&FR6–væÇ2âW'6—7B6ö×ÆWFV@¢òò&ö&R&W7VÇG2Â'WBæWfW"ÆWBâ–æ6ö×ÆWFR66â&WÆ6RF†RÆ7B6ö×ÆWFV@¢òò&ö&RvVöw&‡’ö6Æ–VçBf–Wrà¢–b††46ö×ÆWFVDÖW&vVEfÇVR†æW‡BæÖW&vVB’’°¢G'’²v–æF÷ræÆö6Å7F÷&vRç6WD—FVÒ„ÔU$tTEô44„Uô´U’Â¥4ôâç7G&–æv–g’†æW‡BæÖW&vVB’“²Ò6F6‚²ò¢÷F–öæÂ66†R¢òĞ¢ÒVÇ6R–b‚†–æ6öÖ–ærææöFW2óò’â’°¢6öç7B&Wf–÷W5&ö&RÒ†46ö×ÆWFVDÖW&vVE66â‡&Wf–÷W2’bb†5&ö&TæöFTFWF–Ç2‡&Wf–÷W2æÖW&vVB’ò&Wf–÷W2æÖW&vVB¢çVÆÃ°¢6öç7BfÆÆ&6²Ò&Wf–÷W5&ö&Róò&VD66†VDÖW&vVB‚’óò††46ö×ÆWFVDÖW&vVE66â‡&Wf–÷W2’ò&Wf–÷W2æÖW&vVB¢çVÆÂ“°¢æW‡BÒ°¢ââææW‡BÀ¢ÖW&vVC¢fÆÆ&6²òÇ”66†VE66â†æW‡BæÖW&vVBÂfÆÆ&6²’¢&Ææ´–æ6ö×ÆWFTÖW&vVB†æW‡BæÖW&vVB’À¢Ó°¢Ğ ¢òòF†RVÇ6R÷v÷&²Ö†—7F÷'’66†R6âÇ6ò&RV×G’f÷"6†÷'BW&–öBgFW"à¢òòW7G&VÒ&W7F'BâF†RFVÆÂ—2%3ÓFövWF†W"v—F‚æò†6‡&FRW7F–ÖFRv†–ÆP¢òòF†R&W7BöbF†RæWGv÷&²—26ÆV&Ç’öæÆ–æRâ¶VWF†RÆ7BvööB6†÷'B×FW&Òv÷&°¢òò6–væÇ2VçF–ÂF†RV&Æ–2VÇ6R†—7F÷'’&Vf–ÆÇ2à¢6öç7BVÇ6TÆöö·5Vç6VVFVBÒ–æ6öÖ–æræ'2ÓÓÒbb–æ6öÖ–æræ†6‡&FRÓÓÒçVÆÂbb†–æ6öÖ–ærææöFW2óò’â°¢–b‡VÇ6TÆöö·5Vç6VVFVBbb&Wf–÷W2æ'2ÓÒçVÆÂbb&Wf–÷W2æ'2âbb&Wf–÷W2æ†6‡&FRÓÒçVÆÂ’°¢æW‡BÒ°¢ââææW‡BÀ¢'3¢&Wf–÷W2æ'2À¢†6‡&FS¢&Wf–÷W2æ†6‡&FRÀ¢VÇ6S¢&Wf–÷W2çVÇ6RæÆVæwF‚ò&Wf–÷W2çVÇ6R¢–æ6öÖ–ærçVÇ6RÀ¢Ó°¢Ğ ¢òòF†R6öçfVæ–Væ6R÷&VfW&Væ6RVæGö–çG2&Ræöæ7&—F–6ÂæB6âö666–öæÆÇ’Ö—70¢òòöæRöÆÂv†–ÆRF†R6÷&RæWGv÷&²VæGö–çG2&VÖ–âÆ—fRâ¶VWF†RÆ7B&W÷'FV@¢òòfÇVW2–ç7FVBöbfÆ6†–ær&÷w2öbF6†W2–â&VfW&Væ6Rà¢æW‡BÒ°¢ââææW‡BÀ¢7WÇ“¢æW‡Bç7WÇ’óò&Wf–÷W2ç7WÇ’À¢&Wv&C¢æW‡Bç&Wv&Bóò&Wf–÷W2ç&Wv&BÀ¢æW‡E&Wv&C¢æW‡BææW‡E&Wv&Bóò&Wf–÷W2ææW‡E&Wv&BÀ¢æW‡E&VGV7F–öå6V6öæG3¢æW‡BææW‡E&VGV7F–öå6V6öæG2óò&Wf–÷W2ææW‡E&VGV7F–öå6V6öæG2À¢G„6÷VçC¢æW‡BçG„6÷VçBóò&Wf–÷W2çG„6÷VçBÀ¢6†–VÆFVDæ÷FW3¢æW‡Bç6†–VÆFVDæ÷FW2óò&Wf–÷W2ç6†–VÆFVDæ÷FW2À¢çVÆÆ–f–W'3¢æW‡BæçVÆÆ–f–W'2óò&Wf–÷W2æçVÆÆ–f–W'2À¢6†–VÆFVEfÇVS¢æW‡Bç6†–VÆFVEfÇVRóò&Wf–÷W2ç6†–VÆFVEfÇVRÀ¢7FFU&ö÷C¢æW‡Bç7FFU&ö÷Bóò&Wf–÷W2ç7FFU&ö÷BÀ¢&Æö6´6÷VçC¢æW‡Bæ&Æö6´6÷VçBóò&Wf–÷W2æ&Æö6´6÷VçBÀ¢F66÷&S¢æW‡BæF66÷&Róò&Wf–÷W2æF66÷&RÀ¢6†–åv÷&´†—7F÷'“¢æW‡Bæ6†–åv÷&´†—7F÷'“òæÆVæwF‚òæW‡Bæ6†–åv÷&´†—7F÷'’¢‡&Wf–÷W2æ6†–åv÷&´†—7F÷'’óòµÒ’À¢Ó° ¢&WGW&âæW‡C°§Ğ ¦6öç7B†W&õF—FÆW3¢&V6÷&CÅF"Â7G&–æsâÒ°¢–çFVÆÆ–vVæ6S¢tÖW&vVBÖÖ–æ–ærbæWGv÷&²–çFVÆÆ–vVæ6RrÀ¢ÖW&vVC¢tÖ–æ–ærbÖW&vVBÖÖ–æ–ær–çFVÆÆ–vVæ6RrÀ¢†VÇFƒ¢tæWGv÷&²†VÇF‚6–væÇ2rÀ¢æöFW3¢uV&Æ–2æöFRf–WrrÀ¢WfVçG3¢tÆ—fRWfVçB–çFVÆÆ–vVæ6RrÀ¢÷F3¢u¤´2õD2Ö&¶WB&–6RrÀ¢–×÷'FW#¢tõD267&VVç6†÷B–×÷'FW"rÀ¢†—7F÷'“¢t†—7F÷&–6Â–çFVÆÆ–vVæ6RrÀ¢7WÇ“¢u7WÇ’b&—f7’–çFVÆÆ–vVæ6RrÀ¢&VfW&Væ6S¢u¤¶2V–6²&VfW&Væ6RrÀ¢f–FV÷3¢u¤´2f–FV÷2rÀ§Ó° ¦6öç7B†W&ôFW67&—F–öç3¢&V6÷&CÅF"Â7G&–æsâÒ°¢–çFVÆÆ–vVæ6S¢uV&Æ–2¤¶2–çFVÆÆ–vVæ6Rv—F‚fö7W2öâ¶7(iB¤¶2ÖW&vVBÖ–æ–ærÂæWGv÷&²v÷&²ÂVW"6–væÇ2æB6V7W&—G’6öçFW‡BârÀ¢ÖW&vVC¢uV&Æ–2Ö–æ–ær6–væÇ2Â&öGV6W"F—7G&–'WF–öâæB&7F–6Â6öÆòÖW&vVBÖÖ–æ–ærW7F–ÖFW2f÷"F†R¤¶2æWGv÷&²ârÀ¢†VÇFƒ¢t7W'&VçBV&Æ–2æWGv÷&²66—G’Â6öç6Vç7W27F—f—G’ÂVW"&V6†&–Æ—G’æB&VÆ’†VÇF‚–âöæRf–WrârÀ¢æöFW3¢u&—f7’Öv&Rö'6W'fF–öç2öbF†RV&Æ–2æöFW27W'&VçFÇ’f—6–&ÆRFòF†R¤¶2æWGv÷&²66ææW"ârÀ¢WfVçG3¢u&V6VçBV&Æ–2&Æö6²æBæWGv÷&²7F—f—G’Â÷&væ—¦VB–çFò7F&ÆR6–væÇ2–ç7FVBöb&V6öç7G'V7FVBæ–ÖFVBDrârÀ¢÷F3¢t6ö×ÆWFVB¤´2õD2G&FW2Â7GVÂG&FVB&–6W2æBföÇVÖ^(	G&W&VBFòWFFRWFöÖF–6ÆÇ’g&öÒF†R&—fFRG&FRÖÆör6öææV7F–öâârÀ¢–×÷'FW#¢u&—fFVÇ’&VBG&FRÖÆör67&VVç6†÷G2Â&Wf–WrF†RFWFV7FVBf7G2æBV&Æ—6‚6ö×ÆWFVBG&FW2FòF†RõD26†'BârÀ¢†—7F÷'“¢t6†–âÖFW&—fVBv÷&²†—7F÷'’æBö'6W'fW"†—7F÷'’Â¶WB6W&FR6òVæf–Æ&ÆR†—7F÷&–6ÂFF—2æWfW"–çfVçFVBârÀ¢7WÇ“¢t6öç6Vç7W27WÇ’ÂVÖ—76–öâæBvw&VvFR6†–VÆFVBÖ7F—f—G’–çFVÆÆ–vVæ6Rv—F†÷WBW‡÷6–ær–æF—f–GVÂ†öÆFW'2ârÀ¢&VfW&Væ6S¢t6öçfVæ–VçBV&Æ–26†–â–æf÷&ÖF–öâæBÆ–æ·2FòF†Röff–6–Â¤¶2W‡Æ÷&W"ârÀ¢f–FV÷3¢u6†÷'Bf–FV÷2&÷WB¤´27VVBÂ&—f7’æBF†RæWGv÷&²Â6öÆÆV7FVB–âöæRw&÷v–ærÆ–'&'’ârÀ§Ó° ¦gVæ7F–öâ‚’°¢6öç7B·F"Â6WEF%ÒÒW6U7FFSÅF#â‚‚’ÓâF$g&öÔ†6‚‡v–æF÷ræÆö6F–öâæ†6‚’“°¢6öç7B¶FFÂ6WDFFÒÒW6U7FFSÄF6†&ö&DFFâ†–æ—F–Ä66†VDÆ—fRóòV×G”F6†&ö&B“°¢6öç7B·7FGW2Â6WE7FGW5ÒÒW6U7FFSÂv6öææV7F–ærrÂvÆ—fRrÂw7FÆRsâ†–æ—F–Ä66†VDÆ—fRòvÆ—fRr¢v6öææV7F–ærr“°¢6öç7B¶W'&÷"Â6WDW'&÷%ÒÒW6U7FFSÇ7G&–ærÂçVÆÃâ†çVÆÂ“°¢6öç7B¶F&²Â6WDF&µÒÒW6U7FFR‚‚’Óâv–æF÷ræÖF6„ÖVF–òâ‚r‡&VfW'2Ö6öÆ÷"×66†VÖS¢F&²’r’æÖF6†W2óòfÇ6R“°¢6öç7B¶ÖVçT÷VâÂ6WDÖVçT÷VåÒÒW6U7FFR†fÇ6R“°¢6öç7B·VW'’Â6WEVW'•ÒÒW6U7FFR‚rr“°¢6öç7B¶FWF–ÂÂ6WDFWF–ÅÒÒW6U7FFSÄFWF–ÂÂçVÆÃâ†çVÆÂ“°¢6öç7B·6V&6†–ærÂ6WE6V&6†–æuÒÒW6U7FFR†fÇ6R“°¢6öç7B·6V&6„W'&÷"Â6WE6V&6„W'&÷%ÒÒW6U7FFSÇ7G&–ærÂçVÆÃâ†çVÆÂ“°¢6öç7B¶†—7F÷'’Â6WD†—7F÷'•ÒÒW6U7FFSÄ†—7F÷'•6æ6†÷EµÓâ‚‚’Óâ&VD†—7F÷'’‚’“°¢6öç7B¶†—7F÷'•&ævRÂ6WD†—7F÷'•&ævUÒÒW6U7FFSÄ†—7F÷'•&ævSâ‚s#F‚r“°¢6öç7B&÷'E&VbÒW6U&VcÄ&÷'D6öçG&öÆÆW"ÂçVÆÃâ†çVÆÂ“°¢6öç7B–äfÆ–v‡E&VbÒW6U&Vb†fÇ6R“°¢6öç7B†4Æ—fU&VbÒW6U&Vb„&ööÆVâ†–æ—F–Ä66†VDÆ—fR’“°¢6öç7B6öç6V7WF—fTf–ÇW&W5&VbÒW6U&Vbƒ“°¢6öç7BÆ7E7V66W74E&VbÒW6U&Vb†–æ—F–Ä66†VDÆ—fSòçWFFVDBóò“° ¢òòF†RV&Æ–2VÇ6RFF—2Ç&VG’&–ææVBBR×6V6öæB–çFW'fÇ2âöÆÆ–ærÆÀ¢òòW‡Æ÷&W"VæGö–çG2WfW'’R6V6öæG27&VFW2VææV6W76'’ÆöBæB6â6W6P¢òòG&ç6–VçBf–ÇW&W2âR×6V6öæBFVfVÇB¶VW2F†RF6†&ö&Bg&W6‚v—F†÷W@¢òò†ÖÖW&–ærF†RV&Æ–2’à¢6öç7BöÆÄ×2ÒçVÖ&W"†–×÷'BæÖWFæVçbåd•DUõôÄÅôÕ2ÇÂS“° ¢W6TVffV7B‚‚’Óâ²Fö7VÖVçBæFö7VÖVçDVÆVÖVçBæFF6WBçF†VÖRÒF&²òvF&²r¢vÆ–v‡Bs²ÒÂ¶F&µÒ“° ¢W6TVffV7B‚‚’Óâ°¢6öç7Böä†6„6†ævRÒ‚’Óâ6WEF"‡F$g&öÔ†6‚‡v–æF÷ræÆö6F–öâæ†6‚’“°¢v–æF÷ræFDWfVçDÆ—7FVæW"‚v†6†6†ævRrÂöä†6„6†ævR“°¢&WGW&â‚’Óâv–æF÷rç&VÖ÷fTWfVçDÆ—7FVæW"‚v†6†6†ævRrÂöä†6„6†ævR“°¢ÒÂµÒ“° ¢gVæ7F–öâæf–vFUFõF"†æW‡EF#¢F"’°¢6WEF"†æW‡EF"“°¢6öç7BæW‡D†6‚ÒF$†6†W5¶æW‡EF%Ó°¢–b†æW‡D†6‚’v–æF÷ræÆö6F–öâæ†6‚ÒæW‡D†6ƒ°¢VÇ6Rv–æF÷ræ†—7F÷'’çW6…7FFR†çVÆÂÂrrÂG·v–æF÷ræÆö6F–öâçF†æÖWÒG·v–æF÷ræÆö6F–öâç6V&6‡Ö“°¢Ğ ¢W6TVffV7B‚‚’Óâ°¢–b‡7FGW2ÓÒvÆ—fRr’&WGW&ã°¢6WD†—7F÷'’‚‡&Wf–÷W2’ÓâVæD†—7F÷'•6æ6†÷B‡&Wf–÷W2ÂFF’“°¢ÒÂ¶FFÂ7FGW5Ò“° ¢W6TVffV7B‚‚’Óâ°¢ÆWB7F÷VBÒfÇ6S° ¢7–æ2gVæ7F–öâ&Vg&W6‚‚’°¢òòæWfW"÷fW&ÆgVÆÂF6†&ö&B&Vg&W6‚â6öÖRV&Æ–2VæGö–çG26âF¶P¢òòÆöævW"F†âöæRöÆÆ–ær–çFW'fÂÂæB&÷'F–ærâ–âÖfÆ–v‡B&WVW7Bv0¢òòv†BÖFRF†RT’fÆ—&WGvVVâÄ•dRæBDTÔòà¢–b†–äfÆ–v‡E&Vbæ7W'&VçB’&WGW&ã°¢–äfÆ–v‡E&Vbæ7W'&VçBÒG'VS° ¢6öç7B6öçG&öÆÆW"ÒæWr&÷'D6öçG&öÆÆW"‚“°¢&÷'E&Vbæ7W'&VçBÒ6öçG&öÆÆW#°¢G'’°¢6öç7BÆ—fRÒv—BfWF6„F6†&ö&B†6öçG&öÆÆW"ç6–væÂ“°¢–b‚7F÷VB’°¢6WDFF‚‡&Wf–÷W3¢F6†&ö&DFF’Óâ°¢6öç7B7F&ÆRÒ7F&–Æ—¦TÆ—fU6æ6†÷B‡&Wf–÷W2ÂÆ—fR“°¢G'’²v–æF÷rç6W76–öå7F÷&vRç6WD—FVÒ„Ä•dUô44„Uô´U’Â¥4ôâç7G&–æv–g’‡7F&ÆR’“²Ò6F6‚²ò¢66†R—2÷F–öæÂ¢òĞ¢&WGW&â7F&ÆS°¢Ò“°¢†4Æ—fU&Vbæ7W'&VçBÒG'VS°¢6öç6V7WF—fTf–ÇW&W5&Vbæ7W'&VçBÒ°¢Æ7E7V66W74E&Vbæ7W'&VçBÒÆ—fRçWFFVDC°¢6WE7FGW2‚vÆ—fRr“°¢6WDW'&÷"†çVÆÂ“°¢Ğ¢Ò6F6‚†R’°¢–b†6öçG&öÆÆW"ç6–væÂæ&÷'FVBÇÂ7F÷VB’&WGW&ã°¢6öç7BÖW76vRÒR–ç7Fæ6VöbW'&÷"òRæÖW76vR¢t’Væf–Æ&ÆRs°¢6WDW'&÷"†ÖW76vR“° ¢òòæWfW"&WÆ6RV&Æ–2ÖæWGv÷&²FFv—F‚f'&–6FVBöFVÖòfÇVW2à¢òò–bvRÇ&VG’†fRÆ—fR6æ6†÷BÂ¶VW—BæBÖ&²—B7FÆRv†–ÆP¢òòF†RæW‡B&Vg&W6‚&WG&–W2â&Vf÷&RF†Rf—'7B7V66W76gVÂ6æ6†÷BÂ&VÖ–à¢òò–â4ôääT5D”är7FFRv—F‚&Ææ²ÖWG&–72à¢–b††4Æ—fU&Vbæ7W'&VçB’°¢6öç6V7WF—fTf–ÇW&W5&Vbæ7W'&VçB³Ò°¢6öç7BÆ7DvööDvRÒFFRææ÷r‚’ÒÆ7E7V66W74E&Vbæ7W'&VçC° ¢òò6–ævÆRÖ—76VBöÆÂ†÷"6WfW&Â6†÷'BÖ—76W2’—2æ÷Bâ÷WFvRâ¶VW ¢òòÔ”ääUBÄ•dRæBF†RÆ7BvööBfÇVW2âöæÇ’Ö&²F†R6æ6†÷B7FÆR–`¢òòF†RVçF—&R6÷&R’†2f–ÆVB&WVFVFÇ’f÷"BÆV7BGvòÖ–çWFW2à¢–b†6öç6V7WF—fTf–ÇW&W5&Vbæ7W'&VçBãÒ‚bbÆ7DvööDvRãÒ#ó’°¢6WE7FGW2‚w7FÆRr“°¢ÒVÇ6R°¢6WE7FGW2‚vÆ—fRr“°¢Ğ¢ÒVÇ6R°¢6WE7FGW2‚v6öææV7F–ærr“°¢Ğ¢Òf–æÆÇ’°¢–äfÆ–v‡E&Vbæ7W'&VçBÒfÇ6S°¢Ğ¢Ğ ¢fö–B&Vg&W6‚‚“°¢6öç7B–BÒv–æF÷rç6WD–çFW'fÂ‡&Vg&W6‚ÂÖF‚æÖ‚ƒÂöÆÄ×2’“°¢&WGW&â‚’Óâ°¢7F÷VBÒG'VS°¢v–æF÷ræ6ÆV$–çFW'fÂ†–B“°¢&÷'E&Vbæ7W'&VçCòæ&÷'B‚“°¢–äfÆ–v‡E&Vbæ7W'&VçBÒfÇ6S°¢Ó°¢ÒÂ·öÆÄ×5Ò“°  ¢6öç7BG‡2ÒW6TÖVÖò‚‚’Óâ°¢6öç7B&÷w3¢'&“ÅG…&÷rb²&Æö6´†6ƒ¢7G&–æs²F–ÖW7F×¢çVÖ&W"ÓâÒµÓ°¢f÷"†6öç7B&Æö6²öbFFæ&Æö6·2’°¢f÷"†6öç7BG‚öb&Æö6²çG‡2’&÷w2çW6‚‡²ââçG‚Â&Æö6´†6ƒ¢&Æö6²æ†6‚ÂF–ÖW7F×¢&Æö6²çF–ÖW7F×Ò“°¢Ğ¢&WGW&â&÷w2ç6Æ–6RƒÂS“°¢ÒÂ¶FFæ&Æö6·5Ò“° ¢6öç7BVÇ6UF–ÖW2ÒFFçVÇ6RæÖ‚‡’ÓâçF–ÖR“°¢6öç7BF–fefÇVW2ÒFFçVÇ6RæÖ‚‡’ÓâæF–ff–7VÇG’“°¢6öç7BG…fÇVW2ÒFFçVÇ6RæÖ‚‡’ÓâçG‡2“° ¢7–æ2gVæ7F–öâFõ6V&6‚‡FW‡BÒVW'’’°¢6öç7BÒFW‡BçG&–Ò‚“°¢–b‚’&WGW&ã°¢6WE6V&6†–ær‡G'VR“°¢6WE6V&6„W'&÷"†çVÆÂ“°¢G'’°¢6öç7B&W7VÇBÒv—B6V&6„6†–â‡“°¢6WDFWF–Â‡&W7VÇB“°¢6WEVW'’‡“°¢Ò6F6‚†R’°¢6WE6V&6„W'&÷"†R–ç7Fæ6VöbW'&÷"òRæÖW76vR¢u6V&6‚f–ÆVBr“°¢Òf–æÆÇ’°¢6WE6V&6†–ær†fÇ6R“°¢Ğ¢Ğ ¢gVæ7F–öâöå6V&6‚†S¢f÷&ÔWfVçB’²Rç&WfVçDFVfVÇB‚“²fö–BFõ6V&6‚‚“²Ğ ¢6öç7Bæc¢'&“ÅµF"Â7G&–æuÓâÒ°¢²v–çFVÆÆ–vVæ6RrÂt–çFVÆÆ–vVæ6RuÒÀ¢²vÖW&vVBrÂtÖW&vVBÖ–æ–æruÒÀ¢²v†VÇF‚rÂtæWGv÷&²†VÇF‚uÒÀ¢²vWfVçG2rÂtWfVçG2uÒÀ¢²v÷F2rÂtõD2&–6RuÒÀ¢²v†—7F÷'’rÂt†—7F÷'’uÒÀ¢²w7WÇ’rÂu7WÇ’b&—f7’uÒÀ¢²w&VfW&Væ6RrÂu&VfW&Væ6RuÒÀ¢²wf–FV÷2rÂuf–FV÷2uÒÀ¢Ó° ¢&WGW&â€¢ÆF—b6Æ74æÖSÒ&×6†VÆÂ#à¢Æ†VFW"6Æ74æÖSÒ'F÷&"#à¢Æ'WGFöâ6Æ74æÖSÒ&'&æB"öä6Æ–6³×²‚’Óâæf–vFUFõF"‚v–çFVÆÆ–vVæ6Rr—Ò&–ÖÆ&VÃÒ%¤´27G&VÒ†öÖR#à¢Ç7â6Æ74æÖSÒ&'&æBÖÖ&²#ãÅ6†–VÆD6†V6²6—¦S×³#'ÒóãÂ÷7ãà¢Ç7ããÆ#å¤´3Âö#ãÆVÓâç7G&VÓÂöVÓãÂ÷7ãà¢Ç6ÖÆÃä”åDTÄÄ”tTä4SÂ÷6ÖÆÃà¢Âö'WGFöãà ¢Ææb6Æ74æÖS×¶æbG¶ÖVçT÷Vâòv÷Vâr¢rwÖÓà¢¶æbæÖ‚…¶–BÂÆ&VÅÒ’Óâ€¢Æ'WGFöâ¶W“×¶–GÒ6Æ74æÖS×·F"ÓÓÒ–Bòv7F—fRr¢rwÒöä6Æ–6³×²‚’Óâ²æf–vFUFõF"†–B“²6WDÖVçT÷Vâ†fÇ6R“²×Óç¶Æ&VÇÓÂö'WGFöãà¢’—Ğ¢Æ6Æ74æÖSÒ&F—66÷&BÖæbÖÆ–æ²"‡&VcÒ&‡GG3¢òöF—66÷&Bævrö´¤5•gDtVR"F&vWCÒ%ö&Ææ²"&VÃÒ&æ÷&VfW'&W""öä6Æ–6³×²‚’Óâ6WDÖVçT÷Vâ†fÇ6R—ÓãÄÖW76vT6—&6ÆR6—¦S×³wÒóâ¦ö–âF—66÷&CÂöà¢Æ6Æ74æÖSÒ'FVÆVw&ÒÖæbÖÆ–æ²"‡&VcÒ&‡GG3¢ò÷BæÖR÷¦¶6öff–6–Â"F&vWCÒ%ö&Ææ²"&VÃÒ&æ÷&VfW'&W""öä6Æ–6³×²‚’Óâ6WDÖVçT÷Vâ†fÇ6R—ÓãÅ6VæB6—¦S×³wÒóâ¦ö–âFVÆVw&ÓÂöà¢Æ6Æ74æÖSÒ'‚ÖæbÖÆ–æ²"‡&VcÒ&‡GG3¢ò÷‚æ6öÒ÷¦¶5÷‚"F&vWCÒ%ö&Ææ²"&VÃÒ&æ÷&VfW'&W""öä6Æ–6³×²‚’Óâ6WDÖVçT÷Vâ†fÇ6R—ÓãÇ7â6Æ74æÖSÒ'‚ÖÖ&²"&–Ö†–FFVãÒ'G'VR#åƒÂ÷7ãâföÆÆ÷r¦¶5÷ƒÂöà¢Âöæcà ¢ÆF—b6Æ74æÖSÒ&†VFW"Ö7F–öç2#à¢Ç7â6Æ74æÖSÒ'V&Æ–2×–ÆÂ#ãÄvÆö&S"6—¦S×³GÒóâT$Ä”2ôäÅ“Â÷7ãà¢Ç7â6Æ74æÖS×¶Æ—fR×–ÆÂG·7FGW7ÖÓãÆ’óç·7FGW2ÓÓÒvÆ—fRròtÔ”ääUBÄ•dRr¢7FGW2ÓÓÒw7FÆRròtÄ•dR+r$UE%””ärr¢t4ôääT5D”ärwÓÂ÷7ãà¢Æ6Æ74æÖSÒ&–6öâÖ'Fâ†VFW"ÖF—66÷&B"‡&VcÒ&‡GG3¢òöF—66÷&Bævrö´¤5•gDtVR"F&vWCÒ%ö&Ææ²"&VÃÒ&æ÷&VfW'&W""&–ÖÆ&VÃÒ$¦ö–â¤´2F—66÷&B"F—FÆSÒ$¦ö–â¤´2F—66÷&B#ãÄÖW76vT6—&6ÆR6—¦S×³—ÒóãÂöà¢Æ6Æ74æÖSÒ&–6öâÖ'Fâ†VFW"×FVÆVw&Ò"‡&VcÒ&‡GG3¢ò÷BæÖR÷¦¶6öff–6–Â"F&vWCÒ%ö&Ææ²"&VÃÒ&æ÷&VfW'&W""&–ÖÆ&VÃÒ$¦ö–â¤´2FVÆVw&Ò"F—FÆSÒ$¦ö–â¤´2FVÆVw&Ò#ãÅ6VæB6—¦S×³‡ÒóãÂöà¢Æ6Æ74æÖSÒ&–6öâÖ'Fâ†VFW"×‚"‡&VcÒ&‡GG3¢ò÷‚æ6öÒ÷¦¶5÷‚"F&vWCÒ%ö&Ææ²"&VÃÒ&æ÷&VfW'&W""&–ÖÆ&VÃÒ$föÆÆ÷r¤´2öâ‚"F—FÆSÒ$föÆÆ÷r¦¶5÷‚öâ‚#ãÇ7â6Æ74æÖSÒ'‚ÖÖ&²"&–Ö†–FFVãÒ'G'VR#åƒÂ÷7ããÂöà¢Æ'WGFöâ6Æ74æÖSÒ&–6öâÖ'Fâ"öä6Æ–6³×²‚’Óâ6WDF&²‚‡b’Óâb—Ò&–ÖÆ&VÃÒ%FövvÆRF†VÖR#ç¶F&²òÅ7Vâ6—¦S×³‡Òóâ¢ÄÖööâ6—¦S×³‡ÒóçÓÂö'WGFöãà¢Æ'WGFöâ6Æ74æÖSÒ&–6öâÖ'FâÖö&–ÆRÖÖVçR"öä6Æ–6³×²‚’Óâ6WDÖVçT÷Vâ‚‡b’Óâb—Ò&–ÖÆ&VÃÒ$÷Vâæf–vF–öâ#ç¶ÖVçT÷VâòÅ‚6—¦S×³#Òóâ¢ÄÖVçR6—¦S×³#ÒóçÓÂö'WGFöãà¢ÂöF—cà¢Âö†VFW#à ¢ÆÖ–ãà¢Ç6V7F–öâ6Æ74æÖSÒ&†W&ò×7G&—#à¢ÆF—cà¢ÆF—b6Æ74æÖSÒ&W–V'&÷r#ãÇ7â6Æ74æÖSÒ'VÇ6RÖF÷B"óâ¤¶2V&Æ–2æWGv÷&²–çFVÆÆ–vVæ6SÂöF—cà¢Æƒç¶†W&õF—FÆW5·F%×ÓÂöƒà¢Çç¶†W&ôFW67&—F–öç5·F%×ÓÂ÷à¢ÂöF—cà¢ÆF—b6Æ74æÖSÒ&†W&ò×FööÇ2#à¢ÆF—b6Æ74æÖSÒ&FW6·F÷×6ö6–ÂÖÆ–æ·2"&–ÖÆ&VÃÒ%¤´26ö6–ÂÖVF–Æ–æ·2#à¢Æ‡&VcÒ&‡GG3¢òöF—66÷&Bævrö´¤5•gDtVR"F&vWCÒ%ö&Ææ²"&VÃÒ&æ÷&VfW'&W""&–ÖÆ&VÃÒ$¦ö–â¤´2F—66÷&B#ãÄÖW76vT6—&6ÆR6—¦S×³wÒóãÇ7ãäF—66÷&CÂ÷7ããÂöà¢Æ‡&VcÒ&‡GG3¢ò÷BæÖR÷¦¶6öff–6–Â"F&vWCÒ%ö&Ææ²"&VÃÒ&æ÷&VfW'&W""&–ÖÆ&VÃÒ$¦ö–â¤´2FVÆVw&Ò#ãÅ6VæB6—¦S×³wÒóãÇ7ãåFVÆVw&ÓÂ÷7ããÂöà¢Æ‡&VcÒ&‡GG3¢ò÷‚æ6öÒ÷¦¶5÷‚"F&vWCÒ%ö&Ææ²"&VÃÒ&æ÷&VfW'&W""&–ÖÆ&VÃÒ$föÆÆ÷r¤´2öâ‚#ãÇ7â6Æ74æÖSÒ'‚ÖÖ&²"&–Ö†–FFVãÒ'G'VR#åƒÂ÷7ããÇ7ãä¦¶5÷ƒÂ÷7ããÂöà¢ÆFWF–Ç26Æ74æÖSÒ&FW6·F÷×&W6÷W&6W2#à¢Ç7VÖÖ'“ãÄÆ–æ³"6—¦S×³wÒóãÇ7ãå&W6÷W&6W3Â÷7ããÄ6†Wg&öäF÷vâ6—¦S×³GÒ6Æ74æÖSÒ'&W6÷W&6W2Ö6†Wg&öâ"óãÂ÷7VÖÖ'“à¢ÆF—b6Æ74æÖSÒ&FW6·F÷×&W6÷W&6W2ÖÖVçR#à¢Æ‡&VcÒ&‡GG3¢ò÷¦¶2æ–æfò"F&vWCÒ%ö&Ææ²"&VÃÒ&æ÷&VfW'&W"#ãÇ7ãå¤´2vV'6—FSÂ÷7ããÇ6ÖÆÃç¦¶2æ–æfóÂ÷6ÖÆÃãÂöà¢Æ‡&VcÒ&‡GG3¢ò÷6W'f–6W2ç¦¶2æ–æfò"F&vWCÒ%ö&Ææ²"&VÃÒ&æ÷&VfW'&W"#ãÇ7ãå6W'f–6W2–æFWƒÂ÷7ããÇ6ÖÆÃç6W'f–6W2ç¦¶2æ–æfóÂ÷6ÖÆÃãÂöà¢Æ‡&VcÒ&‡GG3¢ò÷6W'f–6W2ç¦¶2æ–æfòóöf–ÇFW#×7F÷&R"F&vWCÒ%ö&Ææ²"&VÃÒ&æ÷&VfW'&W"#ãÇ7ãåvÆÆWG3Â÷7ããÇ6ÖÆÃäf–Æ&ÆRvÆÆWG3Â÷6ÖÆÃãÂöà¢Æ‡&VcÒ&‡GG3¢òöW‡Æ÷&W"ç¦¶2æ–æfò"F&vWCÒ%ö&Ææ²"&VÃÒ&æ÷&VfW'&W"#ãÇ7ãä&Æö6²W‡Æ÷&W#Â÷7ããÇ6ÖÆÃæW‡Æ÷&W"ç¦¶2æ–æfóÂ÷6ÖÆÃãÂöà¢Æ‡&VcÒ&‡GG3¢òöv—F‡V"æ6öÒöf—&V66‚÷¦¶2×'W7G’"F&vWCÒ%ö&Ææ²"&VÃÒ&æ÷&VfW'&W"#ãÇ7ãä6÷&R6÷W&6SÂ÷7ããÇ6ÖÆÃäv—D‡V"&W÷6—F÷'“Â÷6ÖÆÃãÂöà¢Æ‡&VcÒ&‡GG3¢ò÷¦¶2æ–æfò÷v†—FWW"æ‡FÖÂ"F&vWCÒ%ö&Ææ²"&VÃÒ&æ÷&VfW'&W"#ãÇ7ãåv†—FWW#Â÷7ããÇ6ÖÆÃå&ö¦V7BFö7VÖVçFF–öãÂ÷6ÖÆÃãÂöà¢ÂöF—cà¢ÂöFWF–Ç3à¢ÂöF—cà¢·F"ÓÒv÷F2rbbF"ÓÒv–×÷'FW"rbbF"ÓÒwf–FV÷2rbbÆF—b6Æ74æÖSÒ'7–æ2Ö&÷‚#à¢Ç7ãäæWGv÷&³Â÷7ããÆ#ç¶FFææWGv÷&·ÓÂö#à¢Ç7ãåWFFVCÂ÷7ããÆ#ç¶æWrFFR†FFçWFFVDB’çFôÆö6ÆUF–ÖU7G&–ær‚—ÓÂö#à¢ÂöF—cçĞ¢ÂöF—cà¢Â÷6V7F–öãà ¢·F"ÓÒv÷F2rbbF"ÓÒv–×÷'FW"rbbF"ÓÒwf–FV÷2rbbÃà¢Æf÷&Ò6Æ74æÖSÒ'6V&6†&""öå7V&Ö—C×¶öå6V&6‡Óà¢Å6V&6‚6—¦S×³#Òóà¢Æ–çWBfÇVS×·VW'—Òöä6†ævS×²†R’Óâ6WEVW'’†RçF&vWBçfÇVR—ÒÆ6V†öÆFW#Ò%6V&6‚V&Æ–2&Æö6²†6‚÷"G&ç67F–öâ”B"&–ÖÆ&VÃÒ%6V&6‚V&Æ–2&Æö6²†6‚÷"G&ç67F–öâ”B"óà¢Æ'WGFöâF—6&ÆVC×·6V&6†–æwÓç·6V&6†–æròu6V&6†–æ~(
+br¢u6V&6‚wÓÂö'WGFöãà¢Âöf÷&Óà¢·6V&6„W'&÷"bbÆF—b6Æ74æÖSÒ&–æÆ–æRÖW'&÷"#ç·6V&6„W'&÷'ÓÂöF—cçĞ¢ÂóçĞ¢·F"ÓÒv÷F2rbbF"ÓÒv–×÷'FW"rbbF"ÓÒwf–FV÷2rbb7FGW2ÓÓÒw7FÆRrbbÆF—b6Æ74æÖSÒ&FVÖòÖ&ææW"#ãÆ#äÆ—fR&Vg&W6‚FVÆ–VBãÂö#â6†÷v–ærF†RÆ7BvööBV&Æ–2Ö–ææWB6æ6†÷Bv†–ÆRF†R’&WG&–W2â¶W'&÷"bbÇ7ãç¶W'&÷'ÓÂ÷7ãçÓÂöF—cçĞ¢·F"ÓÒv÷F2rbbF"ÓÒv–×÷'FW"rbbF"ÓÒwf–FV÷2rbb7FGW2ÓÓÒv6öææV7F–ærrbbÆF—b6Æ74æÖSÒ&FVÖòÖ&ææW"#ãÆ#ä6öææV7F–ærFò¤¶2Ö–ææWBãÂö#âv—F–ærf÷"F†Rf—'7BV&Æ–2’6æ6†÷Bâ¶W'&÷"bbÇ7ãç¶W'&÷'ÓÂ÷7ãçÓÂöF—cçĞ ¢·F"ÓÓÒv–çFVÆÆ–vVæ6Rrbb€¢Ä–çFVÆÆ–vVæ6T†öÖRFF×¶FFÒG…fÇVW3×·G…fÇVW7ÒVÇ6UF–ÖW3×·VÇ6UF–ÖW7Òöå&VfW&Væ6S×²‚’Óâæf–vFUFõF"‚w&VfW&Væ6Rr—Òöåf–FV÷3×²‚’Óâæf–vFUFõF"‚wf–FV÷2r—Òóà¢—Ğ ¢·F"ÓÓÒvÖW&vVBrbbÄÖW&vVD–çFVÆÆ–vVæ6UvRFF×¶FFÒóçĞ¢·F"ÓÓÒv†VÇF‚rbbÄæWGv÷&´†VÇF…vRFF×¶FFÒF–fefÇVW3×¶F–fefÇVW7ÒG…fÇVW3×·G…fÇVW7ÒVÇ6UF–ÖW3×·VÇ6UF–ÖW7Òöä÷VäæöFW3×²‚’Óâæf–vFUFõF"‚væöFW2r—ÒóçĞ¢·F"ÓÓÒvæöFW2rbbÄæöFW5vRFF×¶FFÒóçĞ¢·F"ÓÓÒvWfVçG2rbbÄWfVçG5vRFF×¶FFÒ†—7F÷'“×¶†—7F÷'—ÒóçĞ¢·F"ÓÓÒv÷F2rbbÄ÷F4Ö&¶WEvR6—&7VÆF–æu7WÇ“×¶FFç7WÇ—ÒóçĞ¢·F"ÓÓÒv–×÷'FW"rbbÄ÷F567&VVç6†÷D–×÷'FW"óçĞ¢·F"ÓÓÒv†—7F÷'’rbbÄ†—7F÷'•vRFF×¶FFÒ†—7F÷'“×¶†—7F÷'—Ò&ævS×¶†—7F÷'•&ævWÒöå&ævS×·6WD†—7F÷'•&ævWÒóçĞ¢·F"ÓÓÒw7WÇ’rbbÅ7WÇ•&—f7•vRFF×¶FFÒ†—7F÷'“×¶†—7F÷'—Ò&ævS×¶†—7F÷'•&ævWÒöå&ævS×·6WD†—7F÷'•&ævWÒóçĞ¢·F"ÓÓÒw&VfW&Væ6RrbbÅ&VfW&Væ6UvRFF×¶FFÒG‡3×·G‡7Òöå6VÆV7C×²‡fÇVR’Óâfö–BFõ6V&6‚‡fÇVR—ÒóçĞ¢·F"ÓÓÒwf–FV÷2rbbÅf–FV÷5vRóçĞ¢ÂöÖ–ãà ¢Æfö÷FW#à¢ÆF—b6Æ74æÖSÒ&fö÷FW"Ö'&æB#ãÅ6†–VÆD6†V6²6—¦S×³wÒóâ¤´27G&VÒÇ7ãçcã‚ãÂ÷7ããÂöF—cà¢ÆF—cäÖW&vVBÖÖ–æ–ærÂæWGv÷&²bõD2–çFVÆÆ–vVæ6R(
+"V&Æ–2F—7Æ’(
+"&—fFR’7&VFVçF–Ç2&VÖ–â6W'fW"×6–FSÂöF—cà¢ÆF—b6Æ74æÖSÒ&fö÷FW"×6ö6–Ç2#à¢Æ6Æ74æÖSÒ&fö÷FW"×6ö6–Â"‡&VcÒ&‡GG3¢ò÷‚æ6öÒ÷¦¶5÷‚"F&vWCÒ%ö&Ææ²"&VÃÒ&æ÷&VfW'&W"#ãÇ7â6Æ74æÖSÒ'‚ÖÖ&²"&–Ö†–FFVãÒ'G'VR#åƒÂ÷7ãâföÆÆ÷r¦¶5÷ƒÂöà¢Æ6Æ74æÖSÒ&fö÷FW"×6ö6–Â"‡&VcÒ&‡GG3¢òöF—66÷&Bævrö´¤5•gDtVR"F&vWCÒ%ö&Ææ²"&VÃÒ&æ÷&VfW'&W"#ãÄÖW76vT6—&6ÆR6—¦S×³WÒóâ¦ö–â¤´2F—66÷&CÂöà¢Æ6Æ74æÖSÒ&fö÷FW"×6ö6–Â"‡&VcÒ&‡GG3¢ò÷BæÖR÷¦¶6öff–6–Â"F&vWCÒ%ö&Ææ²"&VÃÒ&æ÷&VfW'&W"#ãÅ6VæB6—¦S×³WÒóâ¦ö–â¤´2FVÆVw&ÓÂöà¢ÂöF—cà¢Âöfö÷FW#à ¢¶FWF–ÂbbÄFWF–ÄG&vW"FWF–Ã×¶FWF–ÇÒöä6Æ÷6S×²‚’Óâ6WDFWF–Â†çVÆÂ—ÒóçĞ¢ÂöF—cà¢“°§Ğ ¦gVæ7F–öâ7B‡'C¢çVÖ&W"ÂçVÆÂÂF÷FÃ¢çVÖ&W"ÂçVÆÂ’°¢–b‡'BÓÓÒçVÆÂÇÂF÷FÂÓÓÒçVÆÂÇÂF÷FÂÃÒ’&WGW&âçVÆÃ°¢&WGW&âÖF‚æÖ–âƒÂÖF‚æÖ‚ƒÂ‡'BòF÷FÂ’¢’“°§Ğ ¦gVæ7F–öâ66ävR‡G3¢çVÖ&W"ÂçVÆÂ’°¢–b‚G2’&WGW&âu66ææW"v&Ö–ærWs°¢&WGW&âvR‡G2ÂóóóòG2¢¢G2“°§Ğ ¦gVæ7F–öâg&7F–öåW&6VçB‡fÇVS¢çVÖ&W"ÂçVÆÂ’°¢–b‡fÇVRÓÓÒçVÆÂÇÂçVÖ&W"æ—4f–æ—FR‡fÇVR’’&WGW&âçVÆÃ°¢&WGW&âfÇVRÃÒãRòfÇVR¢¢fÇVS°§Ğ §G—RGG&–'WF–öäw&÷WÒ°¢¶W“¢7G&–æs°¢FG&W76W3¢7G&–æuµÓ°¢&Æö6·3¢çVÖ&W#°¢6†&S¢çVÖ&W"ÂçVÆÃ°¢6öæf–FVæ6S¢çVÖ&W"ÂçVÆÃ°¢6÷VçG&–W3¢7G&–æuµÓ°¢æWGv÷&·3¢7G&–æuµÓ°¢VW%&V6÷&G3¢çVÖ&W#°§Ó° ¦gVæ7F–öâGG&–'WF–öäw&÷W2†FF¢F6†&ö&DFF“¢GG&–'WF–öäw&÷WµÒ°¢6öç7Bw&÷W2ÒæWrÖÇ7G&–ærÂGG&–'WF–öäw&÷Wâ‚“°¢f÷"†6öç7BæöFRöbFFæÖW&vVBææöFW2’°¢–b‚æöFRæGG&–'WFVB’6öçF–çVS°¢6öç7BFG&W76W2Ò†æöFRæGG&–'WF–öäFG&W76W2óòµÒ’æÖ‚†’ÓâæFG&W72’æf–ÇFW"„&ööÆVâ’ç6÷'B‚“°¢6öç7BfÆÆ&6²ÒG¶æöFRæGG&–'WFVD&Æö6·2óòw‚w×ÂG¶æöFRæGG&–'WF–öå6†&Róòw‚w×ÂG¶æöFRæGG&–'WF–öä6öæf–FVæ6Róòw‚wÖ°¢6öç7B¶W’ÒFG&W76W2æÆVæwF‚òFG&W76W2æ¦ö–â‚wÂr’¢fÆÆ&6³°¢6öç7B6÷VçG'’ÒæöFRæ6÷VçG'”æÖRÇÂæöFRæ6÷VçG'”6öFRÇÂuVæ¶æ÷vâs°¢6öç7BæWGv÷&²ÒæöFRææWGv÷&²ÇÂuVæ¶æ÷vâs°¢6öç7BW†—7F–ærÒw&÷W2ævWB†¶W’“°¢–b†W†—7F–ær’°¢W†—7F–ærçVW%&V6÷&G2³Ò°¢–b‚W†—7F–æræ6÷VçG&–W2æ–æ6ÇVFW2†6÷VçG'’’’W†—7F–æræ6÷VçG&–W2çW6‚†6÷VçG'’“°¢–b‚W†—7F–ærææWGv÷&·2æ–æ6ÇVFW2†æWGv÷&²’’W†—7F–ærææWGv÷&·2çW6‚†æWGv÷&²“°¢W†—7F–æræ&Æö6·2ÒÖF‚æÖ‚†W†—7F–æræ&Æö6·2ÂæöFRæGG&–'WFVD&Æö6·2óò“°¢–b†æöFRæGG&–'WF–öå6†&RÓÒçVÆÂ’W†—7F–ærç6†&RÒÖF‚æÖ‚†W†—7F–ærç6†&RóòÂæöFRæGG&–'WF–öå6†&R“°¢–b†æöFRæGG&–'WF–öä6öæf–FVæ6RÓÒçVÆÂ’W†—7F–æræ6öæf–FVæ6RÒÖF‚æÖ‚†W†—7F–æræ6öæf–FVæ6RóòÂæöFRæGG&–'WF–öä6öæf–FVæ6R“°¢ÒVÇ6R°¢w&÷W2ç6WB†¶W’Â°¢¶W’À¢FG&W76W2À¢&Æö6·3¢æöFRæGG&–'WFVD&Æö6·2óòÀ¢6†&S¢æöFRæGG&–'WF–öå6†&RÀ¢6öæf–FVæ6S¢æöFRæGG&–'WF–öä6öæf–FVæ6RÀ¢6÷VçG&–W3¢¶6÷VçG'•ÒÀ¢æWGv÷&·3¢¶æWGv÷&µÒÀ¢VW%&V6÷&G3¢À¢Ò“°¢Ğ¢Ğ¢&WGW&â²ââæw&÷W2çfÇVW2‚•Òç6÷'B‚†Â"’Óâ†"ç6†&Róò’Ò†ç6†&Róò’ÇÂ"æ&Æö6·2Òæ&Æö6·2“°§Ğ ¦gVæ7F–öâvV–v‡FVDGG&–'WF–öä6öæf–FVæ6R†w&÷W3¢GG&–'WF–öäw&÷WµÒ’°¢6öç7B&÷w2Òw&÷W2æf–ÇFW"‚†r’Óâræ&Æö6·2âbbræ6öæf–FVæ6RÓÒçVÆÂ“°¢6öç7BF÷FÂÒ&÷w2ç&VGV6R‚‡7VÒÂr’Óâ7VÒ²ræ&Æö6·2Â“°¢–b‚F÷FÂ’&WGW&âçVÆÃ°¢&WGW&â&÷w2ç&VGV6R‚‡7VÒÂr’Óâ7VÒ²ræ&Æö6·2¢†ræ6öæf–FVæ6Róò’Â’òF÷FÃ°§Ğ ¦gVæ7F–öâGG&–'WF–öäÆ&VÂ†w&÷W¢GG&–'WF–öäw&÷WÂ–æFWƒ¢çVÖ&W"’°¢6öç7B6÷VçG'’Òw&÷Wæ6÷VçG&–W2æÆVæwF‚ÓÓÒòw&÷Wæ6÷VçG&–W5³Ò¢G¶w&÷Wæ6÷VçG&–W2æÆVæwF‡ÒÆö6F–öç6°¢&WGW&âG¶6÷VçG'—Ò+r6÷W&6RG¶–æFW‚²Ö°§Ğ ¦gVæ7F–öâ–çFVÆÆ–vVæ6T†öÖR‡²FFÂG…fÇVW2ÂVÇ6UF–ÖW2Âöå&VfW&Væ6RÂöåf–FV÷2Ó¢²FF¢F6†&ö&DFF²G…fÇVW3¢'&“ÆçVÖ&W"ÂçVÆÃã²VÇ6UF–ÖW3¢çVÖ&W%µÓ²öå&VfW&Væ6S¢‚’Óâfö–C²öåf–FV÷3¢‚’Óâfö–BÒ’°¢6öç7Bw&÷W2ÒGG&–'WF–öäw&÷W2†FF“°¢6öç7BGG&–'WFVD&Æö6·2ÒFFæÖW&vVBæGG&–'WF–öäÖF6†VBóò†w&÷W2ç&VGV6R‚‡7VÒÂr’Óâ7VÒ²ræ&Æö6·2Â’ÇÂçVÆÂ“°¢6öç7BvV–v‡FVD6öæf–FVæ6RÒvV–v‡FVDGG&–'WF–öä6öæf–FVæ6R†w&÷W2“°¢6öç7BF÷6†&RÒg&7F–öåW&6VçB†w&÷W5³Óòç6†&RóòçVÆÂ“°¢6öç7BÖW&vU&FRÒ7B†FFæÖW&vVBæf÷VæBÂFFæÖW&vVBæ6†V6¶VB“°¢6öç7BGG&–'WF–öä7F—fRÒ†GG&–'WFVD&Æö6·2óò’âbbw&÷W2æÆVæwF‚â°¢6öç7B6÷VçG&–W2ÒFFçV&Æ–4æöFW2çF÷FÇ2æ6÷VçG&–W3°¢&WGW&â€¢Ãà¢Ç6V7F–öâ6Æ74æÖSÒ&–çFVÂÖ†W&òÖw&–B#à¢Ç6V7F–öâ6Æ74æÖSÒ'æVÂ–çFVÆÆ–vVæ6R×&–Ö'’GG&–'WF–öâ×&–Ö'’#à¢ÆF—b6Æ74æÖSÒ'æVÂÖ†VB#à¢ÆF—cãÇ7â6Æ74æÖSÒ'æVÂÖ–6öâ#ãÄv—DÖW&vR6—¦S×³#'ÒóãÂ÷7ããÆƒ#äö'6W'fVBÖW&vVBÖÖ–æ–ærGG&–'WF–öãÂöƒ#ãÂöF—cà¢Ç7â6Æ74æÖS×¶6V7W&—G’Ö6†—G¶GG&–'WF–öä7F—fRòvvööBr¢rwÖÓãÆ’óç¶GG&–'WF–öä7F—fRòt$Äô4²EE$”%UD”ôâ5D•dRr¢ut•D”ärdõ"EE$”%UD”ôâwÓÂ÷7ãà¢ÂöF—cà¢ÆF—b6Æ74æÖSÒ&GG&–'WF–öâÖfÆ÷r#à¢ÆF—b6Æ74æÖSÒ&6†–â¶2#ãÇ7ãä´5Â÷7ããÆ#å&VçB&ööbÖöb×v÷&³Âö#ãÂöF—cà¢ÆF—b6Æ74æÖSÒ&ÖW&vRÖ'&÷r#ãÅ¦6—¦S×³#WÒóãÇ7ãäW…õsÂ÷7ããÂöF—cà¢ÆF—b6Æ74æÖSÒ&6†–â¦¶2#ãÇ7ãå¤´3Â÷7ããÆ#äö'6W'fVB6†–ÆB&Æö6·3Âö#ãÂöF—cà¢ÆF—b6Æ74æÖSÒ&GG&–'WF–öâÖ'&÷r#î(i#ÂöF—cà¢ÆF—b6Æ74æÖSÒ&6†–âGG&–'WF–öâ#ãÇ7ãåT$Ä”2•TÄ”äSÂ÷7ããÆ#äGG&–'WF–öâw&÷W3Âö#ãÂöF—cà¢ÂöF—cà¢ÆF—b6Æ74æÖSÒ&–çFVÂ×7FB×&÷rGG&–'WF–öâ×7FB×&÷r#à¢ÆF—cãÇ7ãäGG&–'WFVB&Æö6·3Â÷7ããÆ#ç¶F—7Æ”çVÖ&W"†GG&–'WFVD&Æö6·2ÂG'VR—ÓÂö#ãÂöF—cà¢ÆF—cãÇ7ãåVæ—VRGG&–'WF–öâw&÷W3Â÷7ããÆ#ç¶F—7Æ”çVÖ&W"†w&÷W2æÆVæwF‚ÇÂçVÆÂ—ÓÂö#ãÂöF—cà¢ÆF—cãÇ7ãåvV–v‡FVB6öæf–FVæ6SÂ÷7ããÆ#ç·vV–v‡FVD6öæf–FVæ6RÓÓÒçVÆÂò~(	Br¢G¶f×Bæf÷&ÖB†g&7F–öåW&6VçB‡vV–v‡FVD6öæf–FVæ6R’óò—ÒVÓÂö#ãÂöF—cà¢ÆF—cãÇ7ãäÆ&vW7Bö'6W'fVB6†&SÂ÷7ããÆ#ç·F÷6†&RÓÓÒçVÆÂò~(	Br¢G¶f×Bæf÷&ÖB‡F÷6†&R—ÒVÓÂö#ãÂöF—cà¢ÂöF—cà¢ÆF—b6Æ74æÖSÒ&GG&–'WF–öâÖÖ–æ’ÖÆ—7B#à¢¶w&÷W2ç6Æ–6RƒÂB’æÖ‚†w&÷WÂ–æFW‚’Óâ°¢6öç7B6†&RÒg&7F–öåW&6VçB†w&÷Wç6†&R’óò°¢6öç7B6öæf–FVæ6RÒg&7F–öåW&6VçB†w&÷Wæ6öæf–FVæ6R“°¢&WGW&âÆF—b6Æ74æÖSÒ&GG&–'WF–öâÖÖ–æ’"¶W“×¶w&÷Wæ¶W—Óà¢ÆF—cãÇ7ãç¶GG&–'WF–öäÆ&VÂ†w&÷WÂ–æFW‚—ÓÂ÷7ããÆ#ç¶f×Bæf÷&ÖB‡6†&R—ÒSÂö#ãÂöF—cà¢Æ“ãÇ7â7G–ÆS×·²v–GFƒ¢G´ÖF‚æÖ‚ƒÂÖF‚æÖ–âƒÂ6†&R’—ÒV×ÒóãÂö“à¢Ç6ÖÆÃç¶F—7Æ”çVÖ&W"†w&÷Wæ&Æö6·2ÂG'VR—Ò&Æö6·2+r¶6öæf–FVæ6RÓÓÒçVÆÂòv6öæf–FVæ6RVæf–Æ&ÆRr¢G¶f×Bæf÷&ÖB†6öæf–FVæ6R—ÒR6öæf–FVæ6VÓÂ÷6ÖÆÃà¢ÂöF—cã°¢Ò—Ğ¢²w&÷W2æÆVæwF‚bbÆF—b6Æ74æÖSÒ&V×G’ÖÖ–æ’#åv—F–ærf÷"V&Æ–2&Æö6²ÖGG&–'WF–öâFFãÂöF—cçĞ¢ÂöF—cà¢Ç6Æ74æÖSÒ'6÷W&6RÖæ÷FR#ãÅ6†–VÆD6†V6²6—¦S×³WÒóâ6†&W2&RFVGWÆ–6FVB'’V&Æ–2¶7–÷WBGG&–'WF–öâ6òGWÆ–6FRVW"&÷w2&Ræ÷B6÷VçFVBGv–6Râ6öæf–FVæ6R—2F†R’×&W÷'FVBGG&–'WF–öâ6öæf–FVæ6RãÂ÷à¢Â÷6V7F–öãà ¢Ç6V7F–öâ6Æ74æÖSÒ'æVÂ6–væÂÖ&ö&B#à¢ÆF—b6Æ74æÖSÒ'æVÂÖ†VB#ãÆF—cãÇ7â6Æ74æÖSÒ'æVÂÖ–6öâ#ãÄ7F—f—G’6—¦S×³#ÒóãÂ÷7ããÆƒ#äÆ—fRæWGv÷&²6–væÇ3Âöƒ#ãÂöF—cãÇ7â6Æ74æÖSÒ&Æ—fRÖÖ–æ’#ãÆ’óâT$Ä”3Â÷7ããÂöF—cà¢ÆF—b6Æ74æÖSÒ'6–væÂÖÆ—7B#à¢Å6–væÂÆ&VÃÒ$&Æö6²fÆ÷r"fÇVS×¶FFæ'2ÓÓÒçVÆÂò~(	Br¢G¶f×Bæf÷&ÖB†FFæ'2—Ò%6Òæ÷FSÒ#RÖÖ–çWFRö'6W'fVB&FR"óà¢Å6–væÂÆ&VÃÒ$æWGv÷&²v÷&²"fÇVS×¶F—7Æ”†6‡&FR†FFæ†6‡&FR—Òæ÷FSÒ'V&Æ–26öç6Vç7W2W7F–ÖFR"óà¢Å6–væÂÆ&VÃÒ%f—6–&ÆRVW'2"fÇVS×¶F—7Æ”çVÖ&W"†FFç&VÆ’æ7F—fUVW'2óòFFææöFW2—Òæ÷FS×¶G¶F—7Æ”çVÖ&W"†6÷VçG&–W2—Ò6÷VçG&–W2–âV&Æ–2f–WvÒóà¢Å6–væÂÆ&VÃÒ$GG&–'WFVB&Æö6·2"fÇVS×¶F—7Æ”çVÖ&W"†GG&–'WFVD&Æö6·2ÂG'VR—Òæ÷FS×¶G¶F—7Æ”çVÖ&W"†w&÷W2æÆVæwF‚ÇÂçVÆÂ—ÒVæ—VRGG&–'WF–öâw&÷W6Òóà¢Å6–væÂÆ&VÃÒ$GG&–'WF–öâWFFVB"fÇVS×·66ävR†FFæÖW&vVBæGG&–'WF–öåWFFVDB—Òæ÷FSÒ'V&Æ–2GG&–'WF–öâ—VÆ–æR"óà¢ÂöF—cà¢Â÷6V7F–öãà¢Â÷6V7F–öãà ¢Ç6V7F–öâ6Æ74æÖSÒ&ÖWG&–2Öw&–B–çFVÂÖÖWG&–72#à¢ÄÖWG&–46&B–6öã×³ÄvVvR6—¦S×³—ÒóçÒÆ&VÃÒ$†6‡&FR"fÇVS×¶F—7Æ”†6‡&FR†FFæ†6‡&FR—Ò7V#Ò$æWGv÷&²v÷&²W7F–ÖFR"66VçBóà¢ÄÖWG&–46&B–6öã×³Ä7F—f—G’6—¦S×³—ÒóçÒÆ&VÃÒ$%2"fÇVS×¶F—7Æ”çVÖ&W"†FFæ'2—Ò7V#Ò#VÒö'6W'fVB"óà¢ÄÖWG&–46&B–6öã×³ÄvVvR6—¦S×³—ÒóçÒÆ&VÃÒ$F–ff–7VÇG’"fÇVS×¶F—7Æ”çVÖ&W"†FFæF–ff–7VÇG’ÂG'VR—Ò7V#Ò$6öç6Vç7W2F–ff–7VÇG’"óà¢ÄÖWG&–46&B–6öã×³ÄæWGv÷&²6—¦S×³—ÒóçÒÆ&VÃÒ%f—6–&ÆRæöFW2"fÇVS×¶F—7Æ”çVÖ&W"†FFçV&Æ–4æöFW2çF÷FÇ2ææöFW2óòFFææöFW2—Ò7V#Ò$W‡Æ÷&W"fçFvRö–çB"óà¢ÄÖWG&–46&B–6öã×³Äv—DÖW&vR6—¦S×³—ÒóçÒÆ&VÃÒ$6òÖÆö6FVBVW'2"fÇVS×¶F—7Æ”çVÖ&W"†FFæÖW&vVBæf÷VæB—Ò7V#Ò$Æ7B6ö×ÆWFVB&ö&R"óà¢ÄÖWG&–46&B–6öã×³ÄæWGv÷&²6—¦S×³—ÒóçÒÆ&VÃÒ%VW'26†V6¶VB"fÇVS×¶F—7Æ”çVÖ&W"†FFæÖW&vVBæ6†V6¶VB—Ò7V#Ò$6òÖÆö6F–öâ&ö&R"óà¢ÄÖWG&–46&B–6öã×³Å¦6—¦S×³—ÒóçÒÆ&VÃÒ$ö'6W'f&ÆR6òÖÆö6F–öâ"fÇVS×¶ÖW&vU&FRÓÓÒçVÆÂò~(	Br¢G¶f×Bæf÷&ÖB†ÖW&vU&FR—ÒVÒ7V#Ò%&ö&R6–væÂÂæ÷BÖ–æ–ær6†&R"óà¢ÄÖWG&–46&B–6öã×³Ä6Æö6³26—¦S×³—ÒóçÒÆ&VÃÒ$Æ7B&ö&R"fÇVS×·66ävR†FFæÖW&vVBç66ææVDB—Ò7V#Ò%V&Æ–26òÖÆö6F–öâ66ææW""óà¢Â÷6V7F–öãà ¢ÄGG&–'WF–öä'&V¶F÷vâFF×¶FFÒÆ–Ö—C×³‡Òóà ¢Ç6V7F–öâ6Æ74æÖSÒ'GvòÖ6öÂ–çFVÂÖ6†'G2#à¢ÆF—b6Æ74æÖSÒ'æVÂ#ãÆF—b6Æ74æÖSÒ'æVÂÖ†VB#ãÆF—cãÇ7â6Æ74æÖSÒ'æVÂÖ–6öâ#ãÅvfW26—¦S×³#ÒóãÂ÷7ããÆƒ#åG&ç67F–öâ7F—f—G“Âöƒ#ãÂöF—cãÇ7â6Æ74æÖSÒ'&ævRÖ6†—#ãTÓÂ÷7ããÂöF—cãÅ7&´6†'BfÇVW3×·G…fÇVW7ÒÆ&VÇ3×·VÇ6UF–ÖW7ÒóãÂöF—cà¢ÄÖW&vVD6÷VçG'”'&V¶F÷vâFF×¶FFÒóà¢Â÷6V7F–öãà ¢Ç6V7F–öâ6Æ74æÖSÒ'æVÂÆFW7B×f–FVò×7G&—#à¢ÆF—b6Æ74æÖSÒ&ÆFW7B×f–FVòÖ–6öâ#ãÅ=ç»h‘éì¶»§q«^u¥½¸õìñ9•Ñİ½É¬Í¥é”õìÄåô€¼ùô±…‰•°ô‰Y¥Í¥‰±”¹½‘•ÌˆÙ…±Õ”õí‘¥ÍÁ±…å9Õµ‰•È¡‘…Ñ„¹ÁÕ‰±¥9½‘•Ì¹Ñ½Ñ…±Ì¹¹½‘•Ì€üü‘…Ñ„¹¹½‘•Ì¥ôÍÕˆô‰áÁ±½É•ÈÙ…¹Ñ…”Á½¥¹Ğˆ€¼ø(€€€€€€ğ½‘¥Øø(€€€€€€ñÍ•Ñ¥½¸±…ÍÍ9…µ”ô‰Ñİ¼µ½°ˆø(€€€€€€€€ñ‘¥Ø±…ÍÍ9…µ”ô‰Á…¹•°ˆøñ‘¥Ø±…ÍÍ9…µ”ô‰Á…¹•°µ¡•…ˆøñ‘¥ØøñÍÁ…¸±…ÍÍ9…µ”ô‰Á…¹•°µ¥½¸ˆøñ…Õ”Í¥é”õìÈÁô€¼øğ½ÍÁ…¸øñ Èù¥™™¥Õ±ÑäÍ¥¹…°ğ½ Èøğ½‘¥ØøñÍÁ…¸±…ÍÍ9…µ”ô‰É…¹”µ¡¥ÀˆøÄÕ4ğ½ÍÁ…¸øğ½‘¥ØøñMÁ…É­¡…ÉĞÙ…±Õ•Ìõí‘¥™™Y…±Õ•Íô±…‰•±ÌõíÁÕ±Í•Q¥µ•Íô¡•¥¡ĞõìÈĞÁô€¼øğ½‘¥Øø(€€€€€€€€ñ‘¥Ø±…ÍÍ9…µ”ô‰Á…¹•°ˆøñ‘¥Ø±…ÍÍ9…µ”ô‰Á…¹•°µ¡•…ˆøñ‘¥ØøñÍÁ…¸±…ÍÍ9…µ”ô‰Á…¹•°µ¥½¸ˆøñ]…Ù•ÌÍ¥é”õìÈÁô€¼øğ½ÍÁ…¸øñ ÈùQÉ…¹Í…Ñ¥½¸Í¥¹…°ğ½ Èøğ½‘¥ØøñÍÁ…¸±…ÍÍ9…µ”ô‰É…¹”µ¡¥ÀˆøÄÕ4ğ½ÍÁ…¸øğ½‘¥ØøñMÁ…É­¡…ÉĞÙ…±Õ•ÌõíÑáY…±Õ•Íô±…‰•±ÌõíÁÕ±Í•Q¥µ•Íô¡•¥¡ĞõìÈĞÁô€¼øğ½‘¥Øø(€€€€€€ğ½Í•Ñ¥½¸ø(€€€€€€ñAÕ‰±¥9½‘•MÕµµ…Éä‘…Ñ„õí‘…Ñ…ô½¹=Á•¸õí½¹=Á•¹9½‘•Íô€¼ø(€€€€€€ñÍ•Ñ¥½¸±…ÍÍ9…µ”ô‰Ñİ¼µ½°ˆøñ½Õ¹ÑÉ¥•ÍQ…‰±”‘…Ñ„õí‘…Ñ…ô€¼øñ9½‘•±¥•¹ÑMÕµµ…Éä¹½‘•Ìõí‘…Ñ„¹ÁÕ‰±¥9½‘•Ì¹¹½‘•Íô€¼øğ½Í•Ñ¥½¸ø(€€€€ğ½Í•Ñ¥½¸ø(€€¤ì)ô(()ÑåÁ”9•Ñİ½É­Ù•¹Ğ€ôì(€­•äèÍÑÉ¥¹œì(€Ñ¥Ñ±”èÍÑÉ¥¹œì(€‘•Ñ…¥°èÍÑÉ¥¹œì(€Ñ½¹”è€¥¹™¼œğ€Á½Í¥Ñ¥Ù”œğ€İ…Ñ œì)ôì()™Õ¹Ñ¥½¸Á•É•¹Ñ5½Ù”¡ÕÉÉ•¹Ğè¹Õµ‰•Èğ¹Õ±°°‰…Í•±¥¹”è¹Õµ‰•Èğ¹Õ±°¤ì(€¥˜€¡ÕÉÉ•¹Ğ€ôôô¹Õ±°ñğ‰…Í•±¥¹”€ôôô¹Õ±°ñğ‰…Í•±¥¹”€ôôô€À¤É•ÑÕÉ¸¹Õ±°ì(€É•ÑÕÉ¸€ ¡ÕÉÉ•¹Ğ€´‰…Í•±¥¹”¤€¼‰…Í•±¥¹”¤€¨€ÄÀÀì)ô()™Õ¹Ñ¥½¸Í¥¹•‘A•É•¹Ğ¡Ù…±Õ”è¹Õµ‰•Èğ¹Õ±°¤ì(€¥˜€¡Ù…±Õ”€ôôô¹Õ±°¤É•ÑÕÉ¸€ŸŠPœì(€É•ÑÕÉ¸€‘íÙ…±Õ”€øô€À€ü€œ¬œ€è€œô‘í™µĞ¹™½Éµ…Ğ¡Ù…±Õ”¥ô•€ì)ô()™Õ¹Ñ¥½¸‰Õ¥±‘9•Ñİ½É­Ù•¹ÑÌ¡‘…Ñ„è…Í¡‰½…É‘…Ñ„°¡¥ÍÑ½Éäè!¥ÍÑ½ÉåM¹…ÁÍ¡½Ñmt¤è9•Ñİ½É­Ù•¹Ñmtì(€½¹ÍĞ¹½Ü€ô…Ñ”¹¹½Ü ¤ì(€½¹ÍĞ±…ÍÑ!½ÕÈ€ô¡¥ÍÑ½Éä¹™¥±Ñ•È ¡É½Ü¤€ôøÉ½Ü¹Ğ€øô¹½Ü€´€ØÀ€¨€ØÀ€¨€ÄÀÀÀ¤¹Í½ÉĞ ¡„°ˆ¤€ôø„¹Ğ€´ˆ¹Ğ¤ì(€½¹ÍĞ‰…Í•±¥¹”€ô±…ÍÑ!½ÕÉlÁt€üü¹Õ±°ì(€½¹ÍĞÉ½ÕÁÌ€ô…ÑÑÉ¥‰ÕÑ¥½¹É½ÕÁÌ¡‘…Ñ„¤ì(€½¹ÍĞ…ÑÑÉ¥‰ÕÑ•‘9½Ü€ô‘…Ñ„¹µ•É•¹…ÑÑÉ¥‰ÕÑ¥½¹5…Ñ¡•€üü€¡É½ÕÁÌ¹É•‘Õ” ¡ÍÕ´°É½Ü¤€ôøÍÕ´€¬É½Ü¹‰±½­Ì°€À¤ñğ¹Õ±°¤ì(€½¹ÍĞÑ½ÁM¡…É•9½Ü€ô™É…Ñ¥½¹A•É•¹Ğ¡É½ÕÁÍlÁtü¹Í¡…É”€üü¹Õ±°¤ì(€½¹ÍĞÕÉÉ•¹Ñ9½‘•Ì€ôÙ…±¥‘9Õµ‰•È¡‘…Ñ„¹ÁÕ‰±¥9½‘•Ì¹Ñ½Ñ…±Ì¹¹½‘•Ì€üü‘…Ñ„¹¹½‘•Ì¤ì(€½¹ÍĞ¡…Í¡É…Ñ•5½Ù”€ôÁ•É•¹Ñ5½Ù”¡Ù…±¥‘9Õµ‰•È¡‘…Ñ„¹¡…Í¡É…Ñ”¤°‰…Í•±¥¹”ü¹¡…Í¡É…Ñ”€üü¹Õ±°¤ì(€½¹ÍĞ¹½‘•5½Ù”€ô‰…Í•±¥¹”ü¹Ù¥Í¥‰±•9½‘•Ì€„ôô¹Õ±°€˜˜‰…Í•±¥¹”ü¹Ù¥Í¥‰±•9½‘•Ì€„ôôÕ¹‘•™¥¹•€˜˜ÕÉÉ•¹Ñ9½‘•Ì€„ôô¹Õ±°(€€€€üÕÉÉ•¹Ñ9½‘•Ì€´‰…Í•±¥¹”¹Ù¥Í¥‰±•9½‘•Ì(€€€€è¹Õ±°ì(€½¹ÍĞ…ÑÑÉ¥‰ÕÑ•‘5½Ù”€ô‰…Í•±¥¹”ü¹…ÑÑÉ¥‰ÕÑ•‘	±½­Ì€„ôô¹Õ±°€˜˜‰…Í•±¥¹”ü¹…ÑÑÉ¥‰ÕÑ•‘	±½­Ì€„ôôÕ¹‘•™¥¹•€˜˜…ÑÑÉ¥‰ÕÑ•‘9½Ü€„ôô¹Õ±°(€€€€ü…ÑÑÉ¥‰ÕÑ•‘9½Ü€´‰…Í•±¥¹”¹…ÑÑÉ¥‰ÕÑ•‘	±½­Ì(€€€€è¹Õ±°ì(€½¹ÍĞÍ¡…É•5½Ù”€ô‰…Í•±¥¹”ü¹±…É•ÍÑM¡…É•AĞ€„ôô¹Õ±°€˜˜‰…Í•±¥¹”ü¹±…É•ÍÑM¡…É•AĞ€„ôôÕ¹‘•™¥¹•€˜˜Ñ½ÁM¡…É•9½Ü€„ôô¹Õ±°(€€€€üÑ½ÁM¡…É•9½Ü€´‰…Í•±¥¹”¹±…É•ÍÑM¡…É•AĞ(€€€€è¹Õ±°ì(€½¹ÍĞ•Ù•¹ÑÌè9•Ñİ½É­Ù•¹Ñmt€ômtì((€¥˜€¡‘…Ñ„¹¹•áÑI•‘ÕÑ¥½¹M•½¹‘Ì€„ôô¹Õ±°€˜˜‘…Ñ„¹¹•áÑI•‘ÕÑ¥½¹M•½¹‘Ì€ğô€Ğà€¨€ØÀ€¨€ØÀ¤ì(€€€½¹ÍĞ¹•áÑ5¥¹•È€ôµ¥¹•ÉA…å½ÕĞ¡‘…Ñ„¹¹•áÑI•İ…É¤ì(€€€•Ù•¹ÑÌ¹ÁÕÍ ¡ì(€€€€€­•äè€É•İ…ÉµÍÑ•Àœ°(€€€€€Ñ¥Ñ±”è€µ¥ÍÍ¥½¸ÍÑ•À…ÁÁÉ½…¡¥¹œœ°(€€€€€‘•Ñ…¥°è€‘í½Õ¹Ñ‘½İ¸¡‘…Ñ„¹¹•áÑI•‘ÕÑ¥½¹M•½¹‘Ì¥ôÕ¹Ñ¥°Ñ¡”¹•áĞÉ½ÍÌÉ•İ…É½˜€‘í‘…Ñ„¹¹•áÑI•İ…É€ôôô¹Õ±°€ü€ŸŠPœ€è€‘í™µĞ¹™½Éµ…Ğ¡‘…Ñ„¹¹•áÑI•İ…É¥ôi-Mô‘í¹•áÑ5¥¹•È€ôôô¹Õ±°€ü€œœ€è€€ ‘í™µĞ¹™½Éµ…Ğ¡¹•áÑ5¥¹•È¥ôi-Lµ¥¹•ÈÁ…å½ÕĞ¥ô¹€°(€€€€€Ñ½¹”è‘…Ñ„¹¹•áÑI•‘ÕÑ¥½¹M•½¹‘Ì€ğô€Ø€¨€ØÀ€¨€ØÀ€ü€İ…Ñ œ€è€¥¹™¼œ°(€€€ô¤ì(€ô((€¥˜€¡¡…Í¡É…Ñ•5½Ù”€„ôô¹Õ±°¤ì(€€€•Ù•¹ÑÌ¹ÁÕÍ ¡ì(€€€€€­•äè€¡…Í¡É…Ñ”œ°(€€€€€Ñ¥Ñ±”è9•Ñİ½É¬İ½É¬€‘í5…Ñ ¹…‰Ì¡¡…Í¡É…Ñ•5½Ù”¤€ğ€Ä€ü€¡½±‘¥¹œÍÑ•…‘äœ€è¡…Í¡É…Ñ•5½Ù”€ø€À€ü€¥¹É•…Í•œ€è€‘•É•…Í•õ€°(€€€€€‘•Ñ…¥°è€‘íÍ¥¹•‘A•É•¹Ğ¡¡…Í¡É…Ñ•5½Ù”¥ôÙ•ÉÍÕÌÑ¡”•…É±¥•ÍĞi-L¹ÍÑÉ•…´½‰Í•ÉÙ•ÈÍ¹…ÁÍ¡½Ğ…Ù…¥±…‰±”¥¸Ñ¡”±…ÍĞ¡½ÕÈ¸ÕÉÉ•¹Ğ•ÍÑ¥µ…Ñ”è€‘í‘¥ÍÁ±…å!…Í¡É…Ñ”¡‘…Ñ„¹¡…Í¡É…Ñ”¥ô¹€°(€€€€€Ñ½¹”è5…Ñ ¹…‰Ì¡¡…Í¡É…Ñ•5½Ù”¤€øô€ÄÀ€ü€İ…Ñ œ€è5…Ñ ¹…‰Ì¡¡…Í¡É…Ñ•5½Ù”¤€ğ€Ä€ü€Á½Í¥Ñ¥Ù”œ€è€¥¹™¼œ°(€€€ô¤ì(€ô((€¥˜€¡¹½‘•5½Ù”€„ôô¹Õ±°¤ì(€€€•Ù•¹ÑÌ¹ÁÕÍ ¡ì(€€€€€­•äè€¹½‘•Ìœ°(€€€€€Ñ¥Ñ±”è¹½‘•5½Ù”€ôôô€À€ü€Y¥Í¥‰±”Á••ÈÍ•ĞÕ¹¡…¹•œ€èY¥Í¥‰±”¹½‘•Ì€‘í¹½‘•5½Ù”€ø€À€ü€¥¹É•…Í•œ€è€‘•É•…Í•õ€°(€€€€€‘•Ñ…¥°è€‘í¹½‘•5½Ù”€ø€À€ü€œ¬œ€è€œô‘í¹½‘•5½Ù•ô™É½´Ñ¡”•…É±¥•ÍĞ½‰Í•ÉÙ•ÈÍ¹…ÁÍ¡½Ğ¥¸Ñ¡”±…ÍĞ¡½ÕÈì€‘í‘¥ÍÁ±…å9Õµ‰•È¡ÕÉÉ•¹Ñ9½‘•Ì¥ôÙ¥Í¥‰±”¹½Ü™É½´Ñ¡”•áÁ±½É•ÈÙ…¹Ñ…”Á½¥¹Ğ¹€°(€€€€€Ñ½¹”è5…Ñ ¹…‰Ì¡¹½‘•5½Ù”¤€øô€Ø€ü€İ…Ñ œ€è¹½‘•5½Ù”€ôôô€À€ü€Á½Í¥Ñ¥Ù”œ€è€¥¹™¼œ°(€€€ô¤ì(€ô((€¥˜€¡…ÑÑÉ¥‰ÕÑ•‘5½Ù”€„ôô¹Õ±°¤ì(€€€•Ù•¹ÑÌ¹ÁÕÍ ¡ì(€€€€€­•äè€…ÑÑÉ¥‰ÕÑ¥½¸œ°(€€€€€Ñ¥Ñ±”è…ÑÑÉ¥‰ÕÑ•‘5½Ù”€ø€À€ü€9•Üµ•É”µµ¥¹¥¹œ…ÑÑÉ¥‰ÕÑ¥½¸½‰Í•ÉÙ•œ€è€ÑÑÉ¥‰ÕÑ¥½¸Ñ½Ñ…°Õ¹¡…¹•œ°(€€€€€‘•Ñ…¥°è€‘í…ÑÑÉ¥‰ÕÑ•‘5½Ù”€ø€À€ü€œ¬œ€è€œô‘í‘¥ÍÁ±…å9Õµ‰•È¡…ÑÑÉ¥‰ÕÑ•‘5½Ù”°ÑÉÕ”¥ô…ÑÑÉ¥‰ÕÑ•‰±½­ÌÍ¥¹”Ñ¡”•…É±¥•ÍĞ½‰Í•ÉÙ•ÈÍ¹…ÁÍ¡½Ğ¥¸Ñ¡”±…ÍĞ¡½ÕÈì€‘í‘¥ÍÁ±…å9Õµ‰•È¡…ÑÑÉ¥‰ÕÑ•‘9½Ü°ÑÉÕ”¥ôÕÉÉ•¹Ñ±äµ…Ñ¡•¹€°(€€€€€Ñ½¹”è…ÑÑÉ¥‰ÕÑ•‘5½Ù”€ø€À€ü€Á½Í¥Ñ¥Ù”œ€è€¥¹™¼œ°(€€€ô¤ì(€ô((€¥˜€¡Í¡…É•5½Ù”€„ôô¹Õ±°¤ì(€€€•Ù•¹ÑÌ¹ÁÕÍ ¡ì(€€€€€­•äè€Í¡…É”œ°(€€€€€Ñ¥Ñ±”è€1…É•ÍĞ½‰Í•ÉÙ•…ÑÑÉ¥‰ÕÑ¥½¸Í¡…É”µ½Ù•œ°(€€€€€‘•Ñ…¥°è€‘íÍ¡…É•5½Ù”€øô€À€ü€œ¬œ€è€œô‘í™µĞ¹™½Éµ…Ğ¡Í¡…É•5½Ù”¥ôÁ•É•¹Ñ…”Á½¥¹ÑÌ½Ù•ÈÑ¡”…Ù…¥±…‰±”±…ÍĞµ¡½ÕÈ½‰Í•ÉÙ•Èİ¥¹‘½Üì±…É•ÍĞ½‰Í•ÉÙ•Í¡…É”¥Ì€‘íÑ½ÁM¡…É•9½Ü€ôôô¹Õ±°€ü€ŸŠPœ€è€‘í™µĞ¹™½Éµ…Ğ¡Ñ½ÁM¡…É•9½Ü¥ô•ô¹€°(€€€€€Ñ½¹”è5…Ñ ¹…‰Ì¡Í¡…É•5½Ù”¤€øô€Ô€ü€İ…Ñ œ€è€¥¹™¼œ°(€€€ô¤ì(€ô((€½¹ÍĞÍ…¹M•½¹‘Ì€ô‘…Ñ„¹µ•É•¹Í…¹¹•‘Ğ(€€€€ü5…Ñ ¹µ…à À°5…Ñ ¹™±½½È¡…Ñ”¹¹½Ü ¤€¼€ÄÀÀÀ¤€´€¡‘…Ñ„¹µ•É•¹Í…¹¹•‘Ğ€ø€ÄÁ|ÀÀÁ|ÀÀÁ|ÀÀÀ€ü5…Ñ ¹™±½½È¡‘…Ñ„¹µ•É•¹Í…¹¹•‘Ğ€¼€ÄÀÀÀ¤€è‘…Ñ„¹µ•É•¹Í…¹¹•‘Ğ¤¤(€€€€è¹Õ±°ì(€¥˜€¡Í…¹M•½¹‘Ì€„ôô¹Õ±°¤ì(€€€•Ù•¹ÑÌ¹ÁÕÍ ¡ì(€€€€€­•äè€¼µ±½…Ñ¥½¸œ°(€€€€€Ñ¥Ñ±”èÍ…¹M•½¹‘Ì€ø€ÈÀ€¨€ØÀ€ü€A••È¼µ±½…Ñ¥½¸Í…¸¥Ì…¥¹œœ€è€A••È¼µ±½…Ñ¥½¸Í…¸ÕÉÉ•¹Ğœ°(€€€€€‘•Ñ…¥°è€‘íÍ…¹”¡‘…Ñ„¹µ•É•¹Í…¹¹•‘Ğ¥ôƒ
+Ü€‘í‘¥ÍÁ±…å9Õµ‰•È¡‘…Ñ„¹µ•É•¹™½Õ¹¥ô-…ÍÁ„¼µ±½…Ñ•Á••ÉÌ½‰Í•ÉÙ•™É½´€‘í‘¥ÍÁ±…å9Õµ‰•È¡‘…Ñ„¹µ•É•¹¡•­•¥ô¡•­•¹€°(€€€€€Ñ½¹”èÍ…¹M•½¹‘Ì€ø€ÈÀ€¨€ØÀ€ü€İ…Ñ œ€è€Á½Í¥Ñ¥Ù”œ°(€€€ô¤ì(€ô((€½¹ÍĞÑ¥Á½Õ¹Ğ€ô‘…Ñ„¹É•±…ä¹Ñ¥Á!…Í¡•Ìì(€¥˜€¡Ñ¥Á½Õ¹Ğ€„ôô¹Õ±°¤ì(€€€•Ù•¹ÑÌ¹ÁÕÍ ¡ì(€€€€€­•äè€Ñ¥ÁÌœ°(€€€€€Ñ¥Ñ±”è€‘í‘¥ÍÁ±…å9Õµ‰•È¡Ñ¥Á½Õ¹Ğ¥ô½¹Í•¹ÍÕÌÑ¥À‘íÑ¥Á½Õ¹Ğ€ôôô€Ä€ü€œœ€è€ÌôÙ¥Í¥‰±•€°(€€€€€‘•Ñ…¥°è€	±½­Ñ¥ÁÌ…É”„±¥Ù”½¹Í•¹ÍÕÌµ•ÑÉ¥ŒìµÕ±Ñ¥Á±”Ñ¥ÁÌ…É”¹½Éµ…°½¸„…¹…É”¹½Ğ…ÕÑ½µ…Ñ¥…±±ä…¸•ÉÉ½È¸œ°(€€€€€Ñ½¹”è€¥¹™¼œ°(€€€ô¤ì(€ô((€¥˜€¡‘…Ñ„¹µ•µÁ½½°€„ôô¹Õ±°¤ì(€€€•Ù•¹ÑÌ¹ÁÕÍ ¡ì(€€€€€­•äè€µ•µÁ½½°œ°(€€€€€Ñ¥Ñ±”è‘…Ñ„¹µ•µÁ½½°€ø€À€ü€QÉ…¹Í…Ñ¥½¹Ìİ…¥Ñ¥¹œ¥¸µ•µÁ½½°œ€è€5•µÁ½½°ÕÉÉ•¹Ñ±ä±•…Èœ°(€€€€€‘•Ñ…¥°è€‘í‘¥ÍÁ±…å9Õµ‰•È¡‘…Ñ„¹µ•µÁ½½°¥ôÑÉ…¹Í…Ñ¥½¸‘í‘…Ñ„¹µ•µÁ½½°€ôôô€Ä€ü€œœ€è€Ìôİ…¥Ñ¥¹œ…ĞÑ¡”ÁÕ‰±¥Œ•áÁ±½É•È¹½‘”¹€°(€€€€€Ñ½¹”è‘…Ñ„¹µ•µÁ½½°€ø€ÈÔ€ü€İ…Ñ œ€è€¥¹™¼œ°(€€€ô¤ì(€ô((€É•ÑÕÉ¸•Ù•¹ÑÌ¹Í±¥” À°€à¤ì)ô()™Õ¹Ñ¥½¸Ù•¹ÑÍA…”¡ì‘…Ñ„°¡¥ÍÑ½Éäôèì‘…Ñ„è…Í¡‰½…É‘…Ñ„ì¡¥ÍÑ½Éäè!¥ÍÑ½ÉåM¹…ÁÍ¡½Ñmtô¤ì(€½¹ÍĞ•Ù•¹ÑÌ€ôÕÍ•5•µ¼  ¤€ôø‰Õ¥±‘9•Ñİ½É­Ù•¹ÑÌ¡‘…Ñ„°¡¥ÍÑ½Éä¤°m‘…Ñ„°¡¥ÍÑ½Éåt¤ì(€½¹ÍĞÉ••¹Ñ	±½­Ì€ô‘…Ñ„¹‰±½­Ì¹Í±¥” À°€à¤ì((€É•ÑÕÉ¸€ (€€€€ñÍ•Ñ¥½¸±…ÍÍ9…µ”ô‰Á…”µÍÑ…¬ˆø(€€€€€€ñ‘¥Ø±…ÍÍ9…µ”ô‰ÁÉ¥Ù…äµ…±±½ÕĞˆø(€€€€€€€€ñÑ¥Ù¥ÑäÍ¥é”õìÈÅô€¼ø(€€€€€€€€ñ‘¥Øø(€€€€€€€€€€ñˆù1¥Ù”•Ù•¹Ğ¥¹Ñ•±±¥•¹”ƒŠPÍÑ…‰±”ÁÕ‰±¥ŒÍ¥¹…±Ì½¹±äğ½ˆø(€€€€€€€€€€ñÍÁ…¸ø(€€€€€€€€€€€Q¡¥ÌÁ…”ÑÉ…­Ì½¹Í•¹ÍÕÌ°‰±½¬™±½Ü°Á••È¡…¹•Ì°µ•É•µµ¥¹¥¹œ…ÑÑÉ¥‰ÕÑ¥½¸…¹i-L¹ÍÑÉ•…´½‰Í•ÉÙ•È•Ù•¹ÑÌ¸(€€€€€€€€€€€%Ğ¥¹Ñ•¹Ñ¥½¹…±±ä‘½•Ì¹½ĞÉ•½¹ÍÑÉÕĞ…¸…¹¥µ…Ñ•±¥Ù”	±½­™É½´¥¹Ñ•Éµ¥ÑÑ•¹Ğ‰±½¬µÉ•±…Ñ¥½¹Í¡¥À•¹‘Á½¥¹ÑÌ¸(€€€€€€€€€€ğ½ÍÁ…¸ø(€€€€€€€€ğ½‘¥Øø(€€€€€€ğ½‘¥Øø((€€€€€€ñÍ•Ñ¥½¸±…ÍÍ9…µ”ô‰Á…¹•°ˆø(€€€€€€€€ñ‘¥Ø±…ÍÍ9…µ”ô‰Á…¹•°µ¡•…ˆø(€€€€€€€€€€ñ‘¥ØøñÍÁ…¸±…ÍÍ9…µ”ô‰Á…¹•°µ¥½¸ˆøñÑ¥Ù¥ÑäÍ¥é”õìÈÁô€¼øğ½ÍÁ…¸øñ ÈùÙ•¹Ğ¥¹Ñ•±±¥•¹”ğ½ Èøğ½‘¥Øø(€€€€€€€€€€ñÍÁ…¸±…ÍÍ9…µ”ô‰É…¹”µ¡¥Àˆù1%Y€¬=	MIYğ½ÍÁ…¸ø(€€€€€€€€ğ½‘¥Øø(€€€€€€€€ñÀ±…ÍÍ9…µ”ô‰Í½ÕÉ”µ¹½Ñ”ˆÍÑå±”õíìµ…É¥¹Q½Àè€Àõôø(€€€€€€€€€€ñM¡¥•±‘¡•¬Í¥é”õìÄÕô€¼øÙ•¹ÑÌ½µ‰¥¹”ÕÉÉ•¹Ğ½¹Í•¹ÍÕÌ½ÁÕ‰±¥ŒµA$‘…Ñ„İ¥Ñ i-L¹ÍÑÉ•…´½‰Í•ÉÙ•ÈÍ¹…ÁÍ¡½ÑÌ¸(€€€€€€€€€Q¡•ä‘•ÍÉ¥‰”½‰Í•ÉÙ•¡…¹•Ì°¹½Ğ…ÕÑ¡½É¥Ñ…Ñ¥Ù”¹•Ñİ½É¬µİ¥‘”¥¹¥‘•¹ÑÌ¸(€€€€€€€€ğ½Àø(€€€€€€€€ñ‘¥ØÍÑå±”õíì‘¥ÍÁ±…äè€É¥œ°É¥‘Q•µÁ±…Ñ•½±Õµ¹Ìè€É•Á•…Ğ¡…ÕÑ¼µ™¥Ğ°µ¥¹µ…à ÈàÁÁà°€Å™È¤¤œ°…Àè€ÄÈ°µ…É¥¹Q½Àè€ÄØõôø(€€€€€€€€€í•Ù•¹ÑÌ¹µ…À ¡•Ù•¹Ğ¤€ôø€ñÙ•¹Ñ…É­•äõí•Ù•¹Ğ¹­•åô•Ù•¹Ğõí•Ù•¹Ñô€¼ø¥ô(€€€€€€€€€ì…•Ù•¹ÑÌ¹±•¹Ñ €˜˜€ñ‘¥Ø±…ÍÍ9…µ”ô‰•µÁÑäµµ¥¹¤ˆù½±±•Ñ¥¹œ•¹½Õ ½‰Í•ÉÙ•È‘…Ñ„Ñ¼‘•ÍÉ¥‰”¹•Ñİ½É¬¡…¹•Ì¸ğ½‘¥Øùô(€€€€€€€€ğ½‘¥Øø(€€€€€€ğ½Í•Ñ¥½¸ø((€€€€€€ñ‘¥Ø±…ÍÍ9…µ”ô‰µ•ÑÉ¥ŒµÉ¥¹½‘•Ìµµ•ÑÉ¥Ìˆø(€€€€€€€€ñ5•ÑÉ¥…É¥½¸õìñ	½á•ÌÍ¥é”õìÄåô€¼ùô±…‰•°ô‰I••¹ĞÁÕ‰±¥Œ‰±½­ÌˆÙ…±Õ”õí‘¥ÍÁ±…å9Õµ‰•È¡‘…Ñ„¹‰±½­Ì¹±•¹Ñ ¥ôÍÕˆô‰1…Ñ•ÍĞ•áÁ±½É•ÈÍ¹…ÁÍ¡½Ğˆ…•¹Ğ€¼ø(€€€€€€€€ñ5•ÑÉ¥…É¥½¸õìñ9•Ñİ½É¬Í¥é”õìÄåô€¼ùô±…‰•°ô‰½¹Í•¹ÍÕÌÑ¥ÁÌˆÙ…±Õ”õí‘¥ÍÁ±…å9Õµ‰•È¡‘…Ñ„¹É•±…ä¹Ñ¥Á!…Í¡•Ì¥ôÍÕˆô‰ÕÉÉ•¹ĞÁÕ‰±¥Œ¹½‘”µ•ÑÉ¥Œˆ€¼ø(€€€€€€€€ñ5•ÑÉ¥…É¥½¸õìñÑ¥Ù¥ÑäÍ¥é”õìÄåô€¼ùô±…‰•°ô‰	ALˆÙ…±Õ”õí‘¥ÍÁ±…å9Õµ‰•È¡‘…Ñ„¹‰ÁÌ¥ôÍÕˆôˆÄÕ´½‰Í•ÉÙ•‰±½¬™±½Üˆ€¼ø(€€€€€€€€ñ5•ÑÉ¥…É¥½¸õìñ…Ñ…‰…Í”Í¥é”õìÄåô€¼ùô±…‰•°ô‰5•µÁ½½°ˆÙ…±Õ”õí‘¥ÍÁ±…å9Õµ‰•È¡‘…Ñ„¹µ•µÁ½½°¥ôÍÕˆô‰QÉ…¹Í…Ñ¥½¹Ìİ…¥Ñ¥¹œˆ€¼ø(€€€€€€ğ½‘¥Øø((€€€€€€ñÍ•Ñ¥½¸±…ÍÍ9…µ”ô‰Á…¹•°Ñ…‰±”µÁ…¹•°ˆø(€€€€€€€€ñ‘¥Ø±…ÍÍ9…µ”ô‰Á…¹•°µ¡•…ˆø(€€€€€€€€€€ñ‘¥ØøñÍÁ…¸±…ÍÍ9…µ”ô‰Á…¹•°µ¥½¸ˆøñ	½á•ÌÍ¥é”õìÈÁô€¼øğ½ÍÁ…¸øñ ÈùI••¹ĞÁÕ‰±¥Œ‰±½¬…Ñ¥Ù¥Ñäğ½ Èøğ½‘¥Øø(€€€€€€€€€€ñÍÁ…¸±…ÍÍ9…µ”ô‰±¥Ù”µµ¥¹¤ˆøñ¤€¼ø1%YM9AM!=Pğ½ÍÁ…¸ø(€€€€€€€€ğ½‘¥Øø(€€€€€€€€ñ‘¥Ø±…ÍÍ9…µ”ô‰Ñ…‰±”µÍÉ½±°ˆø(€€€€€€€€€€ñÑ…‰±”ø(€€€€€€€€€€€€ñÑ¡•…øñÑÈøñÑ ù!…Í ğ½Ñ øñÑ ù”ğ½Ñ øñÑ ùğ½Ñ øñÑ ù	±Õ”Í½É”ğ½Ñ øñÑ ùQáÌğ½Ñ øñÑ ù¥™™¥Õ±Ñäğ½Ñ øğ½ÑÈøğ½Ñ¡•…ø(€€€€€€€€€€€€ñÑ‰½‘äø(€€€€€€€€€€€€€íÉ••¹Ñ	±½­Ì¹µ…À ¡‰±½¬°¥¹‘•à¤€ôø€ (€€€€€€€€€€€€€€€€ñÑÈ­•äõí€‘í‰±½¬¹¡…Í¡ô´‘í¥¹‘•áõôø(€€€€€€€€€€€€€€€€€€ñÑøñ½‘”±…ÍÍ9…µ”ô‰Í½™Ğµ½‘”ˆùíÍ¡½ÉĞ¡‰±½¬¹¡…Í °€à¥ôğ½½‘”øğ½Ñø(€€€€€€€€€€€€€€€€€€ñÑùí…”¡‰±½¬¹Ñ¥µ•ÍÑ…µÀ¥ôğ½Ñø(€€€€€€€€€€€€€€€€€€ñÑùí‘¥ÍÁ±…å9Õµ‰•È¡‰±½¬¹‘……M½É”°ÑÉÕ”¥ôğ½Ñø(€€€€€€€€€€€€€€€€€€ñÑùí‘¥ÍÁ±…å9Õµ‰•È¡‰±½¬¹‰±Õ•M½É”°ÑÉÕ”¥ôğ½Ñø(€€€€€€€€€€€€€€€€€€ñÑøñÍÁ…¸±…ÍÍ9…µ”ô‰Á¥±°ˆùí‰±½¬¹Ñá½Õ¹Ñôğ½ÍÁ…¸øğ½Ñø(€€€€€€€€€€€€€€€€€€ñÑùí‘¥ÍÁ±…å9Õµ‰•È¡‰±½¬¹‘¥™™¥Õ±Ñä°ÑÉÕ”¥ôğ½Ñø(€€€€€€€€€€€€€€€€ğ½ÑÈø(€€€€€€€€€€€€€€¤¥ô(€€€€€€€€€€€€€ì…É••¹Ñ	±½­Ì¹±•¹Ñ €˜˜€ñÑÈøñÑ½±MÁ…¸õìÙô±…ÍÍ9…µ”ô‰•µÁÑäµ•±°ˆù]…¥Ñ¥¹œ™½ÈÉ••¹ĞÁÕ‰±¥Œ‰±½¬‘…Ñ„¸ğ½Ñøğ½ÑÈùô(€€€€€€€€€€€€ğ½Ñ‰½‘äø(€€€€€€€€€€ğ½Ñ…‰±”ø(€€€€€€€€ğ½‘¥Øø(€€€€€€€€ñÀ±…ÍÍ9…µ”ô‰Ñ…‰±”µ™½½Ñ¹½Ñ”ˆø(€€€€€€€€€Q¡¥Ì¥Ì„ÍÑ…‰±”É••¹Ğµ‰±½¬Í¹…ÁÍ¡½Ğ°¹½Ğ„É•½¹ÍÑÉÕÑ•±¥Ù”¸A…É•¹ĞÉ•±…Ñ¥½¹Í¡¥ÁÌ…É”¥¹Ñ•¹Ñ¥½¹…±±ä½µ¥ÑÑ•¸(€€€€€€€€ğ½Àø(€€€€€€ğ½Í•Ñ¥½¸ø(€€€€ğ½Í•Ñ¥½¸ø(€€¤ì)ô()™Õ¹Ñ¥½¸Ù•¹Ñ…É¡ì•Ù•¹Ğôèì•Ù•¹Ğè9•Ñİ½É­Ù•¹Ğô¤ì(€½¹ÍĞÑ½¹”€ô•Ù•¹Ğ¹Ñ½¹”€ôôô€İ…Ñ œ(€€€€üì‰½É‘•Èè€É‰„ ÈÀÈ°€ÄÌä°€ÈÀ°€¸ÌÔ¤œ°‰œè€É‰„ ÈÀÈ°€ÄÌä°€ÈÀ°€¸ÀÜ¤œ°‘½Ğè€œŒÔáˆÄàœô(€€€€è•Ù•¹Ğ¹Ñ½¹”€ôôô€Á½Í¥Ñ¥Ù”œ(€€€€€€üì‰½É‘•Èè€É‰„ ÄÄ°€ÄÔà°€ÄÌÀ°€¸ÌÔ¤œ°‰œè€É‰„ ÄÄ°€ÄÔà°€ÄÌÀ°€¸ÀÜ¤œ°‘½Ğè€œŒÁˆå”àÈœô(€€€€€€èì‰½É‘•Èè€É‰„ ÄÀÔ°€äÈ°€ÈÔÔ°€¸Èà¤œ°‰œè€É‰„ ÄÀÔ°€äÈ°€ÈÔÔ°€¸ÀÔ¤œ°‘½Ğè€œŒÙÕ‘™Œœôì(€É•ÑÕÉ¸€ (€€€€ñ‘¥ØÍÑå±”õíì‰½É‘•Èè€ÅÁàÍ½±¥€‘íÑ½¹”¹‰½É‘•Éõ€°‰…­É½Õ¹èÑ½¹”¹‰œ°‰½É‘•ÉI…‘¥ÕÌè€ÄØ°Á…‘‘¥¹œè€œÄÕÁà€ÄÙÁàœ°µ¥¹!•¥¡Ğè€ÄÄÈõôø(€€€€€€ñ‘¥ØÍÑå±”õíì‘¥ÍÁ±…äè€™±•àœ°…Àè€ä°…±¥¹%Ñ•µÌè€•¹Ñ•Èœ°µ…É¥¹	½ÑÑ½´è€àõôøñ¤ÍÑå±”õíìİ¥‘Ñ è€à°¡•¥¡Ğè€à°‰½É‘•ÉI…‘¥ÕÌè€äää°‰…­É½Õ¹èÑ½¹”¹‘½Ğ°‘¥ÍÁ±…äè€‰±½¬œõô€¼øñˆùí•Ù•¹Ğ¹Ñ¥Ñ±•ôğ½ˆøğ½‘¥Øø(€€€€€€ñÍÁ…¸ÍÑå±”õíì‘¥ÍÁ±…äè€‰±½¬œ°½Á…¥Ñäè€¸ÜÈ°±¥¹•!•¥¡Ğè€Ä¸ĞÔ°™½¹ÑM¥é”è€ÄÌõôùí•Ù•¹Ğ¹‘•Ñ…¥±ôğ½ÍÁ…¸ø(€€€€ğ½‘¥Øø(€€¤ì)ô()™Õ¹Ñ¥½¸!¥ÍÑ½ÉåA…”¡ì‘…Ñ„°¡¥ÍÑ½Éä°É…¹”°½¹I…¹”ôèì‘…Ñ„è…Í¡‰½…É‘…Ñ„ì¡¥ÍÑ½Éäè!¥ÍÑ½ÉåM¹…ÁÍ¡½ÑmtìÉ…¹”è!¥ÍÑ½ÉåI…¹”ì½¹I…¹”è€¡É…¹”è!¥ÍÑ½ÉåI…¹”¤€ôøÙ½¥ô¤ì(€½¹ÍĞÕÑ½™˜€ô…Ñ”¹¹½Ü ¤€´É…¹•5Ì¡É…¹”¤ì(€½¹ÍĞÉ½İÌ€ô¡¥ÍÑ½Éä¹™¥±Ñ•È ¡É½Ü¤€ôøÉ½Ü¹Ğ€øôÕÑ½™˜¤ì(€½¹ÍĞ™¥ÉÍĞ€ôÉ½İÍlÁt€üü¹Õ±°ì(€½¹ÍĞ±…ÍĞ€ôÉ½İÌ¹…Ğ ´Ä¤€üü¹Õ±°ì(€½¹ÍĞ½±‘•ÍĞ€ô¡¥ÍÑ½ÉålÁtü¹Ğ€üü¹Õ±°ì(€½¹ÍĞÍ…µÁ±•MÁ…¸€ô™¥ÉÍĞ€˜˜±…ÍĞ€ü5…Ñ ¹µ…à À°±…ÍĞ¹Ğ€´™¥ÉÍĞ¹Ğ¤€è€Àì(€½¹ÍĞÁ½¥¹ÑÍáÁ•Ñ•€ô5…Ñ ¹µ…à Ä°5…Ñ ¹™±½½È¡É…¹•5Ì¡É…¹”¤€¼!%MQ=Ie}M5A1}5L¤¤ì(€½¹ÍĞ½Ù•É…”€ô5…Ñ ¹µ¥¸ ÄÀÀ°€¡É½İÌ¹±•¹Ñ €¼Á½¥¹ÑÍáÁ•Ñ•¤€¨€ÄÀÀ¤ì(€½¹ÍĞÉ…¹•Ìè!¥ÍÑ½ÉåI…¹•mt€ôlœÅ œ°€œÈÑ œ°€œİœ°€œÌÁtì((€½¹ÍĞ¡…¥¹]½É¬€ô€¡‘…Ñ„¹¡…¥¹]½É­!¥ÍÑ½Éä€üümt¤¹™¥±Ñ•È ¡Á½¥¹Ğ¤€ôøÁ½¥¹Ğ¹Ñ¥µ”€øôÕÑ½™˜¤ì(€½¹ÍĞ¡…Í¡É…Ñ•M•É¥•Ì€ô½µ‰¥¹•‘¡…¥¹M•É¥•Ì (€€€É½İÌ¹µ…À ¡É½Ü¤€ôø€¡ìÑ¥µ”èÉ½Ü¹Ğ°Ù…±Õ”èÉ½Ü¹¡…Í¡É…Ñ”ô¤¤°(€€€¡…¥¹]½É¬¹µ…À ¡Á½¥¹Ğ¤€ôø€¡ìÑ¥µ”èÁ½¥¹Ğ¹Ñ¥µ”°Ù…±Õ”èÁ½¥¹Ğ¹¡…Í¡É…Ñ”ô¤¤°(€€€ÕÑ½™˜°(€€¤ì(€½¹ÍĞ‘¥™™¥Õ±ÑåM•É¥•Ì€ô½µ‰¥¹•‘¡…¥¹M•É¥•Ì (€€€É½İÌ¹µ…À ¡É½Ü¤€ôø€¡ìÑ¥µ”èÉ½Ü¹Ğ°Ù…±Õ”èÉ½Ü¹‘¥™™¥Õ±Ñäô¤¤°(€€€¡…¥¹]½É¬¹µ…À ¡Á½¥¹Ğ¤€ôø€¡ìÑ¥µ”èÁ½¥¹Ğ¹Ñ¥µ”°Ù…±Õ”èÁ½¥¹Ğ¹‘¥™™¥Õ±Ñäô¤¤°(€€€ÕÑ½™˜°(€€¤ì((€½¹ÍĞ¡…Í¡É…Ñ••±Ñ„€ôÍ•É¥•Í•±Ñ„¡¡…Í¡É…Ñ•M•É¥•Ì¤ì(€½¹ÍĞ‘¥™™¥Õ±Ñå•±Ñ„€ôÍ•É¥•Í•±Ñ„¡‘¥™™¥Õ±ÑåM•É¥•Ì¤ì(€½¹ÍĞ¹½‘•Í•±Ñ„€ô‘•±Ñ…‰Í½±ÕÑ”¡™¥ÉÍĞü¹Ù¥Í¥‰±•9½‘•Ì€üü¹Õ±°°±…ÍĞü¹Ù¥Í¥‰±•9½‘•Ì€üü¹Õ±°¤ì(€½¹ÍĞ…ÑÑÉ¥‰ÕÑ•‘•±Ñ„€ô‘•±Ñ…‰Í½±ÕÑ”¡™¥ÉÍĞü¹…ÑÑÉ¥‰ÕÑ•‘	±½­Ì€üü¹Õ±°°±…ÍĞü¹…ÑÑÉ¥‰ÕÑ•‘	±½­Ì€üü¹Õ±°¤ì(€½¹ÍĞÍ¡…É••±Ñ„€ô‘•±Ñ…‰Í½±ÕÑ”¡™¥ÉÍĞü¹±…É•ÍÑM¡…É•AĞ€üü¹Õ±°°±…ÍĞü¹±…É•ÍÑM¡…É•AĞ€üü¹Õ±°¤ì(€½¹ÍĞ½1½…Ñ¥½¹•±Ñ„€ô‘•±Ñ…‰Í½±ÕÑ”¡™¥ÉÍĞü¹½1½…Ñ¥½¹AĞ€üü¹Õ±°°±…ÍĞü¹½1½…Ñ¥½¹AĞ€üü¹Õ±°¤ì(€½¹ÍĞ¡…¥¹MÁ…¸€ô5…Ñ ¹µ…à¡Í•É¥•ÍMÁ…¸¡¡…Í¡É…Ñ•M•É¥•Ì¤°Í•É¥•ÍMÁ…¸¡‘¥™™¥Õ±ÑåM•É¥•Ì¤¤ì(€½¹ÍĞ¡…¥¹M…µÁ±•Ì€ô5…Ñ ¹µ…à¡¡…Í¡É…Ñ•M•É¥•Ì¹±•¹Ñ °‘¥™™¥Õ±ÑåM•É¥•Ì¹±•¹Ñ ¤ì(€½¹ÍĞ±…Ñ•ÍÑ!…Í¡É…Ñ”€ô¡…Í¡É…Ñ•M•É¥•Ì¹…Ğ ´Ä¤ü¹Ù…±Õ”€üü±…ÍĞü¹¡…Í¡É…Ñ”€üü¹Õ±°ì(€½¹ÍĞ±…Ñ•ÍÑ¥™™¥Õ±Ñä€ô‘¥™™¥Õ±ÑåM•É¥•Ì¹…Ğ ´Ä¤ü¹Ù…±Õ”€üü±…ÍĞü¹‘¥™™¥Õ±Ñä€üü¹Õ±°ì(€½¹ÍĞ½‰Í•ÉÙ•ÉMÑ…ÉÑ•€ô½±‘•ÍĞ€ü‘…Ñ•MÑ…µÀ¡½±‘•ÍĞ¤€è€9½ĞÍÑ…ÉÑ•œì((€É•ÑÕÉ¸€ (€€€€ñÍ•Ñ¥½¸±…ÍÍ9…µ”ô‰Á…”µÍÑ…¬¡¥ÍÑ½ÉäµÁ…”ˆø(€€€€€€ñ‘¥Ø±…ÍÍ9…µ”ô‰ÁÉ¥Ù…äµ…±±½ÕĞˆøñ!¥ÍÑ½ÉäÍ¥é”õìÈÅô€¼øñ‘¥Øøñˆù!¥ÍÑ½É¥…°¥¹Ñ•±±¥•¹”°İ¥Ñ Í½ÕÉ”‰½Õ¹‘…É¥•Ìğ½ˆøñÍÁ…¸ù¡…¥¸µÉ•½¹ÍÑÉÕÑ…‰±”İ½É¬‘…Ñ„…¹½‰Í•ÉÙ•Èµ½¹±ä¹•Ñİ½É¬‘…Ñ„…É”­•ÁĞÍ•Á…É…Ñ”¸i-L¹ÍÑÉ•…´¹•Ù•È¥¹Ù•¹ÑÌÁ••È°•½É…Á¡ä°…ÑÑÉ¥‰ÕÑ¥½¸½È¼µ±½…Ñ¥½¸¡¥ÍÑ½Éä™É½´‰•™½É”¥Ğİ…Ì…ÑÕ…±±ä½‰Í•ÉÙ•¸ğ½ÍÁ…¸øğ½‘¥Øøğ½‘¥Øø((€€€€€€ñÍ•Ñ¥½¸±…ÍÍ9…µ”ô‰Ñİ¼µ½°ˆø(€€€€€€€€ñ‘¥Ø±…ÍÍ9…µ”ô‰ÁÉ¥Ù…äµ…±±½ÕĞˆø(€€€€€€€€€€ñQÉ•¹‘¥¹UÀÍ¥é”õìÈÅô€¼ø(€€€€€€€€€€ñ‘¥Øøñˆù!%8	-%10ƒ
+Ü!M!IQ€¬%%U1Qdğ½ˆøñÍÁ…¸ùQ¡”ÁÕ‰±¥Œi-…Ì•áÁ±½É•ÈÉ•½¹ÍÑÉÕÑÌ½µÁ…Ğİ½É¬µ¡¥ÍÑ½Éä‰¥¹Ì™É½´Í•±•Ñ•µÁ…É•¹Ğ¡…¥¸‘…Ñ„¸Q¡”ÕÉÉ•¹ĞÁÕ‰±¥Œ‰…­•¹Í••‘ÌÕÀÑ¼Ñ¡”µ½ÍĞÉ••¹Ğ€ÈĞ¡½ÕÉÌ°Í¼Ñ¡•Í”Ñİ¼¡…ÉÑÌ…¸™¥±°¥µµ•‘¥…Ñ•±ä¥¹ÍÑ•…½˜ÍÑ…ÉÑ¥¹œ™É½´é•É¼Ñ½‘…ä¸ğ½ÍÁ…¸øğ½‘¥Øø(€€€€€€€€ğ½‘¥Øø(€€€€€€€€ñ‘¥Ø±…ÍÍ9…µ”ô‰ÁÉ¥Ù…äµ…±±½ÕĞˆø(€€€€€€€€€€ñ9•Ñİ½É¬Í¥é”õìÈÅô€¼ø(€€€€€€€€€€ñ‘¥Øøñˆù=	MIYH!%MQ=Idƒ
+ÜQI-%9	8í½‰Í•ÉÙ•ÉMÑ…ÉÑ•¹Ñ½UÁÁ•É…Í” ¥ôğ½ˆøñÍÁ…¸ùY¥Í¥‰±”¹½‘•Ì°½Õ¹ÑÉ¥•Ì°µ¥¹¥¹œ…ÑÑÉ¥‰ÕÑ¥½¸°½¹™¥‘•¹”…¹-…ÍÁ„¼µ±½…Ñ¥½¸…É”½‰Í•ÉÙ…Ñ¥½¹Ì™É½´…¸•áÁ±½É•ÈÙ…¹Ñ…”Á½¥¹Ğ¸Q¡•¥È¡¥ÍÑ½Éä‰•¥¹Ìİ¡•¸i-L¹ÍÑÉ•…´É•½É‘•Ñ¡•´…¹¥Ì¹½ĞÉ•ÑÉ½…Ñ¥Ù•±ä™…‰É¥…Ñ•¸ğ½ÍÁ…¸øğ½‘¥Øø(€€€€€€€€ğ½‘¥Øø(€€€€€€ğ½Í•Ñ¥½¸ø((€€€€€€ñÍ•Ñ¥½¸±…ÍÍ9…µ”ô‰Á…¹•°¡¥ÍÑ½ÉäµÑ½½±‰…Èˆø(€€€€€€€€ñ‘¥Øø(€€€€€€€€€€ñÍÁ…¸±…ÍÍ9…µ”ô‰•å•‰É½ÜˆùQ%5I9ğ½ÍÁ…¸ø(€€€€€€€€€€ñ ÈùíÉ…¹”¹Ñ½UÁÁ•É…Í” ¥ô¥¹Ñ•±±¥•¹”ğ½ Èø(€€€€€€€€€€ñÀø(€€€€€€€€€€€íÉ½İÌ¹±•¹Ñ €øô€È€ü€‘íÉ½İÌ¹±•¹Ñ¡ô½‰Í•ÉÙ•ÈÍ¹…ÁÍ¡½ÑÌƒ
+Ü€‘í‘ÕÉ…Ñ¥½¸¡Í…µÁ±•MÁ…¸€¼€ÄÀÀÀ¥ô½‰Í•ÉÙ•ÍÁ…¹€€è€=‰Í•ÉÙ•È¡¥ÍÑ½Éä¥ÌÍÑ¥±°½±±•Ñ¥¹œ¸ô(€€€€€€€€€€€í¡…¥¹M…µÁ±•Ì€øô€È€ü€ƒ
+Ü€‘í¡…¥¹M…µÁ±•Íô¡…¥¸µİ½É¬Í…µÁ±•Ìƒ
+Ü€‘í‘ÕÉ…Ñ¥½¸¡¡…¥¹MÁ…¸€¼€ÄÀÀÀ¥ô¡…¥¸ÍÁ…¹€€è€œô(€€€€€€€€€€ğ½Àø(€€€€€€€€ğ½‘¥Øø(€€€€€€€€ñ‘¥Ø±…ÍÍ9…µ”ô‰¡¥ÍÑ½ÉäµÉ…¹”µÑ…‰Ìˆø(€€€€€€€€€íÉ…¹•Ì¹µ…À ¡Ù…±Õ”¤€ôø€ñ‰ÕÑÑ½¸­•äõíÙ…±Õ•ô±…ÍÍ9…µ”õíÉ…¹”€ôôôÙ…±Õ”€ü€…Ñ¥Ù”œ€è€œô½¹±¥¬õì ¤€ôø½¹I…¹”¡Ù…±Õ”¥ôùíÙ…±Õ”¹Ñ½UÁÁ•É…Í” ¥ôğ½‰ÕÑÑ½¸ø¥ô(€€€€€€€€ğ½‘¥Øø(€€€€€€ğ½Í•Ñ¥½¸ø((€€€€€€ñ‘¥Ø±…ÍÍ9…µ”ô‰µ•ÑÉ¥ŒµÉ¥¡¥ÍÑ½Éäµµ•ÑÉ¥Ìˆø(€€€€€€€€ñ!¥ÍÑ½Éå5•ÑÉ¥Œ¥½¸õìñ…Õ”Í¥é”õìÄåô€¼ùô±…‰•°ô‰!…Í¡É…Ñ”ˆÙ…±Õ”õí‘¥ÍÁ±…å!…Í¡É…Ñ”¡±…Ñ•ÍÑ!…Í¡É…Ñ”¥ô‘•±Ñ„õí¡…Í¡É…Ñ••±Ñ„€ôôô¹Õ±°€ü€¡…¥¸¡¥ÍÑ½Éä±½…‘¥¹œœ€è€‘íÍ¥¹•¡¡…Í¡É…Ñ••±Ñ„¥ôƒ
+Ü¡…¥¸µ‘•É¥Ù•‘ô€¼ø(€€€€€€€€ñ!¥ÍÑ½Éå5•ÑÉ¥Œ¥½¸õìñ…Õ”Í¥é”õìÄåô€¼ùô±…‰•°ô‰¥™™¥Õ±ÑäˆÙ…±Õ”õí‘¥ÍÁ±…å9Õµ‰•È¡±…Ñ•ÍÑ¥™™¥Õ±Ñä°ÑÉÕ”¥ô‘•±Ñ„õí‘¥™™¥Õ±Ñå•±Ñ„€ôôô¹Õ±°€ü€¡…¥¸¡¥ÍÑ½Éä±½…‘¥¹œœ€è€‘íÍ¥¹•¡‘¥™™¥Õ±Ñå•±Ñ„¥ôƒ
+Ü¡…¥¸µ‘•É¥Ù•‘ô€¼ø(€€€€€€€€ñ!¥ÍÑ½Éå5•ÑÉ¥Œ¥½¸õìñ9•Ñİ½É¬Í¥é”õìÄåô€¼ùô±…‰•°ô‰Y¥Í¥‰±”¹½‘•ÌˆÙ…±Õ”õí‘¥ÍÁ±…å9Õµ‰•È¡±…ÍĞü¹Ù¥Í¥‰±•9½‘•Ì€üü¹Õ±°¥ô‘•±Ñ„õíÍ¥¹•¡¹½‘•Í•±Ñ„°€œœ¥ô€¼ø(€€€€€€€€ñ!¥ÍÑ½Éå5•ÑÉ¥Œ¥½¸õìñ¥Ñ5•É”Í¥é”õìÄåô€¼ùô±…‰•°ô‰ÑÑÉ¥‰ÕÑ•‰±½­ÌˆÙ…±Õ”õí‘¥ÍÁ±…å9Õµ‰•È¡±…ÍĞü¹…ÑÑÉ¥‰ÕÑ•‘	±½­Ì€üü¹Õ±°°ÑÉÕ”¥ô‘•±Ñ„õíÍ¥¹•¡…ÑÑÉ¥‰ÕÑ•‘•±Ñ„°€œœ¥ô€¼ø(€€€€€€€€ñ!¥ÍÑ½Éå5•ÑÉ¥Œ¥½¸õìñQÉ•¹‘¥¹UÀÍ¥é”õìÄåô€¼ùô±…‰•°ô‰1…É•ÍĞ½‰Í•ÉÙ•Í¡…É”ˆÙ…±Õ”õí±…ÍĞü¹±…É•ÍÑM¡…É•AĞ€ôôô¹Õ±°ñğ±…ÍĞü¹±…É•ÍÑM¡…É•AĞ€ôôôÕ¹‘•™¥¹•€ü€ŸŠPœ€è€‘í™µĞ¹™½Éµ…Ğ¡±…ÍĞ¹±…É•ÍÑM¡…É•AĞ¥ô•ô‘•±Ñ„õíÍ¡…É••±Ñ„€ôôô¹Õ±°€ü€½±±•Ñ¥¹œ½‰Í•ÉÙ•È¡¥ÍÑ½Éäœ€è€‘íÍ¥¹•¡Í¡…É••±Ñ„°€œœ¥ôÁÑÍô€¼ø(€€€€€€€€ñ!¥ÍÑ½Éå5•ÑÉ¥Œ¥½¸õìñM¡¥•±‘¡•¬Í¥é”õìÄåô€¼ùô±…‰•°ô‰]•¥¡Ñ•½¹™¥‘•¹”ˆÙ…±Õ”õí±…ÍĞü¹İ•¥¡Ñ•‘½¹™¥‘•¹•AĞ€ôôô¹Õ±°ñğ±…ÍĞü¹İ•¥¡Ñ•‘½¹™¥‘•¹•AĞ€ôôôÕ¹‘•™¥¹•€ü€ŸŠPœ€è€‘í™µĞ¹™½Éµ…Ğ¡±…ÍĞ¹İ•¥¡Ñ•‘½¹™¥‘•¹•AĞ¥ô•ô‘•±Ñ„ô‰=‰Í•ÉÙ•ÈµÑÉ…­•…ÑÑÉ¥‰ÕÑ¥½¸½¹™¥‘•¹”ˆ€¼ø(€€€€€€€€ñ!¥ÍÑ½Éå5•ÑÉ¥Œ¥½¸õìñi…ÀÍ¥é”õìÄåô€¼ùô±…‰•°ô‰=‰Í•ÉÙ…‰±”¼µ±½…Ñ¥½¸ˆÙ…±Õ”õí±…ÍĞü¹½1½…Ñ¥½¹AĞ€ôôô¹Õ±°ñğ±…ÍĞü¹½1½…Ñ¥½¹AĞ€ôôôÕ¹‘•™¥¹•€ü€ŸŠPœ€è€‘í™µĞ¹™½Éµ…Ğ¡±…ÍĞ¹½1½…Ñ¥½¹AĞ¥ô•ô‘•±Ñ„õí½1½…Ñ¥½¹•±Ñ„€ôôô¹Õ±°€ü€½±±•Ñ¥¹œ½‰Í•ÉÙ•È¡¥ÍÑ½Éäœ€è€‘íÍ¥¹•¡½1½…Ñ¥½¹•±Ñ„°€œœ¥ôÁÑÍô€¼ø(€€€€€€€€ñ!¥ÍÑ½Éå5•ÑÉ¥Œ¥½¸õìñM•ÉÙ•ÈÍ¥é”õìÄåô€¼ùô±…‰•°ô‰¼µ±½…Ñ•Á••ÉÌˆÙ…±Õ”õí‘¥ÍÁ±…å9Õµ‰•È¡±…ÍĞü¹½1½…Ñ•‘A••ÉÌ€üü¹Õ±°¥ô‘•±Ñ„õí±…ÍĞü¹Á••ÉÍ¡•­•€ü€‘í‘¥ÍÁ±…å9Õµ‰•È¡±…ÍĞ¹½1½…Ñ•‘A••ÉÌ¥ô½˜€‘í‘¥ÍÁ±…å9Õµ‰•È¡±…ÍĞ¹Á••ÉÍ¡•­•¥ô¡•­•ƒ
+Ü½‰Í•ÉÙ•È¡¥ÍÑ½Éå€€è€=‰Í•ÉÙ•È¡¥ÍÑ½Éäô€¼ø(€€€€€€ğ½‘¥Øø((€€€€€€ñÍ•Ñ¥½¸±…ÍÍ9…µ”ô‰Ñİ¼µ½°¡¥ÍÑ½Éäµ¡…ÉÑÌˆø(€€€€€€€€ñ!¥ÍÑ½Éå¡…ÉĞÑ¥Ñ±”ô‰9•Ñİ½É¬¡…Í¡É…Ñ”ƒ
+Ü¡…¥¸‰…­™¥±°ˆ¡¥ÀõíÉ…¹”¹Ñ½UÁÁ•É…Í” ¥ôÙ…±Õ•Ìõí¡…Í¡É…Ñ•M•É¥•Ì¹µ…À ¡Á½¥¹Ğ¤€ôøÁ½¥¹Ğ¹Ù…±Õ”¥ô±…‰•±Ìõí¡…Í¡É…Ñ•M•É¥•Ì¹µ…À ¡Á½¥¹Ğ¤€ôøÁ½¥¹Ğ¹Ñ¥µ”¥ô€¼ø(€€€€€€€€ñ!¥ÍÑ½Éå¡…ÉĞÑ¥Ñ±”ô‰¥™™¥Õ±Ñäƒ
+Ü¡…¥¸‰…­™¥±°ˆ¡¥ÀõíÉ…¹”¹Ñ½UÁÁ•É…Í” ¥ôÙ…±Õ•Ìõí‘¥™™¥Õ±ÑåM•É¥•Ì¹µ…À ¡Á½¥¹Ğ¤€ôøÁ½¥¹Ğ¹Ù…±Õ”¥ô±…‰•±Ìõí‘¥™™¥Õ±ÑåM•É¥•Ì¹µ…À ¡Á½¥¹Ğ¤€ôøÁ½¥¹Ğ¹Ñ¥µ”¥ô€¼ø(€€€€€€€€ñ!¥ÍÑ½Éå¡…ÉĞÑ¥Ñ±”ô‰Y¥Í¥‰±”¹½‘•Ìƒ
+Ü½‰Í•ÉÙ•È¡¥ÍÑ½Éäˆ¡¥ÀõíÉ…¹”¹Ñ½UÁÁ•É…Í” ¥ôÙ…±Õ•ÌõíÉ½İÌ¹µ…À ¡É½Ü¤€ôøÉ½Ü¹Ù¥Í¥‰±•9½‘•Ì¥ô±…‰•±ÌõíÉ½İÌ¹µ…À ¡É½Ü¤€ôøÉ½Ü¹Ğ¥ô€¼ø(€€€€€€€€ñ!¥ÍÑ½Éå¡…ÉĞÑ¥Ñ±”ô‰1…É•ÍĞ…ÑÑÉ¥‰ÕÑ•Í¡…É”ƒ
+Ü½‰Í•ÉÙ•È¡¥ÍÑ½Éäˆ¡¥ÀõíÉ…¹”¹Ñ½UÁÁ•É…Í” ¥ôÙ…±Õ•ÌõíÉ½İÌ¹µ…À ¡É½Ü¤€ôøÉ½Ü¹±…É•ÍÑM¡…É•AĞ¥ô±…‰•±ÌõíÉ½İÌ¹µ…À ¡É½Ü¤€ôøÉ½Ü¹Ğ¥ô€¼ø(€€€€€€€€ñ!¥ÍÑ½Éå¡…ÉĞÑ¥Ñ±”ô‰=‰Í•ÉÙ…‰±”¼µ±½…Ñ¥½¸ƒ
+Ü½‰Í•ÉÙ•È¡¥ÍÑ½Éäˆ¡¥ÀõíÉ…¹”¹Ñ½UÁÁ•É…Í” ¥ôÙ…±Õ•ÌõíÉ½İÌ¹µ…À ¡É½Ü¤€ôøÉ½Ü¹½1½…Ñ¥½¹AĞ¥ô±…‰•±ÌõíÉ½İÌ¹µ…À ¡É½Ü¤€ôøÉ½Ü¹Ğ¥ô€¼ø(€€€€€€€€ñ!¥ÍÑ½Éå¡…ÉĞÑ¥Ñ±”ô‰ÑÑÉ¥‰ÕÑ•‰±½­Ìƒ
+Ü½‰Í•ÉÙ•È¡¥ÍÑ½Éäˆ¡¥ÀõíÉ…¹”¹Ñ½UÁÁ•É…Í” ¥ôÙ…±Õ•ÌõíÉ½İÌ¹µ…À ¡É½Ü¤€ôøÉ½Ü¹…ÑÑÉ¥‰ÕÑ•‘	±½­Ì¥ô±…‰•±ÌõíÉ½İÌ¹µ…À ¡É½Ü¤€ôøÉ½Ü¹Ğ¥ô€¼ø(€€€€€€ğ½Í•Ñ¥½¸ø((€€€€€€ñÍ•Ñ¥½¸±…ÍÍ9…µ”ô‰Á…¹•°¡¥ÍÑ½ÉäµÍÑ½É…”ˆø(€€€€€€€€ñ‘¥Ø±…ÍÍ9…µ”ô‰Á…¹•°µ¡•…ˆøñ‘¥ØøñÍÁ…¸±…ÍÍ9…µ”ô‰Á…¹•°µ¥½¸ˆøñ…Ñ…‰…Í”Í¥é”õìÈÁô€¼øğ½ÍÁ…¸øñ Èù!¥ÍÑ½ÉäÍ½ÕÉ”ÍÑ…ÑÕÌğ½ Èøğ½‘¥ØøñÍÁ…¸±…ÍÍ9…µ”ô‰É…¹”µ¡¥Àˆù!e	I%ğ½ÍÁ…¸øğ½‘¥Øø(€€€€€€€€ñ‘¥Ø±…ÍÍ9…µ”ô‰µ•É”µÍÑ…ÑÌ¹½‘”µÍÑ…ÑÌˆø(€€€€€€€€€€ñ‘¥ØøñÍÁ…¸ù=‰Í•ÉÙ•ÈÍ¹…ÁÍ¡½ÑÌğ½ÍÁ…¸øñˆùí‘¥ÍÁ±…å9Õµ‰•È¡¡¥ÍÑ½Éä¹±•¹Ñ ¥ôğ½ˆøğ½‘¥Øø(€€€€€€€€€€ñ‘¥ØøñÍÁ…¸ù=‰Í•ÉÙ•ÈÑÉ…­¥¹œÍ¥¹”ğ½ÍÁ…¸øñˆùí½±‘•ÍĞ€ü‘…Ñ•MÑ…µÀ¡½±‘•ÍĞ¤€è€)ÕÍĞÍÑ…ÉÑ•ôğ½ˆøğ½‘¥Øø(€€€€€€€€€€ñ‘¥ØøñÍÁ…¸ù¡…¥¸µİ½É¬Í…µÁ±•Ìğ½ÍÁ…¸øñˆùí‘¥ÍÁ±…å9Õµ‰•È ¡‘…Ñ„¹¡…¥¹]½É­!¥ÍÑ½Éä€üümt¤¹±•¹Ñ ¥ôğ½ˆøğ½‘¥Øø(€€€€€€€€€€ñ‘¥ØøñÍÁ…¸ù¡…¥¸‰…­™¥±°ÍÁ…¸ğ½ÍÁ…¸øñˆùí¡…¥¹MÁ…¸€ø€À€ü‘ÕÉ…Ñ¥½¸¡¡…¥¹MÁ…¸€¼€ÄÀÀÀ¤€è€1½…‘¥¹œôğ½ˆøğ½‘¥Øø(€€€€€€€€€€ñ‘¥ØøñÍÁ…¸ù=‰Í•ÉÙ•È½Ù•É…”ğ½ÍÁ…¸øñˆùíÉ½İÌ¹±•¹Ñ €ü€‘í™µĞ¹™½Éµ…Ğ¡½Ù•É…”¥ô•€€è€œÀ”ôğ½ˆøğ½‘¥Øø(€€€€€€€€€€ñ‘¥ØøñÍÁ…¸ù1½…°É•Ñ•¹Ñ¥½¸ğ½ÍÁ…¸øñˆøÌÀ‘…åÌğ½ˆøğ½‘¥Øø(€€€€€€€€ğ½‘¥Øø(€€€€€€€€ñÀ±…ÍÍ9…µ”ô‰Í½ÕÉ”µ¹½Ñ”ˆøñM¡¥•±‘¡•¬Í¥é”õìÄÕô€¼øÕÉÉ•¹ĞÁÕ‰±¥ŒA$±¥µ¥Ñ…Ñ¥½¸è¡…¥¸µİ½É¬‰…­™¥±°¥Ì…Ù…¥±…‰±”™½ÈÉ½Õ¡±äÑ¡”±…ÍĞ€ÈĞ¡½ÕÉÌ°¹½Ğµ…¥¹¹•Ğ‘…ä½¹”¸áÑ•¹‘¥¹œÑÉÕÍÑİ½ÉÑ¡ä¡…¥¸‰…­™¥±°Ñ¼€İ¼ÌÁ½±…Õ¹ É•ÅÕ¥É•Ì„±½¹•È¡¥ÍÑ½É¥…°•¹‘Á½¥¹Ğ½È…É¡¥Ù…°‰…­•¹¸=‰Í•ÉÙ•Èµ½¹±äµ•ÑÉ¥ÌÉ•µ…¥¸ÑÉÕÑ¡™Õ°™É½´Ñ¡•¥ÈÉ•½É‘•ÍÑ…ÉĞ‘…Ñ”¸ğ½Àø(€€€€€€ğ½Í•Ñ¥½¸ø(€€€€ğ½Í•Ñ¥½¸ø(€€¤ì)ô()™Õ¹Ñ¥½¸!¥ÍÑ½Éå5•ÑÉ¥Œ¡ì¥½¸°±…‰•°°Ù…±Õ”°‘•±Ñ„ôèì¥½¸èI•…Ñ9½‘”ì±…‰•°èÍÑÉ¥¹œìÙ…±Õ”èÍÑÉ¥¹œì‘•±Ñ„èÍÑÉ¥¹œô¤ì(€É•ÑÕÉ¸€ (€€€€ñÍ•Ñ¥½¸±…ÍÍ9…µ”ô‰Á…¹•°¡¥ÍÑ½Éäµµ•ÑÉ¥Œˆø(€€€€€€ñ‘¥Ø±…ÍÍ9…µ”ô‰¡¥ÍÑ½Éäµµ•ÑÉ¥Œµ±…‰•°ˆøñÍÁ…¸ùí¥½¹ôğ½ÍÁ…¸øñˆùí±…‰•±ôğ½ˆøğ½‘¥Øø(€€€€€€ñÍÑÉ½¹œùíÙ…±Õ•ôğ½ÍÑÉ½¹œø(€€€€€€ñÍµ…±°ùí‘•±Ñ…ôğ½Íµ…±°ø(€€€€ğ½Í•Ñ¥½¸ø(€€¤ì)ô()™Õ¹Ñ¥½¸!¥ÍÑ½Éå¡…ÉĞ¡ìÑ¥Ñ±”°¡¥À°Ù…±Õ•Ì°±…‰•±ÌôèìÑ¥Ñ±”èÍÑÉ¥¹œì¡¥ÀèÍÑÉ¥¹œìÙ…±Õ•ÌèÉÉ…äñ¹Õµ‰•Èğ¹Õ±°øì±…‰•±Ìè¹Õµ‰•Émtô¤ì(€É•ÑÕÉ¸€ (€€€€ñÍ•Ñ¥½¸±…ÍÍ9…µ”ô‰Á…¹•°ˆø(€€€€€€ñ‘¥Ø±…ÍÍ9…µ”ô‰Á…¹•°µ¡•…ˆøñ‘¥ØøñÍÁ…¸±…ÍÍ9…µ”ô‰Á…¹•°µ¥½¸ˆøñQÉ•¹‘¥¹UÀÍ¥é”õìÈÁô€¼øğ½ÍÁ…¸øñ ÈùíÑ¥Ñ±•ôğ½ Èøğ½‘¥ØøñÍÁ…¸±…ÍÍ9…µ”ô‰É…¹”µ¡¥Àˆùí¡¥Áôğ½ÍÁ…¸øğ½‘¥Øø(€€€€€€ñMÁ…É­¡…ÉĞÙ…±Õ•ÌõíÙ…±Õ•Íô±…‰•±Ìõí±…‰•±Íô¡•¥¡ĞõìÈÌÁô€¼ø(€€€€ğ½Í•Ñ¥½¸ø(€€¤ì)ô()™Õ¹Ñ¥½¸MÕÁÁ±åAÉ¥Ù…åA…”¡ì‘…Ñ„°¡¥ÍÑ½Éä°É…¹”°½¹I…¹”ôèì‘…Ñ„è…Í¡‰½…É‘…Ñ„ì¡¥ÍÑ½Éäè!¥ÍÑ½ÉåM¹…ÁÍ¡½ÑmtìÉ…¹”è!¥ÍÑ½ÉåI…¹”ì½¹I…¹”è€¡É…¹”è!¥ÍÑ½ÉåI…¹”¤€ôøÙ½¥ô¤ì(€½¹ÍĞÕÑ½™˜€ô…Ñ”¹¹½Ü ¤€´É…¹•5Ì¡É…¹”¤ì(€½¹ÍĞÉ½İÌ€ô¡¥ÍÑ½Éä¹™¥±Ñ•È ¡É½Ü¤€ôøÉ½Ü¹Ğ€øôÕÑ½™˜¤ì(€½¹ÍĞ™¥ÉÍĞ€ôÉ½İÍlÁtì(€½¹ÍĞ±…ÍĞ€ôÉ½İÌ¹…Ğ ´Ä¤ì(€½¹ÍĞÉ…¹•Ìè!¥ÍÑ½ÉåI…¹•mt€ôlœÅ œ°€œÈÑ œ°€œİœ°€œÌÁtì((€½¹ÍĞÍÕÁÁ±å•±Ñ„€ô™¥ÉÍĞü¹ÍÕÁÁ±ä€„ô¹Õ±°€˜˜±…ÍĞü¹ÍÕÁÁ±ä€„ô¹Õ±°€ü±…ÍĞ¹ÍÕÁÁ±ä€´™¥ÉÍĞ¹ÍÕÁÁ±ä€è¹Õ±°ì(€½¹ÍĞ¹½Ñ•Í•±Ñ„€ô™¥ÉÍĞü¹Í¡¥•±‘•‘9½Ñ•Ì€„ô¹Õ±°€˜˜±…ÍĞü¹Í¡¥•±‘•‘9½Ñ•Ì€„ô¹Õ±°€˜˜±…ÍĞ¹Í¡¥•±‘•‘9½Ñ•Ì€øô™¥ÉÍĞ¹Í¡¥•±‘•‘9½Ñ•Ì€ü±…ÍĞ¹Í¡¥•±‘•‘9½Ñ•Ì€´™¥ÉÍĞ¹Í¡¥•±‘•‘9½Ñ•Ì€è¹Õ±°ì(€½¹ÍĞ¹Õ±±¥™¥•ÉI•Í•Ğ€ô™¥ÉÍĞü¹¹Õ±±¥™¥•ÉÌ€„ô¹Õ±°€˜˜±…ÍĞü¹¹Õ±±¥™¥•ÉÌ€„ô¹Õ±°€˜˜±…ÍĞ¹¹Õ±±¥™¥•ÉÌ€ğ™¥ÉÍĞ¹¹Õ±±¥™¥•ÉÌì(€½¹ÍĞ¹Õ±±¥™¥•É•±Ñ„€ô™¥ÉÍĞü¹¹Õ±±¥™¥•ÉÌ€„ô¹Õ±°€˜˜±…ÍĞü¹¹Õ±±¥™¥•ÉÌ€„ô¹Õ±°€˜˜€…¹Õ±±¥™¥•ÉI•Í•Ğ€ü±…ÍĞ¹¹Õ±±¥™¥•ÉÌ€´™¥ÉÍĞ¹¹Õ±±¥™¥•ÉÌ€è¹Õ±°ì((€É•ÑÕÉ¸€ (€€€€ñÍ•Ñ¥½¸±…ÍÍ9…µ”ô‰Á…”µÍÑ…¬ˆø(€€€€€€ñ‘¥Ø±…ÍÍ9…µ”ô‰ÁÉ¥Ù…äµ…±±½ÕĞˆøñM¡¥•±‘¡•¬Í¥é”õìÈÅô€¼øñ‘¥ØøñˆùMÕÁÁ±ä¥¹Ñ•±±¥•¹”İ¥Ñ¡½ÕĞ„É¥ ±¥ÍĞğ½ˆøñÍÁ…¸ùi-…Ì¥ÌÍ¡¥•±‘•‰ä‘•Í¥¸¸Q¡¥ÌÁ…”É•Á½ÉÑÌÁÕ‰±¥Œ½¹Í•¹ÍÕÌÍÕÁÁ±ä°É•İ…ÉÍ¡•‘Õ±”…¹…É•…Ñ”Í¡¥•±‘•µÁ½½°…Ñ¥Ù¥Ñäİ¥Ñ¡½ÕĞ±…¥µ¥¹œÑ¼¥‘•¹Ñ¥™ä¡½±‘•ÉÌ°‰…±…¹•Ì°Í•¹‘•ÉÌ°É•¥Á¥•¹ÑÌ½ÈÑÉ…¹Í™•È…µ½Õ¹ÑÌ¸ğ½ÍÁ…¸øğ½‘¥Øøğ½‘¥Øø((€€€€€€ñ‘¥Ø±…ÍÍ9…µ”ô‰¡¥ÍÑ½ÉäµÉ…¹”µÑ…‰Ìˆø(€€€€€€€íÉ…¹•Ì¹µ…À ¡¥Ñ•´¤€ôø€ñ‰ÕÑÑ½¸­•äõí¥Ñ•µô±…ÍÍ9…µ”õíÉ…¹”€ôôô¥Ñ•´€ü€½¸œ€è€œô½¹±¥¬õì ¤€ôø½¹I…¹”¡¥Ñ•´¥ôùí¥Ñ•´¹Ñ½UÁÁ•É…Í” ¥ôğ½‰ÕÑÑ½¸ø¥ô(€€€€€€ğ½‘¥Øø((€€€€€€ñ‘¥Ø±…ÍÍ9…µ”ô‰µ•ÑÉ¥ŒµÉ¥¹½‘•Ìµµ•ÑÉ¥Ìˆø(€€€€€€€€ñ5•ÑÉ¥…É¥½¸õìñ½¥¹ÌÍ¥é”õìÄåô€¼ùô±…‰•°ô‰¥ÉÕ±…Ñ¥¹œÍÕÁÁ±äˆÙ…±Õ”õí‘¥ÍÁ±…å9Õµ‰•È¡‘…Ñ„¹ÍÕÁÁ±ä°ÑÉÕ”¥ôÍÕˆõíÍÕÁÁ±å•±Ñ„€ôôô¹Õ±°€ü€½¹Í•¹ÍÕÌµ‘•É¥Ù•¥ÍÍÕ•ÍÕÁÁ±äœ€è€‘íÍ¥¹•¡ÍÕÁÁ±å•±Ñ„°€œi-Lœ¥ô¥¸Í•±•Ñ•½‰Í•ÉÙ•Èİ¥¹‘½İô€¼ø(€€€€€€€€ñ5•ÑÉ¥…É¥½¸õìñ¥É±•½±±…ÉM¥¸Í¥é”õìÄåô€¼ùô±…‰•°ô‰É½ÍÌ‰±½¬•µ¥ÍÍ¥½¸ˆÙ…±Õ”õí‘…Ñ„¹É•İ…É€ôôô¹Õ±°€ü€ŸŠPœ€è€‘í‘¥ÍÁ±…å9Õµ‰•È¡‘…Ñ„¹É•İ…É¥ôi-MôÍÕˆô‰½¹Í•¹ÍÕÌ•µ¥ÍÍ¥½¸Á•È‰±½¬ˆ€¼ø(€€€€€€€€ñ5•ÑÉ¥…É¥½¸õìñ½¥¹ÌÍ¥é”õìÄåô€¼ùô±…‰•°ô‰5¥¹•ÈÁ…å½ÕĞ€ äÔ”¤ˆÙ…±Õ”õíµ¥¹•ÉA…å½ÕĞ¡‘…Ñ„¹É•İ…É¤€ôôô¹Õ±°€ü€ŸŠPœ€è€‘í‘¥ÍÁ±…å9Õµ‰•È¡µ¥¹•ÉA…å½ÕĞ¡‘…Ñ„¹É•İ…É¤¥ôi-MôÍÕˆô‰áÁ•Ñ•…•ÁÑ•µ‰±½¬µ¥¹•ÈÉ•‘¥Ğˆ€¼ø(€€€€€€€€ñ5•ÑÉ¥…É¥½¸õìñ¥É±•½±±…ÉM¥¸Í¥é”õìÄåô€¼ùô±…‰•°ô‰•Ù•±½Áµ•¹Ğ…±±½…Ñ¥½¸€ Ô”¤ˆÙ…±Õ”õí‘•Ù•±½Áµ•¹Ñ±±½…Ñ¥½¸¡‘…Ñ„¹É•İ…É¤€ôôô¹Õ±°€ü€ŸŠPœ€è€‘í‘¥ÍÁ±…å9Õµ‰•È¡‘•Ù•±½Áµ•¹Ñ±±½…Ñ¥½¸¡‘…Ñ„¹É•İ…É¤¥ôi-MôÍÕˆô‰A•È…•ÁÑ•‰±½¬ˆ€¼ø(€€€€€€€€ñ5•ÑÉ¥…É¥½¸õìñQ¥µ•ÉI•Í•ĞÍ¥é”õìÄåô€¼ùô±…‰•°ô‰9•áĞÉ•‘ÕÑ¥½¸ˆÙ…±Õ”õí½Õ¹Ñ‘½İ¸¡‘…Ñ„¹¹•áÑI•‘ÕÑ¥½¹M•½¹‘Ì¥ôÍÕˆõí‘…Ñ„¹¹•áÑI•İ…É€ôôô¹Õ±°€ü€½¹Í•¹ÍÕÌÍ¡•‘Õ±”œ€è9•áĞÉ½ÍÌ€‘í‘¥ÍÁ±…å9Õµ‰•È¡‘…Ñ„¹¹•áÑI•İ…É¥ôƒ
+Üµ¥¹•È€‘í‘¥ÍÁ±…å9Õµ‰•È¡µ¥¹•ÉA…å½ÕĞ¡‘…Ñ„¹¹•áÑI•İ…É¤¥ôi-Mô€¼ø(€€€€€€€€ñ5•ÑÉ¥…É¥½¸õìñ1½­-•å¡½±”Í¥é”õìÄåô€¼ùô±…‰•°ô‰M¡¥•±‘•¹½Ñ•ÌˆÙ…±Õ”õí‘¥ÍÁ±…å9Õµ‰•È¡‘…Ñ„¹Í¡¥•±‘•‘9½Ñ•Ì°ÑÉÕ”¥ôÍÕˆõí¹½Ñ•Í•±Ñ„€ôôô¹Õ±°€ü€	…­•¹µ½‰Í•ÉÙ•…É•…Ñ”œ€è€¬‘í‘¥ÍÁ±…å9Õµ‰•È¡¹½Ñ•Í•±Ñ„°ÑÉÕ”¥ô¥¸Í•±•Ñ•İ¥¹‘½İô€¼ø(€€€€€€€€ñ5•ÑÉ¥…É¥½¸õìñ1½­-•å¡½±”Í¥é”õìÄåô€¼ùô±…‰•°ô‰9Õ±±¥™¥•ÉÌ€¼ÍÁ•¹‘ÌˆÙ…±Õ”õí‘¥ÍÁ±…å9Õµ‰•È¡‘…Ñ„¹¹Õ±±¥™¥•ÉÌ°ÑÉÕ”¥ôÍÕˆõí¹Õ±±¥™¥•ÉI•Í•Ğ€ü€	…­•¹½Õ¹Ñ•ÈÉ•Í•Ğ½‰Í•ÉÙ•œ€è¹Õ±±¥™¥•É•±Ñ„€ôôô¹Õ±°€ü€	…­•¹µ½‰Í•ÉÙ•…É•…Ñ”œ€è€¬‘í‘¥ÍÁ±…å9Õµ‰•È¡¹Õ±±¥™¥•É•±Ñ„°ÑÉÕ”¥ô¥¸Í•±•Ñ•İ¥¹‘½İô€¼ø(€€€€€€€€ñ5•ÑÉ¥…É¥½¸õìñ…Ñ…‰…Í”Í¥é”õìÄåô€¼ùô±…‰•°ô‰ÕµÕ±…Ñ¥Ù”Í¡¥•±‘•¥ÍÍÕ…¹”ˆÙ…±Õ”õí‘¥ÍÁ±…å9Õµ‰•È¡‘…Ñ„¹Í¡¥•±‘•‘Y…±Õ”€üü‘…Ñ„¹ÍÕÁÁ±ä°ÑÉÕ”¥ôÍÕˆô‰½¹Í•¹ÍÕÌµ‘•É¥Ù•…É•…Ñ”ƒ
+Ü¹½Ğİ…±±•Ğ‰…±…¹•Ìˆ€¼ø(€€€€€€ğ½‘¥Øø((€€€€€€ñÍ•Ñ¥½¸±…ÍÍ9…µ”ô‰Ñİ¼µ½°ˆø(€€€€€€€€ñ‘¥Ø±…ÍÍ9…µ”ô‰Á…¹•°ˆø(€€€€€€€€€€ñ‘¥Ø±…ÍÍ9…µ”ô‰Á…¹•°µ¡•…ˆøñ‘¥ØøñÍÁ…¸±…ÍÍ9…µ”ô‰Á…¹•°µ¥½¸ˆøñQÉ•¹‘¥¹UÀÍ¥é”õìÈÁô€¼øğ½ÍÁ…¸øñ ÈùMÕÁÁ±äÉ½İÑ ƒ
+Ü½‰Í•ÉÙ•È¡¥ÍÑ½Éäğ½ Èøğ½‘¥ØøñÍÁ…¸±…ÍÍ9…µ”ô‰É…¹”µ¡¥ÀˆùíÉ…¹”¹Ñ½UÁÁ•É…Í” ¥ôğ½ÍÁ…¸øğ½‘¥Øø(€€€€€€€€€€ñ!¥ÍÑ½Éå¡…ÉĞÑ¥Ñ±”ô‰¥ÉÕ±…Ñ¥¹œi-Lˆ¡¥Àô‰=9M9MULMUAA1dˆÙ…±Õ•ÌõíÉ½İÌ¹µ…À ¡É½Ü¤€ôøÉ½Ü¹ÍÕÁÁ±ä€üü¹Õ±°¥ô±…‰•±ÌõíÉ½İÌ¹µ…À ¡É½Ü¤€ôøÉ½Ü¹Ğ¥ô€¼ø(€€€€€€€€ğ½‘¥Øø(€€€€€€€€ñ‘¥Ø±…ÍÍ9…µ”ô‰Á…¹•°ˆø(€€€€€€€€€€ñ‘¥Ø±…ÍÍ9…µ”ô‰Á…¹•°µ¡•…ˆøñ‘¥ØøñÍÁ…¸±…ÍÍ9…µ”ô‰Á…¹•°µ¥½¸ˆøñ1½­-•å¡½±”Í¥é”õìÈÁô€¼øğ½ÍÁ…¸øñ ÈùM¡¥•±‘•…Ñ¥Ù¥Ñäƒ
+Ü½‰Í•ÉÙ•È¡¥ÍÑ½Éäğ½ Èøğ½‘¥ØøñÍÁ…¸±…ÍÍ9…µ”ô‰É…¹”µ¡¥ÀˆùíÉ…¹”¹Ñ½UÁÁ•É…Í” ¥ôğ½ÍÁ…¸øğ½‘¥Øø(€€€€€€€€€€ñ!¥ÍÑ½Éå¡…ÉĞÑ¥Ñ±”ô‰M¡¥•±‘•¹½Ñ•Ìˆ¡¥Àô‰IQˆÙ…±Õ•ÌõíÉ½İÌ¹µ…À ¡É½Ü¤€ôøÉ½Ü¹Í¡¥•±‘•‘9½Ñ•Ì€üü¹Õ±°¥ô±…‰•±ÌõíÉ½İÌ¹µ…À ¡É½Ü¤€ôøÉ½Ü¹Ğ¥ô€¼ø(€€€€€€€€€€ñ!¥ÍÑ½Éå¡…ÉĞÑ¥Ñ±”ô‰9Õ±±¥™¥•ÉÌ€¼ÍÁ•¹‘Ìˆ¡¥Àô‰IQˆÙ…±Õ•ÌõíÉ½İÌ¹µ…À ¡É½Ü¤€ôøÉ½Ü¹¹Õ±±¥™¥•ÉÌ€üü¹Õ±°¥ô±…‰•±ÌõíÉ½İÌ¹µ…À ¡É½Ü¤€ôøÉ½Ü¹Ğ¥ô€¼ø(€€€€€€€€ğ½‘¥Øø(€€€€€€ğ½Í•Ñ¥½¸ø((€€€€€€ñÍ•Ñ¥½¸±…ÍÍ9…µ”ô‰Á…¹•°ˆø(€€€€€€€€ñ‘¥Ø±…ÍÍ9…µ”ô‰Á…¹•°µ¡•…ˆøñ‘¥ØøñÍÁ…¸±…ÍÍ9…µ”ô‰Á…¹•°µ¥½¸ˆøñQ¥µ•ÉI•Í•ĞÍ¥é”õìÈÁô€¼øğ½ÍÁ…¸øñ Èùµ¥ÍÍ¥½¸Í¡•‘Õ±”ğ½ Èøğ½‘¥ØøñÍÁ…¸±…ÍÍ9…µ”ô‰É…¹”µ¡¥Àˆù=9M9MULğ½ÍÁ…¸øğ½‘¥Øø(€€€€€€€€ñ‘¥Ø±…ÍÍ9…µ”ô‰µ•É”µÍÑ…ÑÌ¹½‘”µÍÑ…ÑÌˆø(€€€€€€€€€€ñ‘¥ØøñÍÁ…¸ùÉ½ÍÌ‰±½¬•µ¥ÍÍ¥½¸ğ½ÍÁ…¸øñˆùí‘…Ñ„¹É•İ…É€ôôô¹Õ±°€ü€ŸŠPœ€è€‘í‘¥ÍÁ±…å9Õµ‰•È¡‘…Ñ„¹É•İ…É¥ôi-Môğ½ˆøğ½‘¥Øø(€€€€€€€€€€ñ‘¥ØøñÍÁ…¸ù5¥¹•ÈÁ…å½ÕĞ€ äÔ”¤ğ½ÍÁ…¸øñˆùíµ¥¹•ÉA…å½ÕĞ¡‘…Ñ„¹É•İ…É¤€ôôô¹Õ±°€ü€ŸŠPœ€è€‘í‘¥ÍÁ±…å9Õµ‰•È¡µ¥¹•ÉA…å½ÕĞ¡‘…Ñ„¹É•İ…É¤¥ôi-Môğ½ˆøğ½‘¥Øø(€€€€€€€€€€ñ‘¥ØøñÍÁ…¸ù•Ù•±½Áµ•¹Ğ…±±½…Ñ¥½¸€ Ô”¤ğ½ÍÁ…¸øñˆùí‘•Ù•±½Áµ•¹Ñ±±½…Ñ¥½¸¡‘…Ñ„¹É•İ…É¤€ôôô¹Õ±°€ü€ŸŠPœ€è€‘í‘¥ÍÁ±…å9Õµ‰•È¡‘•Ù•±½Áµ•¹Ñ±±½…Ñ¥½¸¡‘…Ñ„¹É•İ…É¤¥ôi-Môğ½ˆøğ½‘¥Øø(€€€€€€€€€€ñ‘¥ØøñÍÁ…¸ù9•áĞÉ½ÍÌ•µ¥ÍÍ¥½¸ğ½ÍÁ…¸øñˆùí‘…Ñ„¹¹•áÑI•İ…É€ôôô¹Õ±°€ü€ŸŠPœ€è€‘í‘¥ÍÁ±…å9Õµ‰•È¡‘…Ñ„¹¹•áÑI•İ…É¥ôi-Môğ½ˆøğ½‘¥Øø(€€€€€€€€€€ñ‘¥ØøñÍÁ…¸ù9•áĞµ¥¹•ÈÁ…å½ÕĞğ½ÍÁ…¸øñˆùíµ¥¹•ÉA…å½ÕĞ¡‘…Ñ„¹¹•áÑI•İ…É¤€ôôô¹Õ±°€ü€ŸŠPœ€è€‘í‘¥ÍÁ±…å9Õµ‰•È¡µ¥¹•ÉA…å½ÕĞ¡‘…Ñ„¹¹•áÑI•İ…É¤¥ôi-Môğ½ˆøğ½‘¥Øø(€€€€€€€€€€ñ‘¥ØøñÍÁ…¸ù9•áĞÉ•‘ÕÑ¥½¸ğ½ÍÁ…¸øñˆùí½Õ¹Ñ‘½İ¸¡‘…Ñ„¹¹•áÑI•‘ÕÑ¥½¹M•½¹‘Ì¥ôğ½ˆøğ½‘¥Øø(€€€€€€€€€€ñ‘¥ØøñÍÁ…¸ùÍ½É”ğ½ÍÁ…¸øñˆùí‘¥ÍÁ±…å9Õµ‰•È¡‘…Ñ„¹‘……M½É”°ÑÉÕ”¥ôğ½ˆøğ½‘¥Øø(€€€€€€€€ğ½‘¥Øø(€€€€€€€€ñÀ±…ÍÍ9…µ”ô‰Í½ÕÉ”µ¹½Ñ”ˆøñM¡¥•±‘¡•¬Í¥é”õìÄÕô€¼ø9¼…¹¹Õ…±¥é•¥¹™±…Ñ¥½¸•ÍÑ¥µ…Ñ”¥ÌÍ¡½İ¸¸I•İ…É…¹É•‘ÕÑ¥½¸Ù…±Õ•Ì½µ”™É½´Ñ¡”ÁÕ‰±¥Œi-…Ì½¹Í•¹ÍÕÌ½•áÁ±½É•ÈA$¸ğ½Àø(€€€€€€ğ½Í•Ñ¥½¸ø((€€€€€€ñ‘¥Ø±…ÍÍ9…µ”ô‰É•™•É•¹”µ…±±½ÕĞˆø(€€€€€€€€ñ‘¥ØøñÍÁ…¸±…ÍÍ9…µ”ô‰•å•‰É½ÜˆùAI%Yd	=U9Idğ½ÍÁ…¸øñ Èù]¡…ĞÑ¡¥ÌÁ…”¥¹Ñ•¹Ñ¥½¹…±±ä…¹¹½ĞÍ¡½Üğ½ ÈøñÀùQ½À¡½±‘•ÉÌ°É¥¡•ÍĞİ…±±•ÑÌ°İ…±±•Ğ½¹•¹ÑÉ…Ñ¥½¸…¹¥¹‘¥Ù¥‘Õ…°…‘‘É•ÍÌ‰…±…¹•Ì…É”¹½Ğ¥¹™•ÉÉ•¸Q¡”ÁÕ‰±¥Œ•áÁ±½É•È‰…­•¹‘½•Ì¹½Ğ•áÁ½Í”„ÑÉ…¹ÍÁ…É•¹ĞÉ¥ µ±¥ÍĞ‘…Ñ…Í•Ğ™½ÈÑ¡”Í¡¥•±‘•µ‰äµ‘•™…Õ±Ğ¡…¥¸¸ğ½Àøğ½‘¥Øø(€€€€€€ğ½‘¥Øø(€€€€ğ½Í•Ñ¥½¸ø(€€¤ì)ô()™Õ¹Ñ¥½¸I•™•É•¹•A…”¡ì‘…Ñ„°ÑáÌ°½¹M•±•Ğôèì‘…Ñ„è…Í¡‰½…É‘…Ñ„ìÑáÌèÉÉ…äñQáI½Ü€˜ì‰±½­!…Í èÍÑÉ¥¹œìÑ¥µ•ÍÑ…µÀè¹Õµ‰•Èôøì½¹M•±•Ğè€¡Ù…±Õ”èÍÑÉ¥¹œ¤€ôøÙ½¥ô¤ì(€½¹ÍĞ¡…ÍM¡¥•±‘•€ô‘…Ñ„¹Í¡¥•±‘•‘9½Ñ•Ì€„ôô¹Õ±°ñğ‘…Ñ„¹¹Õ±±¥™¥•ÉÌ€„ôô¹Õ±°ñğ‘…Ñ„¹ÍÑ…Ñ•I½½Ğ€„ôô¹Õ±°ì(€É•ÑÕÉ¸€ (€€€€ñÍ•Ñ¥½¸±…ÍÍ9…µ”ô‰Á…”µÍÑ…¬ˆø(€€€€€€ñ‘¥Ø±…ÍÍ9…µ”ô‰É•™•É•¹”µ…±±½ÕĞˆø(€€€€€€€€ñ‘¥ØøñÍÁ…¸±…ÍÍ9…µ”ô‰•å•‰É½ÜˆùMUAA=IQ%9II9ğ½ÍÁ…¸øñ Èù¡…¥¸¥¹™½Éµ…Ñ¥½¸¥¸½¹”Á±…”ğ½ ÈøñÀùUÍ•™Õ°i-…Ì¡…¥¸™…ÑÌÍÑ…ä¡•É”™½È½¹Ù•¹¥•¹”¸i-L¹ÍÑÉ•…´‘½•Ì¹½ĞÑÉäÑ¼‘ÕÁ±¥…Ñ”•Ù•Éä•áÁ±½É•È™•…ÑÕÉ”¸ğ½Àøğ½‘¥Øø(€€€€€€€€ñ„±…ÍÍ9…µ”ô‰Í•½¹‘…Éäµ±¥¹¬ˆ¡É•˜ô‰¡ÑÑÁÌè¼½•áÁ±½É•È¹é­…Ì¹¥¹™¼ˆÑ…É•Ğô‰}‰±…¹¬ˆÉ•°ô‰¹½É•™•ÉÉ•Èˆù=Á•¸½™™¥¥…°i-…ÌáÁ±½É•ÈƒŠ\ğ½„ø(€€€€€€ğ½‘¥Øø(€€€€€€ñ‘¥Ø±…ÍÍ9…µ”ô‰µ•ÑÉ¥ŒµÉ¥¹½‘•Ìµµ•ÑÉ¥Ìˆø(€€€€€€€í‘…Ñ„¹ÍÕÁÁ±ä€„ôô¹Õ±°€˜˜€ñ5•ÑÉ¥…É¥½¸õìñ½¥¹ÌÍ¥é”õìÄåô€¼ùô±…‰•°ô‰¥ÉÕ±…Ñ¥¹œˆÙ…±Õ”õí‘¥ÍÁ±…å9Õµ‰•È¡‘…Ñ„¹ÍÕÁÁ±ä°ÑÉÕ”¥ôÍÕˆô‰i-L¥ÍÍÕ•ˆ€¼ùô(€€€€€€€í‘…Ñ„¹É•İ…É€„ôô¹Õ±°€˜˜€ñ5•ÑÉ¥…É¥½¸õìñ¥É±•½±±…ÉM¥¸Í¥é”õìÄåô€¼ùô±…‰•°ô‰É½ÍÌ•µ¥ÍÍ¥½¸ˆÙ…±Õ”õí€‘í‘¥ÍÁ±…å9Õµ‰•È¡‘…Ñ„¹É•İ…É¥ôi-MôÍÕˆô‰A•È‰±½¬ˆ€¼ùô(€€€€€€€í‘…Ñ„¹É•İ…É€„ôô¹Õ±°€˜˜€ñ5•ÑÉ¥…É¥½¸õìñ½¥¹ÌÍ¥é”õìÄåô€¼ùô±…‰•°ô‰5¥¹•ÈÁ…å½ÕĞˆÙ…±Õ”õí€‘í‘¥ÍÁ±…å9Õµ‰•È¡µ¥¹•ÉA…å½ÕĞ¡‘…Ñ„¹É•İ…É¤¥ôi-MôÍÕˆôˆäÔ”½˜É½ÍÌ•µ¥ÍÍ¥½¸ˆ€¼ùô(€€€€€€€í‘…Ñ„¹¹•áÑI•‘ÕÑ¥½¹M•½¹‘Ì€„ôô¹Õ±°€˜˜€ñ5•ÑÉ¥…É¥½¸õìñQ¥µ•ÉI•Í•ĞÍ¥é”õìÄåô€¼ùô±…‰•°ô‰9•áĞÉ•‘ÕÑ¥½¸ˆÙ…±Õ”õí½Õ¹Ñ‘½İ¸¡‘…Ñ„¹¹•áÑI•‘ÕÑ¥½¹M•½¹‘Ì¥ôÍÕˆõí‘…Ñ„¹¹•áÑI•İ…É€ôôô¹Õ±°€ü€½¹Í•¹ÍÕÌÍ¡•‘Õ±”œ€è9•áĞÉ½ÍÌ€‘í‘¥ÍÁ±…å9Õµ‰•È¡‘…Ñ„¹¹•áÑI•İ…É¥ôƒ
+Üµ¥¹•È€‘í‘¥ÍÁ±…å9Õµ‰•È¡µ¥¹•ÉA…å½ÕĞ¡‘…Ñ„¹¹•áÑI•İ…É¤¥ôi-Mô€¼ùô(€€€€€€€í‘…Ñ„¹‰±½­½Õ¹Ğ€„ôô¹Õ±°€˜˜€ñ5•ÑÉ¥…É¥½¸õìñ	½á•ÌÍ¥é”õìÄåô€¼ùô±…‰•°ô‰	±½­ÌˆÙ…±Õ”õí‘¥ÍÁ±…å9Õµ‰•È¡‘…Ñ„¹‰±½­½Õ¹Ğ°ÑÉÕ”¥ôÍÕˆô‰=‰Í•ÉÙ•¡…¥¸Ñ½Ñ…°ˆ€¼ùô(€€€€€€€í‘…Ñ„¹Ñá½Õ¹Ğ€„ôô¹Õ±°€˜˜€ñ5•ÑÉ¥…É¥½¸õìñÑ¥Ù¥ÑäÍ¥é”õìÄåô€¼ùô±…‰•°ô‰QÉ…¹Í…Ñ¥½¹ÌˆÙ…±Õ”õí‘¥ÍÁ±…å9Õµ‰•È¡‘…Ñ„¹Ñá½Õ¹Ğ°ÑÉÕ”¥ôÍÕˆô‰AÕ‰±¥Œ…É•…Ñ”ˆ€¼ùô(€€€€€€€í‘…Ñ„¹Í¡¥•±‘•‘9½Ñ•Ì€„ôô¹Õ±°€˜˜€ñ5•ÑÉ¥…É¥½¸õìñ1½­-•å¡½±”Í¥é”õìÄåô€¼ùô±…‰•°ô‰M¡¥•±‘•¹½Ñ•ÌˆÙ…±Õ”õí‘¥ÍÁ±…å9Õµ‰•È¡‘…Ñ„¹Í¡¥•±‘•‘9½Ñ•Ì°ÑÉÕ”¥ôÍÕˆô‰9½Ñ•Ìµ¥¹Ñ•ˆ€¼ùô(€€€€€€€í‘…Ñ„¹¹Õ±±¥™¥•ÉÌ€„ôô¹Õ±°€˜˜€ñ5•ÑÉ¥…É¥½¸õìñ1½­-•å¡½±”Í¥é”õìÄåô€¼ùô±…‰•°ô‰9Õ±±¥™¥•ÉÌˆÙ…±Õ”õí‘¥ÍÁ±…å9Õµ‰•È¡‘…Ñ„¹¹Õ±±¥™¥•ÉÌ°ÑÉÕ”¥ôÍÕˆô‰M¡¥•±‘•ÍÁ•¹‘Ìˆ€¼ùô(€€€€€€€í‘…Ñ„¹‘……M½É”€„ôô¹Õ±°€˜˜€ñ5•ÑÉ¥…É¥½¸õìñ	½á•ÌÍ¥é”õìÄåô€¼ùô±…‰•°ô‰Í½É”ˆÙ…±Õ”õí‘¥ÍÁ±…å9Õµ‰•È¡‘…Ñ„¹‘……M½É”°ÑÉÕ”¥ôÍÕˆô‰½¹Í•¹ÍÕÌÁÉ½É•ÍÌˆ€¼ùô(€€€€€€ğ½‘¥Øø(€€€€€€ñÀ±…ÍÍ9…µ”ô‰Í½ÕÉ”µ¹½Ñ”ˆøñM¡¥•±‘¡•¬Í¥é”õìÄÕô€¼øI•™•É•¹”…É‘Ì…ÁÁ•…È½¹±äİ¡•¸Ñ¡”ÁÕ‰±¥ŒA$É•Á½ÉÑÌÑ¡…Ğ™¥•±¸1…ÍĞ½½Ù…±Õ•Ì…É”É•Ñ…¥¹•…É½ÍÌÍ¡½ÉĞ•¹‘Á½¥¹Ğµ¥ÍÍ•Ì¥¹ÍÑ•…½˜™±…Í¡¥¹œÕ¹…Ù…¥±…‰±”‘…Ñ„¸ğ½Àø(€€€€€€ñÍ•Ñ¥½¸±…ÍÍ9…µ”ô‰Ñİ¼µ½°Ñ…‰±•ÌµÉ½Üˆøñ	±½­ÍQ…‰±”‰±½­Ìõí‘…Ñ„¹‰±½­Ì¹Í±¥” À°€ÄÀ¥ô½¹M•±•Ğõí½¹M•±•Ñô€¼øñQÉ…¹Í…Ñ¥½¹ÍQ…‰±”ÑáÌõíÑáÌ¹Í±¥” À°€ÄÀ¥ô½¹M•±•Ğõí½¹M•±•Ñô€¼øğ½Í•Ñ¥½¸ø(€€€€€í¡…ÍM¡¥•±‘•€˜˜€ñM¡¥•±‘•‘A…¹•°‘…Ñ„õí‘…Ñ…ô€¼ùô(€€€€ğ½Í•Ñ¥½¸ø(€€¤ì)ô()™Õ¹Ñ¥½¸AÕ‰±¥9½‘•MÕµµ…Éä¡ì‘…Ñ„°½¹=Á•¸ôèì‘…Ñ„è…Í¡‰½…É‘…Ñ„ì½¹=Á•¸üè€ ¤€ôøÙ½¥ô¤ì(€½¹ÍĞĞ€ô‘…Ñ„¹ÁÕ‰±¥9½‘•Ì¹Ñ½Ñ…±Ìì(€É•ÑÕÉ¸€ (€€€€ñÍ•Ñ¥½¸±…ÍÍ9…µ”ô‰Á…¹•°¹½‘”µÍÕµµ…Éäˆø(€€€€€€ñ‘¥Ø±…ÍÍ9…µ”ô‰Á…¹•°µ¡•…ˆø(€€€€€€€€ñ‘¥ØøñÍÁ…¸±…ÍÍ9…µ”ô‰Á…¹•°µ¥½¸ˆøñ±½‰”ÈÍ¥é”õìÈÁô€¼øğ½ÍÁ…¸øñ ÈùAÕ‰±¥Œ¹½‘”Ù¥•Üğ½ Èøğ½‘¥Øø(€€€€€€€í½¹=Á•¸€˜˜€ñ‰ÕÑÑ½¸±…ÍÍ9…µ”ô‰Ñ•áĞµ‰Ñ¸ˆ½¹±¥¬õí½¹=Á•¹ôùY¥•Ü¹½‘•ÌƒŠHğ½‰ÕÑÑ½¸ùô(€€€€€€ğ½‘¥Øø(€€€€€€ñ‘¥Ø±…ÍÍ9…µ”ô‰µ•É”µÍÑ…ÑÌ¹½‘”µÍÑ…ÑÌˆø(€€€€€€€€ñ‘¥ØøñÍÁ…¸ùY¥Í¥‰±”¹½‘•Ìğ½ÍÁ…¸øñˆùí‘¥ÍÁ±…å9Õµ‰•È¡Ğ¹¹½‘•Ì€üü‘…Ñ„¹¹½‘•Ì¥ôğ½ˆøğ½‘¥Øø(€€€€€€€€ñ‘¥ØøñÍÁ…¸ù½Õ¹ÑÉ¥•Ìğ½ÍÁ…¸øñˆùí‘¥ÍÁ±…å9Õµ‰•È¡Ğ¹½Õ¹ÑÉ¥•Ì¥ôğ½ˆøğ½‘¥Øø(€€€€€€€€ñ‘¥ØøñÍÁ…¸ù%¹‰½Õ¹ğ½ÍÁ…¸øñˆùí‘¥ÍÁ±…å9Õµ‰•È¡Ğ¹¥¹‰½Õ¹¥ôğ½ˆøğ½‘¥Øø(€€€€€€€€ñ‘¥ØøñÍÁ…¸ù=ÕÑ‰½Õ¹ğ½ÍÁ…¸øñˆùí‘¥ÍÁ±…å9Õµ‰•È¡Ğ¹½ÕÑ‰½Õ¹¥ôğ½ˆøğ½‘¥Øø(€€€€€€ğ½‘¥Øø(€€€€€€ñÀ±…ÍÍ9…µ”ô‰Í½ÕÉ”µ¹½Ñ”ˆøñM¡¥•±‘¡•¬Í¥é”õìÄÕô€¼ø9½‘”‘…Ñ„¥ÌÁÉ¥Ù…äµÁÉ•Í•ÉÙ¥¹œèÑ¡”i-…ÌA$É•Á½ÉÑÌ½Õ¹ÑÉä…¹µ…Í­•¹•Ñİ½É¬¥¹™½Éµ…Ñ¥½¸É…Ñ¡•ÈÑ¡…¸ÁÕ‰±¥¥é¥¹œ•á…ĞÁ••È…‘‘É•ÍÍ•Ì¸ğ½Àø(€€€€ğ½Í•Ñ¥½¸ø(€€¤ì)ô()™Õ¹Ñ¥½¸M¡¥•±‘•‘A…¹•°¡ì‘…Ñ„ôèì‘…Ñ„è…Í¡‰½…É‘…Ñ„ô¤ì(€É•ÑÕÉ¸€ (€€€€ñ‘¥Ø±…ÍÍ9…µ”ô‰Á…¹•°ÁÉ¥Ù…äµÁ…¹•°ˆø(€€€€€€ñ‘¥Ø±…ÍÍ9…µ”ô‰Á…¹•°µ¡•…ˆøñ‘¥ØøñÍÁ…¸±…ÍÍ9…µ”ô‰Á…¹•°µ¥½¸ˆøñ1½­-•å¡½±”Í¥é”õìÈÁô€¼øğ½ÍÁ…¸øñ ÈùM¡¥•±‘•Á½½°ğ½ Èøğ½‘¥ØøñÍÁ…¸±…ÍÍ9…µ”ô‰ÁÉ¥Ù…äµ¡¥ÀˆøñM¡¥•±‘¡•¬Í¥é”õìÄÑô€¼øAI%YQğ½ÍÁ…¸øğ½‘¥Øø(€€€€€€ñ‘¥Ø±…ÍÍ9…µ”ô‰ÁÉ¥Ù…äµÉ¥ˆø(€€€€€€€€ñ‘¥ØøñÍÁ…¸ù9½Ñ•Ìµ¥¹Ñ•ğ½ÍÁ…¸øñˆùí‘¥ÍÁ±…å9Õµ‰•È¡‘…Ñ„¹Í¡¥•±‘•‘9½Ñ•Ì°ÑÉÕ”¥ôğ½ˆøğ½‘¥Øø(€€€€€€€€ñ‘¥ØøñÍÁ…¸ù9Õ±±¥™¥•ÉÌÍÁ•¹Ğğ½ÍÁ…¸øñˆùí‘¥ÍÁ±…å9Õµ‰•È¡‘…Ñ„¹¹Õ±±¥™¥•ÉÌ°ÑÉÕ”¥ôğ½ˆøğ½‘¥Øø(€€€€€€ğ½‘¥Øø(€€€€€€ñ‘¥Ø±…ÍÍ9…µ”ô‰ÍÑ…Ñ”µÉ½½ĞˆøñÍÁ…¸ùM¡¥•±‘•ÍÑ…Ñ”É½½Ğğ½ÍÁ…¸øñ½‘”ùí‘…Ñ„¹ÍÑ…Ñ•I½½Ğ€üÍ¡½ÉĞ¡‘…Ñ„¹ÍÑ…Ñ•I½½Ğ°€ÄØ¤€è€ŸŠPôğ½½‘”øğ½‘¥Øø(€€€€€€ñÀ±…ÍÍ9…µ”ô‰ÁÉ¥Ù…äµ¹½Ñ”ˆøñM¡¥•±‘¡•¬Í¥é”õìÄİô€¼øM•¹‘•È°É•¥Á¥•¹Ğ…¹ÑÉ…¹Í™•È…µ½Õ¹ÑÌÉ•µ…¥¸Í¡¥•±‘•‰ä‘•Í¥¸¸Q¡”•áÁ±½É•ÈÉ•Á½ÉÑÌÁÕ‰±¥Œ½¹Í•¹ÍÕÌ…Ñ¥Ù¥Ñä¥¹ÍÑ•…¸ğ½Àø(€€€€ğ½‘¥Øø(€€¤ì)ô()™Õ¹Ñ¥½¸5•É•‘A…¹•°¡ì‘…Ñ„ôèì‘…Ñ„è…Í¡‰½…É‘…Ñ„ô¤ì(€½¹ÍĞÉ…Ñ¥¼€ô‘…Ñ„¹µ•É•¹¡•­•€˜˜‘…Ñ„¹µ•É•¹™½Õ¹€„ôô¹Õ±°€ü5…Ñ ¹µ¥¸ ÄÀÀ°€¡‘…Ñ„¹µ•É•¹™½Õ¹€¼‘…Ñ„¹µ•É•¹¡•­•¤€¨€ÄÀÀ¤€è¹Õ±°ì(€É•ÑÕÉ¸€ (€€€€ñÍ•Ñ¥½¸±…ÍÍ9…µ”ô‰Á…¹•°µ•É•µÁ…¹•°ˆø(€€€€€€ñ‘¥Ø±…ÍÍ9…µ”ô‰Á…¹•°µ¡•…ˆøñ‘¥ØøñÍÁ…¸±…ÍÍ9…µ”ô‰Á…¹•°µ¥½¸ˆøñ¥Ñ5•É”Í¥é”õìÈÁô€¼øğ½ÍÁ…¸øñ ÈùA••È¼µ±½…Ñ¥½¸ÁÉ½‰”ğ½ Èøğ½‘¥ØøñÍÁ…¸±…ÍÍ9…µ”ô‰É…¹”µ¡¥ÀˆùMUAA=IQ%9M%90ğ½ÍÁ…¸øğ½‘¥Øø(€€€€€€ñ‘¥Ø±…ÍÍ9…µ”ô‰µ•É•µ±…å½ÕĞˆø(€€€€€€€€ñ‘¥Ø±…ÍÍ9…µ”ô‰µ•É”µÙ¥ÍÕ…°ˆøñ‘¥Ø±…ÍÍ9…µ”ô‰¡…¥¸­…ÌˆøñÍÁ…¸ù-MAğ½ÍÁ…¸øñˆùA…É•¹ĞA½\ğ½ˆøğ½‘¥Øøñ‘¥Ø±…ÍÍ9…µ”ô‰µ•É”µ…ÉÉ½Üˆøñi…ÀÍ¥é”õìÈÉô€¼øñÍÁ…¸ùÕáA½\ğ½ÍÁ…¸øğ½‘¥Øøñ‘¥Ø±…ÍÍ9…µ”ô‰¡…¥¸é­…ÌˆøñÍÁ…¸ùi-Lğ½ÍÁ…¸øñˆù¡¥±‰±½¬ğ½ˆøğ½‘¥Øøğ½‘¥Øø(€€€€€€€€ñ‘¥Ø±…ÍÍ9…µ”ô‰µ•É”µÍÑ…ÑÌˆø(€€€€€€€€€€ñ‘¥ØøñÍÁ…¸ùA••ÉÌ¡•­•ğ½ÍÁ…¸øñˆùí‘¥ÍÁ±…å9Õµ‰•È¡‘…Ñ„¹µ•É•¹¡•­•¥ôğ½ˆøğ½‘¥Øø(€€€€€€€€€€ñ‘¥ØøñÍÁ…¸ùAÉ½‰”µÉ•…¡…‰±”ğ½ÍÁ…¸øñˆùí‘¥ÍÁ±…å9Õµ‰•È¡‘…Ñ„¹µ•É•¹É•…¡…‰±”¥ôğ½ˆøğ½‘¥Øø(€€€€€€€€€€ñ‘¥ØøñÍÁ…¸ù-…ÍÁ„¼µ±½…Ñ•ğ½ÍÁ…¸øñˆùí‘¥ÍÁ±…å9Õµ‰•È¡‘…Ñ„¹µ•É•¹™½Õ¹¥ôğ½ˆøğ½‘¥Øø(€€€€€€€€€€ñ‘¥ØøñÍÁ…¸ù=‰Í•ÉÙ…‰±”¼µ±½…Ñ¥½¸ğ½ÍÁ…¸øñˆùíÉ…Ñ¥¼€ôôô¹Õ±°€ü€ŸŠPœ€è€‘í™µĞ¹™½Éµ…Ğ¡É…Ñ¥¼¥ô•ôğ½ˆøğ½‘¥Øø(€€€€€€€€ğ½‘¥Øø(€€€€€€ğ½‘¥Øø(€€€€€€ñÀ±…ÍÍ9…µ”ô‰Í½ÕÉ”µ¹½Ñ”ˆùQ¡¥ÌÁ••ÈÁÉ½‰”¥ÌÍ•Á…É…Ñ”™É½´‰±½¬…ÑÑÉ¥‰ÕÑ¥½¸¸™…¥±•ÁÉ½‰”¥Ì¹½ĞÁÉ½½˜½˜¹½¸µµ•É•µ¥¹¥¹œ‰•…ÕÍ”™¥É•İ…±±Ì…¹¥¹‰½Õ¹µ½¹±äÁ••ÉÌ…¸‰”Õ¹ÁÉ½‰•…‰±”¸ğ½Àø(€€€€ğ½Í•Ñ¥½¸ø(€€¤ì)ô()™Õ¹Ñ¥½¸	±½­ÍA…”¡ì‰±½­Ì°½¹M•±•Ğôèì‰±½­Ìè	±½­I½İmtì½¹M•±•Ğè€¡¡…Í èÍÑÉ¥¹œ¤€ôøÙ½¥ô¤ì(€½¹ÍĞm™¥±Ñ•È°Í•Ñ¥±Ñ•Ét€ôÕÍ•MÑ…Ñ” œœ¤ì(€½¹ÍĞÙ¥Í¥‰±”€ô‰±½­Ì¹™¥±Ñ•È ¡ˆ¤€ôøˆ¹¡…Í ¹Ñ½1½İ•É…Í” ¤¹¥¹±Õ‘•Ì¡™¥±Ñ•È¹ÑÉ¥´ ¤¹Ñ½1½İ•É…Í” ¤¤¤ì(€É•ÑÕÉ¸€ (€€€€ñÍ•Ñ¥½¸±…ÍÍ9…µ”ô‰Á…”µÍÑ…¬ˆø(€€€€€€ñ‘¥Ø±…ÍÍ9…µ”ô‰Á…”µÑ½½±Ìˆøñ‘¥ØøñˆùíÙ¥Í¥‰±”¹±•¹Ñ¡ôğ½ˆøñÍÁ…¸øÉ••¹ĞÁÕ‰±¥Œ‰±½­Ìğ½ÍÁ…¸øğ½‘¥Øøñ¥¹ÁÕĞÙ…±Õ”õí™¥±Ñ•Éô½¹¡…¹”õì¡”¤€ôøÍ•Ñ¥±Ñ•È¡”¹Ñ…É•Ğ¹Ù…±Õ”¥ôÁ±…•¡½±‘•Èô‰¥±Ñ•ÈÉ••¹Ğ¡…Í¡•Ìˆ€¼øğ½‘¥Øø(€€€€€€ñ	±½­ÍQ…‰±”‰±½­ÌõíÙ¥Í¥‰±•ô½¹M•±•Ğõí½¹M•±•Ñô•áÁ…¹‘•€¼ø(€€€€ğ½Í•Ñ¥½¸ø(€€¤ì)ô()™Õ¹Ñ¥½¸QÉ…¹Í…Ñ¥½¹ÍA…”¡ìÑáÌ°½¹M•±•ĞôèìÑáÌèÉÉ…äñQáI½Ü€˜ì‰±½­!…Í èÍÑÉ¥¹œìÑ¥µ•ÍÑ…µÀè¹Õµ‰•Èôøì½¹M•±•Ğè€¡¥èÍÑÉ¥¹œ¤€ôøÙ½¥ô¤ì(€½¹ÍĞmµ½‘”°Í•Ñ5½‘•t€ôÕÍ•MÑ…Ñ”ğ…±°œğ€Í¡¥•±‘•œğ€½¥¹‰…Í”œø …±°œ¤ì(€½¹ÍĞÙ¥Í¥‰±”€ôÑáÌ¹™¥±Ñ•È ¡Ğ¤€ôøµ½‘”€ôôô€…±°œñğĞ¹­¥¹¹Ñ½1½İ•É…Í” ¤€ôôôµ½‘”¤ì(€É•ÑÕÉ¸€ (€€€€ñÍ•Ñ¥½¸±…ÍÍ9…µ”ô‰Á…”µÍÑ…¬ˆø(€€€€€€ñ‘¥Ø±…ÍÍ9…µ”ô‰ÁÉ¥Ù…äµ…±±½ÕĞˆøñ1½­-•å¡½±”Í¥é”õìÈÅô€¼øñ‘¥ØøñˆùAÉ¥Ù…äµ…İ…É”ÑÉ…¹Í…Ñ¥½¸Ù¥•Üğ½ˆøñÍÁ…¸ùQÉ…¹Í…Ñ¥½¸%Ì…¹ÁÕ‰±¥Œ½¹™¥Éµ…Ñ¥½¸‘…Ñ„…É”Ù¥Í¥‰±”ìÍ•¹‘•È°É•¥Á¥•¹Ğ…¹ÑÉ…¹Í™•ÉÉ•…µ½Õ¹ĞÉ•µ…¥¸Í¡¥•±‘•¸ğ½ÍÁ…¸øğ½‘¥Øøğ½‘¥Øø(€€€€€€ñ‘¥Ø±…ÍÍ9…µ”ô‰Á…”µÑ½½±Ìˆøñ‘¥ØøñˆùíÙ¥Í¥‰±”¹±•¹Ñ¡ôğ½ˆøñÍÁ…¸øÉ••¹ĞÑÉ…¹Í…Ñ¥½¹Ìğ½ÍÁ…¸øğ½‘¥Øøñ‘¥Ø±…ÍÍ9…µ”ô‰Í•µ•¹Ñ•ˆøñ‰ÕÑÑ½¸±…ÍÍ9…µ”õíµ½‘”€ôôô€…±°œ€ü€½¸œ€è€œô½¹±¥¬õì ¤€ôøÍ•Ñ5½‘” …±°œ¥ôù±°ğ½‰ÕÑÑ½¸øñ‰ÕÑÑ½¸±…ÍÍ9…µ”õíµ½‘”€ôôô€Í¡¥•±‘•œ€ü€½¸œ€è€œô½¹±¥¬õì ¤€ôøÍ•Ñ5½‘” Í¡¥•±‘•œ¥ôùM¡¥•±‘•ğ½‰ÕÑÑ½¸øñ‰ÕÑÑ½¸±…ÍÍ9…µ”õíµ½‘”€ôôô€½¥¹‰…Í”œ€ü€½¸œ€è€œô½¹±¥¬õì ¤€ôøÍ•Ñ5½‘” ½¥¹‰…Í”œ¥ôù½¥¹‰…Í”ğ½‰ÕÑÑ½¸øğ½‘¥Øøğ½‘¥Øø(€€€€€€ñQÉ…¹Í…Ñ¥½¹ÍQ…‰±”ÑáÌõíÙ¥Í¥‰±•ô½¹M•±•Ğõí½¹M•±•Ñô•áÁ…¹‘•€¼ø(€€€€ğ½Í•Ñ¥½¸ø(€€¤ì)ô()™Õ¹Ñ¥½¸9½‘•ÍA…”¡ì‘…Ñ„ôèì‘…Ñ„è…Í¡‰½…É‘…Ñ„ô¤ì(€½¹ÍĞĞ€ô‘…Ñ„¹ÁÕ‰±¥9½‘•Ì¹Ñ½Ñ…±Ìì(€½¹ÍĞ±½…Ñ•‘AĞ€ôĞ¹¹½‘•Ì€˜˜Ğ¹±½…Ñ•€„ôô¹Õ±°€ü€¡Ğ¹±½…Ñ•€¼Ğ¹¹½‘•Ì¤€¨€ÄÀÀ€è¹Õ±°ì(€É•ÑÕÉ¸€ (€€€€ñÍ•Ñ¥½¸±…ÍÍ9…µ”ô‰Á…”µÍÑ…¬ˆø(€€€€€€ñ‘¥Ø±…ÍÍ9…µ”ô‰ÁÉ¥Ù…äµ…±±½ÕĞˆøñ±½‰”ÈÍ¥é”õìÈÅô€¼øñ‘¥ØøñˆùAÕ‰±¥Œ¹•Ñİ½É¬Ù¥•Ü°¹½Ğ„±½‰…°É…İ±•Èğ½ˆøñÍÁ…¸ùQ¡¥Ì¥ÌÑ¡”ÁÕ‰±¥ŒÁ••ÈÙ¥•Ü•áÁ½Í•‰äÑ¡”i-…Ì•áÁ±½É•È‰…­•¹¸á…ĞÁ••È…‘‘É•ÍÍ•Ì…É”¹½Ğ‘¥ÍÁ±…å•ì½Õ¹ÑÉä…¹µ…Í­•¹•Ñİ½É¬±…‰•±ÌÁÉ•Í•ÉÙ”½Á•É…Ñ½ÈÁÉ¥Ù…ä¸ğ½ÍÁ…¸øğ½‘¥Øøğ½‘¥Øø(€€€€€€ñ‘¥Ø±…ÍÍ9…µ”ô‰µ•ÑÉ¥ŒµÉ¥¹½‘•Ìµµ•ÑÉ¥Ìˆø(€€€€€€€€ñ5•ÑÉ¥…É¥½¸õìñM•ÉÙ•ÈÍ¥é”õìÄåô€¼ùô±…‰•°ô‰Y¥Í¥‰±”¹½‘•ÌˆÙ…±Õ”õí‘¥ÍÁ±…å9Õµ‰•È¡Ğ¹¹½‘•Ì€üü‘…Ñ„¹¹½‘•Ì¥ôÍÕˆô‰áÁ±½É•ÈÙ…¹Ñ…”Á½¥¹Ğˆ…•¹Ğ€¼ø(€€€€€€€€ñ5•ÑÉ¥…É¥½¸õìñ±½‰”ÈÍ¥é”õìÄåô€¼ùô±…‰•°ô‰½Õ¹ÑÉ¥•ÌˆÙ…±Õ”õí‘¥ÍÁ±…å9Õµ‰•È¡Ğ¹½Õ¹ÑÉ¥•Ì¥ôÍÕˆõí±½…Ñ•‘AĞ€ôôô¹Õ±°€ü€1½…Ñ¥½¸…É•…Ñ”œ€è€‘í™µĞ¹™½Éµ…Ğ¡±½…Ñ•‘AĞ¥ô”±½…Ñ•‘ô€¼ø(€€€€€€€€ñ5•ÑÉ¥…É¥½¸õìñ9•Ñİ½É¬Í¥é”õìÄåô€¼ùô±…‰•°ô‰%¹‰½Õ¹ˆÙ…±Õ”õí‘¥ÍÁ±…å9Õµ‰•È¡Ğ¹¥¹‰½Õ¹¥ôÍÕˆô‰=‰Í•ÉÙ•½¹¹•Ñ¥½¹Ìˆ€¼ø(€€€€€€€€ñ5•ÑÉ¥…É¥½¸õìñ9•Ñİ½É¬Í¥é”õìÄåô€¼ùô±…‰•°ô‰=ÕÑ‰½Õ¹ˆÙ…±Õ”õí‘¥ÍÁ±…å9Õµ‰•È¡Ğ¹½ÕÑ‰½Õ¹¥ôÍÕˆô‰=‰Í•ÉÙ•½¹¹•Ñ¥½¹Ìˆ€¼ø(€€€€€€€€ñ5•ÑÉ¥…É¥½¸õìñÑ¥Ù¥ÑäÍ¥é”õìÄåô€¼ùô±…‰•°ô‰%AØĞˆÙ…±Õ”õí‘¥ÍÁ±…å9Õµ‰•È¡Ğ¹¥ÁØĞ¥ôÍÕˆô‰Y¥Í¥‰±”Á••ÉÌˆ€¼ø(€€€€€€€€ñ5•ÑÉ¥…É¥½¸õìñÑ¥Ù¥ÑäÍ¥é”õìÄåô€¼ùô±…‰•°ô‰%AØØˆÙ…±Õ”õí‘¥ÍÁ±…å9Õµ‰•È¡Ğ¹¥ÁØØ¥ôÍÕˆô‰Y¥Í¥‰±”Á••ÉÌˆ€¼ø(€€€€€€€€ñ5•ÑÉ¥…É¥½¸õìñ	½á•ÌÍ¥é”õìÄåô€¼ùô±…‰•°ô‰	±½­ÌÉ•±…å•ˆÙ…±Õ”õí‘¥ÍÁ±…å9Õµ‰•È¡Ğ¹‰±½­ÍI•±…å•°ÑÉÕ”¥ôÍÕˆô‰¥ÉÍĞµ‘•±¥Ù•É•Ñ¼Ù…¹Ñ…”¹½‘”ˆ€¼ø(€€€€€€€€ñ5•ÑÉ¥…É¥½¸õìñ±½¬ÌÍ¥é”õìÄåô€¼ùô±…‰•°ô‰A••ÈÉ•½É‘ÌˆÙ…±Õ”õí‘¥ÍÁ±…å9Õµ‰•È¡‘…Ñ„¹ÁÕ‰±¥9½‘•Ì¹¹½‘•Ì¹±•¹Ñ ¥ôÍÕˆô‰AÉ¥Ù…äµÍ…™”É½İÌˆ€¼ø(€€€€€€ğ½‘¥Øø(€€€€€€ñÍ•Ñ¥½¸±…ÍÍ9…µ”ô‰Ñİ¼µ½°¹½‘”µ½±Õµ¹Ìˆø(€€€€€€€€ñ½Õ¹ÑÉ¥•ÍQ…‰±”‘…Ñ„õí‘…Ñ…ô€¼ø(€€€€€€€€ñ9½‘•±¥•¹ÑMÕµµ…Éä¹½‘•Ìõí‘…Ñ„¹ÁÕ‰±¥9½‘•Ì¹¹½‘•Íô€¼ø(€€€€€€ğ½Í•Ñ¥½¸ø(€€€€€€ñ9½‘•ÍQ…‰±”¹½‘•Ìõí‘…Ñ„¹ÁÕ‰±¥9½‘•Ì¹¹½‘•Íô€¼ø(€€€€ğ½Í•Ñ¥½¸ø(€€¤ì)ô()™Õ¹Ñ¥½¸½Õ¹ÑÉ¥•ÍQ…‰±”¡ì‘…Ñ„ôèì‘…Ñ„è…Í¡‰½…É‘…Ñ„ô¤ì(€É•ÑÕÉ¸€ (€€€€ñÍ•Ñ¥½¸±…ÍÍ9…µ”ô‰Á…¹•°Ñ…‰±”µÁ…¹•°ˆø(€€€€€€ñ‘¥Ø±…ÍÍ9…µ”ô‰Á…¹•°µ¡•…ˆøñ‘¥ØøñÍÁ…¸±…ÍÍ9…µ”ô‰Á…¹•°µ¥½¸ˆøñ±½‰”ÈÍ¥é”õìÈÁô€¼øğ½ÍÁ…¸øñ Èù½Õ¹ÑÉä‘¥ÍÑÉ¥‰ÕÑ¥½¸ğ½ Èøğ½‘¥ØøñÍÁ…¸±…ÍÍ9…µ”ô‰É…¹”µ¡¥ÀˆùAU	1%ğ½ÍÁ…¸øğ½‘¥Øø(€€€€€€ñ‘¥Ø±…ÍÍ9…µ”ô‰Ñ…‰±”µÍÉ½±°ˆøñÑ…‰±”øñÑ¡•…øñÑÈøñÑ ù½Õ¹ÑÉäğ½Ñ øñÑ ù½‘”ğ½Ñ øñÑ ù9½‘•Ìğ½Ñ øñÑ ùM¡…É”ğ½Ñ øğ½ÑÈøğ½Ñ¡•…øñÑ‰½‘äø(€€€€€€€í‘…Ñ„¹ÁÕ‰±¥9½‘•Ì¹½Õ¹ÑÉ¥•Ì¹µ…À ¡Œ¤€ôø€ñÑÈ­•äõí€‘íŒ¹½‘•ô´‘íŒ¹¹…µ•õôøñÑùíŒ¹¹…µ•ôğ½ÑøñÑøñÍÁ…¸±…ÍÍ9…µ”ô‰Á¥±°ˆùíŒ¹½‘•ôğ½ÍÁ…¸øğ½ÑøñÑùíŒ¹½Õ¹Ñôğ½ÑøñÑùíŒ¹Á•É•¹Ğ€ôôô¹Õ±°€ü€ŸŠPœ€è€‘í™µĞ¹™½Éµ…Ğ¡Œ¹Á•É•¹Ğ¥ô•ôğ½Ñøğ½ÑÈø¥ô(€€€€€€€ì…‘…Ñ„¹ÁÕ‰±¥9½‘•Ì¹½Õ¹ÑÉ¥•Ì¹±•¹Ñ €˜˜€ñÑÈøñÑ½±MÁ…¸õìÑô±…ÍÍ9…µ”ô‰•µÁÑäµ•±°ˆù½Õ¹ÑÉä…É•…Ñ•Ì…É”¹½Ğ…Ù…¥±…‰±”™É½´Ñ¡¥ÌA$É•ÍÁ½¹Í”¸ğ½Ñøğ½ÑÈùô(€€€€€€ğ½Ñ‰½‘äøğ½Ñ…‰±”øğ½‘¥Øø(€€€€ğ½Í•Ñ¥½¸ø(€€¤ì)ô()™Õ¹Ñ¥½¸9½‘•±¥•¹ÑMÕµµ…Éä¡ì¹½‘•Ìôèì¹½‘•ÌèAÕ‰±¥9½‘•I½İmtô¤ì(€½¹ÍĞÉ½ÕÁÌ€ô¹•Ü5…ÀñÍÑÉ¥¹œ°¹Õµ‰•Èø ¤ì(€¹½‘•Ì¹™½É…  ¡¸¤€ôøÉ½ÕÁÌ¹Í•Ğ¡¸¹ÕÍ•É•¹Ğñğ€U¹­¹½İ¸±¥•¹Ğœ°€¡É½ÕÁÌ¹•Ğ¡¸¹ÕÍ•É•¹Ğñğ€U¹­¹½İ¸±¥•¹Ğœ¤ñğ€À¤€¬€Ä¤¤ì(€½¹ÍĞÉ½İÌ€ôl¸¸¹É½ÕÁÌ¹•¹ÑÉ¥•Ì ¥t¹Í½ÉĞ ¡„°ˆ¤€ôø‰lÅt€´…lÅt¤ì(€É•ÑÕÉ¸€ (€€€€ñÍ•Ñ¥½¸±…ÍÍ9…µ”ô‰Á…¹•°Ñ…‰±”µÁ…¹•°ˆø(€€€€€€ñ‘¥Ø±…ÍÍ9…µ”ô‰Á…¹•°µ¡•…ˆøñ‘¥ØøñÍÁ…¸±…ÍÍ9…µ”ô‰Á…¹•°µ¥½¸ˆøñM•ÉÙ•ÈÍ¥é”õìÈÁô€¼øğ½ÍÁ…¸øñ Èù±¥•¹ĞÙ•ÉÍ¥½¹Ìğ½ Èøğ½‘¥ØøñÍÁ…¸±…ÍÍ9…µ”ô‰É…¹”µ¡¥ÀˆùAU	1%ğ½ÍÁ…¸øğ½‘¥Øø(€€€€€€ñ‘¥Ø±…ÍÍ9…µ”ô‰Ñ…‰±”µÍÉ½±°ˆøñÑ…‰±”øñÑ¡•…øñÑÈøñÑ ù±¥•¹Ğ€¼ÕÍ•È…•¹Ğğ½Ñ øñÑ ù½Õ¹Ğğ½Ñ øğ½ÑÈøğ½Ñ¡•…øñÑ‰½‘äø(€€€€€€€íÉ½İÌ¹µ…À ¡m±¥•¹Ğ°½Õ¹Ñt¤€ôø€ñÑÈ­•äõí±¥•¹ÑôøñÑøñ½‘”±…ÍÍ9…µ”ô‰Í½™Ğµ½‘”ˆùí±¥•¹Ñôğ½½‘”øğ½ÑøñÑùí½Õ¹Ñôğ½Ñøğ½ÑÈø¥ô(€€€€€€€ì…É½İÌ¹±•¹Ñ €˜˜€ñÑÈøñÑ½±MÁ…¸õìÉô±…ÍÍ9…µ”ô‰•µÁÑäµ•±°ˆù±¥•¹ĞµÙ•ÉÍ¥½¸…É•…Ñ•Ì…É”¹½Ğ…Ù…¥±…‰±”¸ğ½Ñøğ½ÑÈùô(€€€€€€ğ½Ñ‰½‘äøğ½Ñ…‰±”øğ½‘¥Øø(€€€€ğ½Í•Ñ¥½¸ø(€€¤ì)ô()™Õ¹Ñ¥½¸9½‘•ÍQ…‰±”¡ì¹½‘•Ìôèì¹½‘•ÌèAÕ‰±¥9½‘•I½İmtô¤ì(€É•ÑÕÉ¸€ (€€€€ñÍ•Ñ¥½¸±…ÍÍ9…µ”ô‰Á…¹•°Ñ…‰±”µÁ…¹•°•áÁ…¹‘•ˆø(€€€€€€ñ‘¥Ø±…ÍÍ9…µ”ô‰Á…¹•°µ¡•…ˆøñ‘¥ØøñÍÁ…¸±…ÍÍ9…µ”ô‰Á…¹•°µ¥½¸ˆøñ9•Ñİ½É¬Í¥é”õìÈÁô€¼øğ½ÍÁ…¸øñ ÈùY¥Í¥‰±”ÁÕ‰±¥ŒÁ••ÉÌğ½ Èøğ½‘¥ØøñÍÁ…¸±…ÍÍ9…µ”ô‰ÁÉ¥Ù…äµ¡¥ÀˆøñM¡¥•±‘¡•¬Í¥é”õìÄÑô€¼ø5M-ğ½ÍÁ…¸øğ½‘¥Øø(€€€€€€ñ‘¥Ø±…ÍÍ9…µ”ô‰Ñ…‰±”µÍÉ½±°ˆøñÑ…‰±”øñÑ¡•…øñÑÈøñÑ ùA••Èğ½Ñ øñÑ ù½Õ¹ÑÉäğ½Ñ øñÑ ù9•Ñİ½É¬ğ½Ñ øñÑ ù±¥•¹Ğğ½Ñ øñÑ ù¥É•Ñ¥½¸ğ½Ñ øñÑ ùAÉ½Ñ½½°ğ½Ñ øñÑ ùA¥¹œğ½Ñ øñÑ ù½¹¹•Ñ•ğ½Ñ øñÑ ùI•±…å•ğ½Ñ øğ½ÑÈøğ½Ñ¡•…øñÑ‰½‘äø(€€€€€€€í¹½‘•Ì¹µ…À ¡¸°¤¤€ôø€ñÑÈ­•äõí€‘í¸¹¥‘ô´‘í¥õôøñÑøñ½‘”±…ÍÍ9…µ”ô‰Í½™Ğµ½‘”ˆùíÍ¡½ÉĞ¡¸¹¥°€Ø¥ôğ½½‘”øğ½ÑøñÑùí¸¹½Õ¹ÑÉå9…µ”ñğ¸¹½Õ¹ÑÉå½‘”ñğ€U¹­¹½İ¸ôğ½ÑøñÑøñ½‘”±…ÍÍ9…µ”ô‰Í½™Ğµ½‘”ˆùí¸¹¹•Ñİ½É¬ñğ€ŸŠPôğ½½‘”øğ½ÑøñÑùí¸¹ÕÍ•É•¹Ğñğ€ŸŠPôğ½ÑøñÑøñÍÁ…¸±…ÍÍ9…µ”ô‰Á¥±°ˆùí¸¹½ÕÑ‰½Õ¹€ôôô¹Õ±°€ü€ŸŠPœ€è¸¹½ÕÑ‰½Õ¹€ü€=ÕÑ‰½Õ¹œ€è€%¹‰½Õ¹ôğ½ÍÁ…¸øğ½ÑøñÑùí‘¥ÍÁ±…å9Õµ‰•È¡¸¹ÁÉ½Ñ½½±Y•ÉÍ¥½¸¥ôğ½ÑøñÑùí¸¹Á¥¹5Ì€ôôô¹Õ±°€ü€ŸŠPœ€è€‘í‘¥ÍÁ±…å9Õµ‰•È¡¸¹Á¥¹5Ì¥ôµÍôğ½ÑøñÑùí‘ÕÉ…Ñ¥½¸¡¸¹½¹¹•Ñ•‘½ÉM•Œ¥ôğ½ÑøñÑùí‘¥ÍÁ±…å9Õµ‰•È¡¸¹‰±½­ÍI•±…å•¥ôğ½Ñøğ½ÑÈø¥ô(€€€€€€€ì…¹½‘•Ì¹±•¹Ñ €˜˜€ñÑÈøñÑ½±MÁ…¸õìåô±…ÍÍ9…µ”ô‰•µÁÑäµ•±°ˆù9¼ÁÉ¥Ù…äµÍ…™”Á••ÈÉ½İÌİ•É”É•ÑÕÉ¹•¸ğ½Ñøğ½ÑÈùô(€€€€€€ğ½Ñ‰½‘äøğ½Ñ…‰±”øğ½‘¥Øø(€€€€€€ñÀ±…ÍÍ9…µ”ô‰Ñ…‰±”µ™½½Ñ¹½Ñ”ˆûŠqI•±…å•“Štµ•…¹ÌÑ¡”Á••Èİ…Ì™¥ÉÍĞÑ¼‘•±¥Ù•È„‰±½¬Ñ¼Ñ¡”•áÁ±½É•ÈÙ…¹Ñ…”¹½‘”ì¥Ğ‘½•Ì¹½Ğ¥‘•¹Ñ¥™äÑ¡”µ¥¹•ÈÑ¡…Ğ™½Õ¹Ñ¡…Ğ‰±½¬¸ğ½Àø(€€€€ğ½Í•Ñ¥½¸ø(€€¤ì)ô()™Õ¹Ñ¥½¸5¥¹¥¹A…”¡ì‘…Ñ„°‘¥™™Y…±Õ•Ì°ÁÕ±Í•Q¥µ•Ìôèì‘…Ñ„è…Í¡‰½…É‘…Ñ„ì‘¥™™Y…±Õ•ÌèÉÉ…äñ¹Õµ‰•Èğ¹Õ±°øìÁÕ±Í•Q¥µ•Ìè¹Õµ‰•Émtô¤ì(€É•ÑÕÉ¸€ (€€€€ñÍ•Ñ¥½¸±…ÍÍ9…µ”ô‰µ¥¹¥¹œµ±…å½ÕĞÁ…”µÍÑ…¬ˆø(€€€€€€ñ‘¥Ø±…ÍÍ9…µ”ô‰ÁÉ¥Ù…äµ…±±½ÕĞˆøñ¥Ñ5•É”Í¥é”õìÈÅô€¼øñ‘¥ØøñˆùAÕ‰±¥Œ¹•Ñİ½É¬µ¥¹¥¹œ½¹±äğ½ˆøñÍÁ…¸ùQ¡¥ÌÁ…”¡…Ì¹¼½¹¹•Ñ¥½¸Ñ¼…¹äÁ•ÉÍ½¹…°µ¥¹•È°‰É¥‘”°İ½É­•È¹…µ”°İ…±±•Ğ°±½…°¹½‘”½ÈAÉ½µ•Ñ¡•ÕÌ•¹‘Á½¥¹Ğ¸ğ½ÍÁ…¸øğ½‘¥Øøğ½‘¥Øø(€€€€€€ñ‘¥Ø±…ÍÍ9…µ”ô‰µ•ÑÉ¥ŒµÉ¥µ¥¹¥¹œµµ•ÑÉ¥Ìˆø(€€€€€€€€ñ5•ÑÉ¥…É¥½¸õìñ…Õ”Í¥é”õìÄåô€¼ùô±…‰•°ô‰9•Ñİ½É¬¡…Í¡É…Ñ”ˆÙ…±Õ”õí‘¥ÍÁ±…å!…Í¡É…Ñ”¡‘…Ñ„¹¡…Í¡É…Ñ”¥ôÍÕˆô‰AÕ‰±¥Œ¹•Ñİ½É¬•ÍÑ¥µ…Ñ”ˆ…•¹Ğ€¼ø(€€€€€€€€ñ5•ÑÉ¥…É¥½¸õìñÑ¥Ù¥ÑäÍ¥é”õìÄåô€¼ùô±…‰•°ô‰	ALˆÙ…±Õ”õí‘¥ÍÁ±…å9Õµ‰•È¡‘…Ñ„¹‰ÁÌ¥ôÍÕˆô‰	±½¬ÁÉ½‘ÕÑ¥½¸ˆ€¼ø(€€€€€€€€ñ5•ÑÉ¥…É¥½¸õìñ¥É±•½±±…ÉM¥¸Í¥é”õìÄåô€¼ùô±…‰•°ô‰5¥¹•ÈÁ…å½ÕĞˆÙ…±Õ”õí€‘í‘¥ÍÁ±…å9Õµ‰•È¡µ¥¹•ÉA…å½ÕĞ¡‘…Ñ„¹É•İ…É¤¥ôi-MôÍÕˆôˆäÔ”½˜É½ÍÌ‰±½¬•µ¥ÍÍ¥½¸ˆ€¼ø(€€€€€€€€ñ5•ÑÉ¥…É¥½¸õìñ¥Ñ5•É”Í¥é”õìÄåô€¼ùô±…‰•°ô‰¼µ±½…Ñ•Á••ÉÌˆÙ…±Õ”õí‘¥ÍÁ±…å9Õµ‰•È¡‘…Ñ„¹µ•É•¹™½Õ¹¥ôÍÕˆô‰-…ÍÁ„¹½‘”‘•Ñ•Ñ•ˆ€¼ø(€€€€€€ğ½‘¥Øø(€€€€€€ñ‘¥Ø±…ÍÍ9…µ”ô‰Á…¹•°ˆøñ‘¥Ø±…ÍÍ9…µ”ô‰Á…¹•°µ¡•…ˆøñ‘¥ØøñÍÁ…¸±…ÍÍ9…µ”ô‰Á…¹•°µ¥½¸ˆøñ…Õ”Í¥é”õìÈÁô€¼øğ½ÍÁ…¸øñ Èù9•Ñİ½É¬‘¥™™¥Õ±Ñäğ½ Èøğ½‘¥ØøñÍÁ…¸±…ÍÍ9…µ”ô‰É…¹”µ¡¥ÀˆøÄÕ4ğ½ÍÁ…¸øğ½‘¥ØøñMÁ…É­¡…ÉĞÙ…±Õ•Ìõí‘¥™™Y…±Õ•Íô±…‰•±ÌõíÁÕ±Í•Q¥µ•Íô¡•¥¡ĞõìÈĞÁô€¼øğ½‘¥Øø(€€€€€€ñ5•É•‘A…¹•°‘…Ñ„õí‘…Ñ…ô€¼ø(€€€€ğ½Í•Ñ¥½¸ø(€€¤ì)ô()™Õ¹Ñ¥½¸	±½­ÍQ…‰±”¡ì‰±½­Ì°½¹M•±•Ğ°•áÁ…¹‘•€ô™…±Í”ôèì‰±½­Ìè	±½­I½İmtì½¹M•±•Ğè€¡¡…Í èÍÑÉ¥¹œ¤€ôøÙ½¥ì•áÁ…¹‘•üè‰½½±•…¸ô¤ì(€É•ÑÕÉ¸€ (€€€€ñÍ•Ñ¥½¸±…ÍÍ9…µ”õíÁ…¹•°Ñ…‰±”µÁ…¹•°€‘í•áÁ…¹‘•€ü€•áÁ…¹‘•œ€è€œõôø(€€€€€€ñ‘¥Ø±…ÍÍ9…µ”ô‰Á…¹•°µ¡•…ˆøñ‘¥ØøñÍÁ…¸±…ÍÍ9…µ”ô‰Á…¹•°µ¥½¸ˆøñ	½á•ÌÍ¥é”õìÈÁô€¼øğ½ÍÁ…¸øñ Èù	±½­Ìğ½ Èøğ½‘¥ØøñÍÁ…¸±…ÍÍ9…µ”ô‰±¥Ù”µµ¥¹¤ˆøñ¤€¼ø1%Yğ½ÍÁ…¸øğ½‘¥Øø(€€€€€€ñ‘¥Ø±…ÍÍ9…µ”ô‰Ñ…‰±”µÍÉ½±°ˆøñÑ…‰±”øñÑ¡•…øñÑÈøñÑ ù!…Í ğ½Ñ øñÑ ù”ğ½Ñ øñÑ ùğ½Ñ øñÑ ù	±Õ”Í½É”ğ½Ñ øñÑ ùQáÌğ½Ñ øñÑ ù¥™™¥Õ±Ñäğ½Ñ øğ½ÑÈøğ½Ñ¡•…øñÑ‰½‘äø(€€€€€€€í‰±½­Ì¹µ…À ¡ˆ°¤¤€ôø€ñÑÈ­•äõí€‘íˆ¹¡…Í¡ô´‘í¥õôøñÑøñ‰ÕÑÑ½¸±…ÍÍ9…µ”ô‰¡…Í µ±¥¹¬ˆ½¹±¥¬õì ¤€ôø½¹M•±•Ğ¡ˆ¹¡…Í ¥ôøñ!…Í Í¥é”õìÄÑô€¼ùíÍ¡½ÉĞ¡ˆ¹¡…Í °€à¥ôğ½‰ÕÑÑ½¸øğ½ÑøñÑùí…”¡ˆ¹Ñ¥µ•ÍÑ…µÀ¥ôğ½ÑøñÑùí‘¥ÍÁ±…å9Õµ‰•È¡ˆ¹‘……M½É”°ÑÉÕ”¥ôğ½ÑøñÑùí‘¥ÍÁ±…å9Õµ‰•È¡ˆ¹‰±Õ•M½É”°ÑÉÕ”¥ôğ½ÑøñÑøñÍÁ…¸±…ÍÍ9…µ”ô‰Á¥±°ˆùíˆ¹Ñá½Õ¹Ñôğ½ÍÁ…¸øğ½ÑøñÑùí‘¥ÍÁ±…å9Õµ‰•È¡ˆ¹‘¥™™¥Õ±Ñä°ÑÉÕ”¥ôğ½Ñøğ½ÑÈø¥ô(€€€€€€€ì…‰±½­Ì¹±•¹Ñ €˜˜€ñÑÈøñÑ½±MÁ…¸õìÙô±…ÍÍ9…µ”ô‰•µÁÑäµ•±°ˆù9¼É••¹ĞÁÕ‰±¥Œ‰±½¬‘…Ñ„¸ğ½Ñøğ½ÑÈùô(€€€€€€ğ½Ñ‰½‘äøğ½Ñ…‰±”øğ½‘¥Øø(€€€€ğ½Í•Ñ¥½¸ø(€€¤ì)ô()™Õ¹Ñ¥½¸QÉ…¹Í…Ñ¥½¹ÍQ…‰±”¡ìÑáÌ°½¹M•±•Ğ°•áÁ…¹‘•€ô™…±Í”ôèìÑáÌèÉÉ…äñQáI½Ü€˜ì‰±½­!…Í èÍÑÉ¥¹œìÑ¥µ•ÍÑ…µÀè¹Õµ‰•Èôøì½¹M•±•Ğè€¡¥èÍÑÉ¥¹œ¤€ôøÙ½¥ì•áÁ…¹‘•üè‰½½±•…¸ô¤ì(€É•ÑÕÉ¸€ (€€€€ñÍ•Ñ¥½¸±…ÍÍ9…µ”õíÁ…¹•°Ñ…‰±”µÁ…¹•°€‘í•áÁ…¹‘•€ü€•áÁ…¹‘•œ€è€œõôø(€€€€€€ñ‘¥Ø±…ÍÍ9…µ”ô‰Á…¹•°µ¡•…ˆøñ‘¥ØøñÍÁ…¸±…ÍÍ9…µ”ô‰Á…¹•°µ¥½¸ˆøñ1½­-•å¡½±”Í¥é”õìÈÁô€¼øğ½ÍÁ…¸øñ ÈùQÉ…¹Í…Ñ¥½¹Ìğ½ Èøğ½‘¥ØøñÍÁ…¸±…ÍÍ9…µ”ô‰ÁÉ¥Ù…äµ¡¥ÀˆøñM¡¥•±‘¡•¬Í¥é”õìÄÑô€¼øAI%Ydµ]Iğ½ÍÁ…¸øğ½‘¥Øø(€€€€€€ñ‘¥Ø±…ÍÍ9…µ”ô‰Ñ…‰±”µÍÉ½±°ˆøñÑ…‰±”øñÑ¡•…øñÑÈøñÑ ùQà%ğ½Ñ øñÑ ù”ğ½Ñ øñÑ ùQåÁ”ğ½Ñ øñÑ ùÑ¥½¹Ìğ½Ñ øñÑ ù	±½¬ğ½Ñ øğ½ÑÈøğ½Ñ¡•…øñÑ‰½‘äø(€€€€€€€íÑáÌ¹µ…À ¡Ñà°¤¤€ôø€ñÑÈ­•äõí€‘íÑà¹¥‘ô´‘í¥õôøñÑøñ‰ÕÑÑ½¸±…ÍÍ9…µ”ô‰¡…Í µ±¥¹¬ˆ½¹±¥¬õì ¤€ôø½¹M•±•Ğ¡Ñà¹¥¥ôøñ1½­-•å¡½±”Í¥é”õìÄÑô€¼ùíÍ¡½ÉĞ¡Ñà¹¥°€à¥ôğ½‰ÕÑÑ½¸øğ½ÑøñÑùí…”¡Ñà¹Ñ¥µ•ÍÑ…µÀ¥ôğ½ÑøñÑøñÍÁ…¸±…ÍÍ9…µ”ô‰Í¡¥•±µÁ¥±°ˆùíÑà¹­¥¹‘ôğ½ÍÁ…¸øğ½ÑøñÑùíÑà¹Í¡¥•±‘•‘Ñ¥½¹Ì€üü€ŸŠPôğ½ÑøñÑøñ½‘”±…ÍÍ9…µ”ô‰Í½™Ğµ½‘”ˆùíÍ¡½ÉĞ¡Ñà¹‰±½­!…Í °€Ø¥ôğ½½‘”øğ½Ñøğ½ÑÈø¥ô(€€€€€€€ì…ÑáÌ¹±•¹Ñ €˜˜€ñÑÈøñÑ½±MÁ…¸õìÕô±…ÍÍ9…µ”ô‰•µÁÑäµ•±°ˆù9¼É••¹ĞÁÕ‰±¥ŒÑÉ…¹Í…Ñ¥½¸‘…Ñ„¸ğ½Ñøğ½ÑÈùô(€€€€€€ğ½Ñ‰½‘äøğ½Ñ…‰±”øğ½‘¥Øø(€€€€ğ½Í•Ñ¥½¸ø(€€¤ì)ô()™Õ¹Ñ¥½¸•Ñ…¥±É…İ•È¡ì‘•Ñ…¥°°½¹±½Í”ôèì‘•Ñ…¥°è•Ñ…¥°ì½¹±½Í”è€ ¤€ôøÙ½¥ô¤ì(€É•ÑÕÉ¸€ (€€€€ñ‘¥Ø±…ÍÍ9…µ”ô‰‘É…İ•Èµ‰…­‘É½Àˆ½¹5½ÕÍ•½İ¸õì¡”¤€ôøì¥˜€¡”¹ÕÉÉ•¹ÑQ…É•Ğ€ôôô”¹Ñ…É•Ğ¤½¹±½Í” ¤ìõôø(€€€€€€ñ…Í¥‘”±…ÍÍ9…µ”ô‰‘É…İ•ÈˆÉ½±”ô‰‘¥…±½œˆ…É¥„µµ½‘…°ô‰ÑÉÕ”ˆ…É¥„µ±…‰•°ô‰M•…É É•ÍÕ±Ğˆø(€€€€€€€€ñ‘¥Ø±…ÍÍ9…µ”ô‰‘É…İ•Èµ¡•…ˆøñ‘¥ØøñÍÁ…¸±…ÍÍ9…µ”ô‰•å•‰É½Üˆùí‘•Ñ…¥°¹ÑåÁ”€ôôô€ÁÉ¥Ù…äœ€ü€AÉ¥Ù…ä¹½Ñ¥”œ€è€‘í‘•Ñ…¥°¹ÑåÁ•ôÉ•ÍÕ±Ñôğ½ÍÁ…¸øñ ÈùíÍ¡½ÉĞ¡‘•Ñ…¥°¹ÅÕ•Éä°€ÄĞ¥ôğ½ Èøğ½‘¥Øøñ‰ÕÑÑ½¸±…ÍÍ9…µ”ô‰¥½¸µ‰Ñ¸ˆ½¹±¥¬õí½¹±½Í•ô…É¥„µ±…‰•°ô‰±½Í”ˆøñ`Í¥é”õìÈÁô€¼øğ½‰ÕÑÑ½¸øğ½‘¥Øø(€€€€€€€í‘•Ñ…¥°¹ÑåÁ”€ôôô€ÁÉ¥Ù…äœ€ü€ñ‘¥Ø±…ÍÍ9…µ”ô‰ÁÉ¥Ù…äµÉ•ÍÕ±ĞˆøñM¡¥•±‘¡•¬Í¥é”õìÌÑô€¼øñ Ìù‘‘É•ÍÌ…Ñ¥Ù¥ÑäÍÑ…åÌÁÉ¥Ù…Ñ”ğ½ ÌøñÀùíMÑÉ¥¹œ ¡‘•Ñ…¥°¹‘…Ñ„…Ììµ•ÍÍ…”üèÍÑÉ¥¹œô¤¹µ•ÍÍ…”ñğ€œœ¥ôğ½Àøğ½‘¥Øø€è€ñ‘¥Ø±…ÍÍ9…µ”ô‰‘•Ñ…¥°µ±¥ÍĞˆùí½‰©•Ñ¹ÑÉ¥•Ì¡‘•Ñ…¥°¹‘…Ñ„¤¹µ…À ¡m­•ä°Ù…±Õ•t¤€ôø€ñ‘¥Ø­•äõí­•åôøñÍÁ…¸ùí­•åôğ½ÍÁ…¸øñ½‘”ùíÙ…±Õ•ôğ½½‘”øğ½‘¥Øø¥ôğ½‘¥Øùô(€€€€€€ğ½…Í¥‘”ø(€€€€ğ½‘¥Øø(€€¤ì)ô()•áÁ½ÉĞ‘•™…Õ±ĞÁÀì(

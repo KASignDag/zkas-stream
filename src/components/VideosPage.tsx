@@ -2,6 +2,13 @@ import { Clock3, Play, ShieldCheck } from 'lucide-react';
 
 const videos = [
   {
+    title: 'Built from Kaspa. Enhanced for privacy.',
+    description: 'A 20-second look at how ZKAS was built from a Kaspa fork and the benefits it carries forward.',
+    duration: '20 sec',
+    src: '/videos/zkas-built-from-kaspa-20s.mp4',
+    poster: '/videos/zkas-built-from-kaspa-poster.jpg',
+  },
+  {
     title: 'Private by default. Built for speed.',
     description: 'A 15-second ZKAS speed and privacy comparison with Zcash and Monero.',
     duration: '15 sec',
@@ -19,7 +26,7 @@ export function VideosPage() {
           <h2 id="video-library-title">Watch ZKAS in motion</h2>
           <p>Short videos about ZKAS speed, privacy and the network. New releases will be added here.</p>
         </div>
-        <span className="video-count">{videos.length} VIDEO</span>
+        <span className="video-count">{videos.length} {videos.length === 1 ? 'VIDEO' : 'VIDEOS'}</span>
       </div>
 
       <div className="video-gallery">
