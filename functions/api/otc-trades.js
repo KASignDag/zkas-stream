@@ -1,4 +1,35 @@
 const commonTradeArrays = ['trades', 'data', 'results', 'items', 'completedTrades', 'completed_trades'];
+const reviewedSep2LateTrades = [
+  {
+    "timestamp": 1788396600000,
+    "side": "buy",
+    "zkasAmount": 2500,
+    "totalKas": 130,
+    "priceKas": 0.052
+  },
+  {
+    "timestamp": 1788396720000,
+    "side": "buy",
+    "zkasAmount": 430000,
+    "totalKas": 9999.9983,
+    "priceKas": 0.02325581
+  },
+  {
+    "timestamp": 1788396960000,
+    "side": "sell",
+    "zkasAmount": 200000,
+    "totalKas": 5273.744,
+    "priceKas": 0.02636872
+  },
+  {
+    "timestamp": 1788397020000,
+    "side": "sell",
+    "zkasAmount": 2000,
+    "totalKas": 52.73744,
+    "priceKas": 0.02636872
+  }
+];
+
 
 function first(record, keys) {
   for (const key of keys) {
@@ -78,6 +109,11 @@ async function handleGet({ request, env, waitUntil }) {
   if (!endpoint) {
     if (env.OTC_TRADES) {
       const stored = await env.OTC_TRADES.get('trades:v1', 'json');
+      if (Array.isArray(stored?.trades) && stored.trades.length === 464) {
+        stored.trades = [...stored.trades, ...reviewedSep2LateTrades];
+        stored.updatedAt = Date.now();
+        await env.OTC_TRADES.put('trades:v1', JSON.stringify(stored));
+      }
       const trades = Array.isArray(stored?.trades) ? stored.trades.map(normalizeTrade).filter(Boolean).slice(-5000) : [];
       if (trades.length) {
         return json({ schemaVersion: 1, status: 'live', source: 'screenshot-import', updatedAt: stored.updatedAt || updatedAt, trades }, 200, 'public, max-age=10, s-maxage=30, stale-while-revalidate=120');
