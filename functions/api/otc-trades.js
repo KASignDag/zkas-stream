@@ -1,4 +1,13 @@
 const commonTradeArrays = ['trades', 'data', 'results', 'items', 'completedTrades', 'completed_trades'];
+const reviewedSep3MorningTrades = [
+  { timestamp: 1788408600000, side: 'sell', zkasAmount: 29000, priceKas: 0.02631035, totalKas: 763.00015 },
+  { timestamp: 1788408660000, side: 'sell', zkasAmount: 131000, priceKas: 0.02636872, totalKas: 3454.30232 },
+  { timestamp: 1788408720000, side: 'sell', zkasAmount: 143638.7, priceKas: 0.02784765, totalKas: 4000.00024406 },
+  { timestamp: 1788415920000, side: 'buy', zkasAmount: 175000, priceKas: 0.02857142, totalKas: 4999.9985 },
+  { timestamp: 1788434160000, side: 'buy', zkasAmount: 50000, priceKas: 0.0227, totalKas: 1135 },
+  { timestamp: 1788436740000, side: 'buy', zkasAmount: 29501, priceKas: 0.02297297, totalKas: 677.72558797 },
+  { timestamp: 1788436800000, side: 'buy', zkasAmount: 30000, priceKas: 0.02259335, totalKas: 677.8005 },
+];
 
 function first(record, keys) {
   for (const key of keys) {
@@ -78,6 +87,11 @@ async function handleGet({ request, env, waitUntil }) {
   if (!endpoint) {
     if (env.OTC_TRADES) {
       const stored = await env.OTC_TRADES.get('trades:v1', 'json');
+      if (Array.isArray(stored?.trades) && stored.trades.length === 468) {
+        stored.trades = [...stored.trades, ...reviewedSep3MorningTrades];
+        stored.updatedAt = Date.now();
+        await env.OTC_TRADES.put('trades:v1', JSON.stringify(stored));
+      }
       const trades = Array.isArray(stored?.trades) ? stored.trades.map(normalizeTrade).filter(Boolean).slice(-5000) : [];
       if (trades.length) {
         return json({ schemaVersion: 1, status: 'live', source: 'screenshot-import', updatedAt: stored.updatedAt || updatedAt, trades }, 200, 'public, max-age=10, s-maxage=30, stale-while-revalidate=120');
