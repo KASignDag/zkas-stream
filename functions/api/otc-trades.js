@@ -1,84 +1,4 @@
 const commonTradeArrays = ['trades', 'data', 'results', 'items', 'completedTrades', 'completed_trades'];
-const reviewedSep2EveningTrades = [
-  {
-    "timestamp": 1788391260000,
-    "side": "sell",
-    "zkasAmount": 25000,
-    "totalKas": 659.218,
-    "priceKas": 0.02636872
-  },
-  {
-    "timestamp": 1788391980000,
-    "side": "sell",
-    "zkasAmount": 100000,
-    "totalKas": 3260,
-    "priceKas": 0.0326
-  },
-  {
-    "timestamp": 1788392040000,
-    "side": "sell",
-    "zkasAmount": 80000,
-    "totalKas": 2600,
-    "priceKas": 0.0325
-  },
-  {
-    "timestamp": 1788392940000,
-    "side": "buy",
-    "zkasAmount": 2500,
-    "totalKas": 350,
-    "priceKas": 0.14
-  },
-  {
-    "timestamp": 1788393720000,
-    "side": "sell",
-    "zkasAmount": 2000,
-    "totalKas": 68.8,
-    "priceKas": 0.0344
-  },
-  {
-    "timestamp": 1788393780000,
-    "side": "sell",
-    "zkasAmount": 5000,
-    "totalKas": 160,
-    "priceKas": 0.032
-  },
-  {
-    "timestamp": 1788393840000,
-    "side": "sell",
-    "zkasAmount": 12000,
-    "totalKas": 380.55564,
-    "priceKas": 0.03171297
-  },
-  {
-    "timestamp": 1788393870000,
-    "side": "sell",
-    "zkasAmount": 3000,
-    "totalKas": 96,
-    "priceKas": 0.032
-  },
-  {
-    "timestamp": 1788393960000,
-    "side": "sell",
-    "zkasAmount": 6000,
-    "totalKas": 192,
-    "priceKas": 0.032
-  },
-  {
-    "timestamp": 1788393990000,
-    "side": "sell",
-    "zkasAmount": 1000,
-    "totalKas": 32,
-    "priceKas": 0.032
-  },
-  {
-    "timestamp": 1788394440000,
-    "side": "sell",
-    "zkasAmount": 500,
-    "totalKas": 16,
-    "priceKas": 0.032
-  }
-];
-
 
 function first(record, keys) {
   for (const key of keys) {
@@ -158,11 +78,6 @@ async function handleGet({ request, env, waitUntil }) {
   if (!endpoint) {
     if (env.OTC_TRADES) {
       const stored = await env.OTC_TRADES.get('trades:v1', 'json');
-      if (Array.isArray(stored?.trades) && stored.trades.length === 453) {
-        stored.trades = [...stored.trades, ...reviewedSep2EveningTrades];
-        stored.updatedAt = Date.now();
-        await env.OTC_TRADES.put('trades:v1', JSON.stringify(stored));
-      }
       const trades = Array.isArray(stored?.trades) ? stored.trades.map(normalizeTrade).filter(Boolean).slice(-5000) : [];
       if (trades.length) {
         return json({ schemaVersion: 1, status: 'live', source: 'screenshot-import', updatedAt: stored.updatedAt || updatedAt, trades }, 200, 'public, max-age=10, s-maxage=30, stale-while-revalidate=120');
