@@ -387,15 +387,22 @@ footer { width: min(1320px, calc(100% - 40px)); margin: 0 auto; padding: 22px 0 
 .feature-panel { margin-top: 18px; }
 .feature-panel .panel-head { align-items: flex-start; }
 .feature-intro { max-width: 860px; margin: 0 0 14px; color: var(--muted); font-size: 12px; line-height: 1.6; }
-.feature-facts, .key-grid, .ecosystem-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 11px; }
-.feature-facts > div, .key-grid > div, .ecosystem-grid > a, .proof-grid > div, .roadmap-grid > div { min-width: 0; padding: 15px; border: 1px solid var(--border); border-radius: 11px; background: var(--surface-2); }
+.feature-facts, .key-grid, .ecosystem-grid, .get-started-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 11px; }
+.feature-facts > div, .key-grid > div, .ecosystem-grid > a, .get-started-grid > a, .proof-grid > div, .roadmap-grid > div { min-width: 0; padding: 15px; border: 1px solid var(--border); border-radius: 11px; background: var(--surface-2); }
 .feature-facts span, .key-grid span, .proof-grid > div > span { display: block; color: var(--accent); font-size: 9px; font-weight: 900; letter-spacing: 1px; text-transform: uppercase; }
-.feature-facts b, .key-grid b, .ecosystem-grid b, .proof-grid b, .roadmap-grid b { display: block; margin-top: 7px; font-size: 14px; line-height: 1.3; }
-.feature-facts small, .key-grid small, .ecosystem-grid small, .proof-grid small { display: block; margin-top: 6px; color: var(--muted); font-size: 10px; line-height: 1.5; }
+.feature-facts b, .key-grid b, .ecosystem-grid b, .get-started-grid b, .proof-grid b, .roadmap-grid b { display: block; margin-top: 7px; font-size: 14px; line-height: 1.3; }
+.feature-facts small, .key-grid small, .ecosystem-grid small, .get-started-grid small, .proof-grid small { display: block; margin-top: 6px; color: var(--muted); font-size: 10px; line-height: 1.5; }
 .proof-grid, .roadmap-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 11px; }
 .proof-grid code { padding: 1px 4px; border-radius: 4px; background: var(--surface-3); color: var(--text); font-size: .95em; }
-.ecosystem-grid > a { color: inherit; text-decoration: none; transition: border-color .16s ease, transform .16s ease; }
-.ecosystem-grid > a:hover { border-color: color-mix(in srgb, var(--accent) 45%, var(--border)); transform: translateY(-1px); }
+.ecosystem-grid > a, .get-started-grid > a { color: inherit; text-decoration: none; transition: border-color .16s ease, transform .16s ease; }
+.ecosystem-grid > a:hover, .get-started-grid > a:hover { border-color: color-mix(in srgb, var(--accent) 45%, var(--border)); transform: translateY(-1px); }
+.get-started-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.tokenomics-timeline { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 0; margin-top: 2px; }
+.tokenomics-timeline > div { position: relative; min-width: 0; padding: 25px 14px 15px; border-top: 2px solid color-mix(in srgb, var(--accent) 46%, var(--border)); }
+.tokenomics-timeline > div::before { position: absolute; top: -6px; left: 14px; width: 10px; height: 10px; border-radius: 50%; background: var(--accent); content: ''; box-shadow: 0 0 0 4px var(--accent-soft); }
+.tokenomics-timeline span { display: block; color: var(--accent); font-size: 9px; font-weight: 900; letter-spacing: .8px; text-transform: uppercase; }
+.tokenomics-timeline b { display: block; margin-top: 7px; font-size: 14px; line-height: 1.3; }
+.tokenomics-timeline small { display: block; margin-top: 5px; color: var(--muted); font-size: 10px; line-height: 1.45; }
 .status-badge { display: inline-flex; width: fit-content; padding: 5px 7px; border-radius: 999px; font-size: 8px; font-weight: 900; letter-spacing: .8px; }
 .status-badge.live { color: var(--accent); background: var(--accent-soft); }
 .status-badge.preview { color: #9a671b; background: color-mix(in srgb, #f2c94c 24%, var(--surface)); }
@@ -405,7 +412,8 @@ footer { width: min(1320px, calc(100% - 40px)); margin: 0 auto; padding: 22px 0 
 @media (max-width: 1050px) {
   .intel-hero-grid { grid-template-columns: 1fr; }
   .intel-stat-row { grid-template-columns: repeat(2, 1fr); }
-  .feature-facts, .key-grid, .ecosystem-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .feature-facts, .key-grid, .ecosystem-grid, .get-started-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .tokenomics-timeline { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 13px 0; }
 }
 
 @media (max-width: 720px) {
@@ -419,7 +427,8 @@ footer { width: min(1320px, calc(100% - 40px)); margin: 0 auto; padding: 22px 0 
   .intel-stat-row { grid-template-columns: 1fr 1fr; }
   .intelligence-merge .chain { width: 120px; }
   .intel-stat-row b { font-size: 15px; }
-  .feature-facts, .key-grid, .ecosystem-grid, .proof-grid, .roadmap-grid { grid-template-columns: 1fr; }
+  .feature-facts, .key-grid, .ecosystem-grid, .get-started-grid, .proof-grid, .roadmap-grid { grid-template-columns: 1fr; }
+  .tokenomics-timeline { grid-template-columns: 1fr; }
   .feature-panel .panel-head { flex-direction: column; }
   .feature-panel .secondary-link { width: 100%; }
 }

@@ -1822,14 +1822,32 @@ function ReferencePage({ data, txs, onSelect }: { data: DashboardData; txs: Arra
 
       <section className="panel feature-panel">
         <div className="panel-head">
-          <div><span className="panel-icon"><Link2 size={20} /></span><h2>Wallets & ecosystem</h2></div>
+          <div><span className="panel-icon"><TimerReset size={20} /></span><h2>ZKAS tokenomics timeline</h2></div>
+          <a className="secondary-link" href="https://zkas.info/whitepaper.html" target="_blank" rel="noreferrer">Verify in whitepaper ↗</a>
+        </div>
+        <p className="feature-intro">ZKAS launched with a front-loaded proof-of-work schedule. The block reward halves every three months until it reaches a two-step permanent tail.</p>
+        <div className="tokenomics-timeline">
+          <div><span>Launch</span><b>60 ZKAS / block</b><small>57 to the miner · 3 to development</small></div>
+          <div><span>Month 3</span><b>30 ZKAS / block</b><small>First three-month halving</small></div>
+          <div><span>Month 6</span><b>15 ZKAS / block</b><small>Second three-month halving</small></div>
+          <div><span>About month 10</span><b>6 ZKAS / block</b><small>First tail-emission floor begins</small></div>
+          <div><span>Month 24 onward</span><b>0.6 ZKAS / block</b><small>Permanent tail · about 18.9M ZKAS yearly</small></div>
+        </div>
+        <p className="source-note"><ShieldCheck size={15} /> ZKAS has no fixed maximum supply. The permanent tail emission is designed to continue funding proof-of-work security.</p>
+      </section>
+
+      <section className="panel feature-panel">
+        <div className="panel-head">
+          <div><span className="panel-icon"><Link2 size={20} /></span><h2>Get started with ZKAS</h2></div>
           <a className="secondary-link" href="https://services.zkas.info" target="_blank" rel="noreferrer">All official services ↗</a>
         </div>
-        <div className="ecosystem-grid">
-          <a href="https://services.zkas.info/?filter=store" target="_blank" rel="noreferrer"><span className="status-badge live">AVAILABLE</span><b>Light & paper wallets</b><small>Self-custody options for everyday use and offline storage.</small></a>
-          <a href="https://wallet.zkas.info" target="_blank" rel="noreferrer"><span className="status-badge live">LIVE</span><b>Web wallet</b><small>Convenient browser access; local self-custody offers stronger protection.</small></a>
-          <a href="https://github.com/firecash/zkas-rusty" target="_blank" rel="noreferrer"><span className="status-badge live">LIVE</span><b>CLI & core source</b><small>Run the official node and self-hosted wallet tools.</small></a>
-          <a href="https://services.zkas.info" target="_blank" rel="noreferrer"><span className="status-badge preview">PREVIEW</span><b>Developer services</b><small>The SDK is in developer preview; the payment gateway is in testing.</small></a>
+        <div className="get-started-grid">
+          <a href="https://github.com/firecash/zkas-wallet/releases" target="_blank" rel="noreferrer"><span className="status-badge live">OFFICIAL DOWNLOAD</span><b>ZKAS Wallet</b><small>Download the current self-custody wallet release from the official repository.</small></a>
+          <a href="https://zkas.info/paper-wallet.html" target="_blank" rel="noreferrer"><span className="status-badge live">OFFLINE OPTION</span><b>Paper Wallet</b><small>Generate a shielded address and seed locally for offline storage.</small></a>
+          <a href="https://services.zkas.info" target="_blank" rel="noreferrer"><span className="status-badge live">LIVE OPTIONS</span><b>Mining Pools</b><small>Compare the official directory of ZKAS-compatible pools and payout options.</small></a>
+          <a href="https://github.com/firecash/zkas-rusty#run-a-node" target="_blank" rel="noreferrer"><span className="status-badge live">SELF-HOSTED</span><b>Node & Solo Mining</b><small>Use the official node, wallet-daemon and solo-mining instructions.</small></a>
+          <a href="https://services.zkas.info" target="_blank" rel="noreferrer"><span className="status-badge preview">PREVIEW / TESTING</span><b>Developer Tools</b><small>Find the ZKAS SDK and the payment-gateway project with their current status.</small></a>
+          <a href="https://zkas.info/legal/zkas-legal-position-draft-v2.pdf" target="_blank" rel="noreferrer"><span className="status-badge roadmap">DRAFT V2</span><b>Legal Position Memorandum</b><small>Read the project’s August 29, 2026 draft—not final legal advice.</small></a>
         </div>
       </section>
 
