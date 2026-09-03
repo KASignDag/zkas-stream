@@ -1018,6 +1018,19 @@ function IntelligenceHome({ data, txValues, pulseTimes, onReference, onVideos }:
         <MergedCountryBreakdown data={data} />
       </section>
 
+      <section className="panel feature-panel">
+        <div className="panel-head">
+          <div><span className="panel-icon"><ShieldCheck size={20} /></span><h2>Why ZKAS</h2></div>
+          <a className="secondary-link" href="https://zkas.info/whitepaper.html" target="_blank" rel="noreferrer">Official whitepaper ↗</a>
+        </div>
+        <div className="feature-facts">
+          <div><span>Privacy</span><b>Mandatory shielded payments</b><small>Orchard-based transfers are private by default.</small></div>
+          <div><span>Speed</span><b>~1 second target</b><small>Fast block production for practical payments.</small></div>
+          <div><span>Proof system</span><b>No trusted setup</b><small>Halo 2 removes the need for a trusted ceremony.</small></div>
+          <div><span>Security</span><b>Kaspa merged mining</b><small>The same kHeavyHash work can secure both networks.</small></div>
+        </div>
+      </section>
+
       <section className="panel latest-video-strip">
         <div className="latest-video-icon"><Play size={24} fill="currentColor" /></div>
         <div>
@@ -1765,6 +1778,21 @@ function SupplyPrivacyPage({ data, history, range, onRange }: { data: DashboardD
         <p className="source-note"><ShieldCheck size={15} /> No annualized inflation estimate is shown. Reward and reduction values come from the public ZKas consensus/explorer API.</p>
       </section>
 
+      <section className="panel feature-panel">
+        <div className="panel-head">
+          <div><span className="panel-icon"><LockKeyhole size={20} /></span><h2>Selective disclosure</h2></div>
+          <a className="secondary-link" href="https://zkas.info/whitepaper.html" target="_blank" rel="noreferrer">Privacy design ↗</a>
+        </div>
+        <p className="feature-intro">ZKAS keeps payments private by default while viewing keys allow an owner to reveal only the access needed for accounting, auditing or compliance.</p>
+        <div className="key-grid">
+          <div><span>Spending key</span><b>Controls funds</b><small>Keep private. This is the authority that can spend.</small></div>
+          <div><span>Full viewing key</span><b>Broad wallet visibility</b><small>Can disclose wallet activity without granting spend authority.</small></div>
+          <div><span>Incoming viewing key</span><b>Incoming visibility</b><small>Provides narrower access to received-payment information.</small></div>
+          <div><span>Outgoing viewing key</span><b>Outgoing visibility</b><small>Provides narrower access to sent-payment information.</small></div>
+        </div>
+        <p className="source-note"><ShieldCheck size={15} /> Viewing keys do not authorize spending, but they can reveal private financial information. Share them only intentionally.</p>
+      </section>
+
       <div className="reference-callout">
         <div><span className="eyebrow">PRIVACY BOUNDARY</span><h2>What this page intentionally cannot show</h2><p>Top holders, richest wallets, wallet concentration and individual address balances are not inferred. The public explorer backend does not expose a transparent rich-list dataset for the shielded-by-default chain.</p></div>
       </div>
@@ -1780,6 +1808,43 @@ function ReferencePage({ data, txs, onSelect }: { data: DashboardData; txs: Arra
         <div><span className="eyebrow">SUPPORTING REFERENCE</span><h2>Chain information in one place</h2><p>Useful ZKas chain facts stay here for convenience. ZKAS.stream does not try to duplicate every explorer feature.</p></div>
         <a className="secondary-link" href="https://explorer.zkas.info" target="_blank" rel="noreferrer">Open official ZKas Explorer ↗</a>
       </div>
+
+      <section className="panel feature-panel">
+        <div className="panel-head">
+          <div><span className="panel-icon"><ShieldCheck size={20} /></span><h2>Fair-launch proof</h2></div>
+          <a className="secondary-link" href="https://zkas.info/whitepaper.html" target="_blank" rel="noreferrer">Verify in whitepaper ↗</a>
+        </div>
+        <div className="proof-grid">
+          <div><span>NO PREMINE</span><b>Genesis coinbase is provably unspendable</b><small>The nominal 1 ZKAS genesis output was sent to a one-byte <code>OP_FALSE</code> script, so it cannot be spent.</small></div>
+          <div><span>PUBLIC ANCHOR</span><b>Genesis anchored to Bitcoin</b><small>The genesis construction commits to Bitcoin block 959,713, providing a public timestamp reference.</small></div>
+        </div>
+      </section>
+
+      <section className="panel feature-panel">
+        <div className="panel-head">
+          <div><span className="panel-icon"><Link2 size={20} /></span><h2>Wallets & ecosystem</h2></div>
+          <a className="secondary-link" href="https://services.zkas.info" target="_blank" rel="noreferrer">All official services ↗</a>
+        </div>
+        <div className="ecosystem-grid">
+          <a href="https://services.zkas.info/?filter=store" target="_blank" rel="noreferrer"><span className="status-badge live">AVAILABLE</span><b>Light & paper wallets</b><small>Self-custody options for everyday use and offline storage.</small></a>
+          <a href="https://wallet.zkas.info" target="_blank" rel="noreferrer"><span className="status-badge live">LIVE</span><b>Web wallet</b><small>Convenient browser access; local self-custody offers stronger protection.</small></a>
+          <a href="https://github.com/firecash/zkas-rusty" target="_blank" rel="noreferrer"><span className="status-badge live">LIVE</span><b>CLI & core source</b><small>Run the official node and self-hosted wallet tools.</small></a>
+          <a href="https://services.zkas.info" target="_blank" rel="noreferrer"><span className="status-badge preview">PREVIEW</span><b>Developer services</b><small>The SDK is in developer preview; the payment gateway is in testing.</small></a>
+        </div>
+      </section>
+
+      <section className="panel feature-panel">
+        <div className="panel-head">
+          <div><span className="panel-icon"><Activity size={20} /></span><h2>Development & security status</h2></div>
+          <span className="range-chip">OFFICIAL ROADMAP</span>
+        </div>
+        <div className="roadmap-grid">
+          <div><span className="status-badge live">LIVE</span><b>Available today</b><ul><li>Mandatory Orchard shielded transfers</li><li>Native and Kaspa merged mining</li><li>Public explorer and wallet tools</li></ul></div>
+          <div><span className="status-badge roadmap">ROADMAP · NOT LIVE</span><b>Still in development</b><ul><li>Independent security audit</li><li>Expanded light-client infrastructure</li><li>Recursive verification and full-chain membership</li><li>Private programmability</li></ul></div>
+        </div>
+        <p className="source-note"><ShieldCheck size={15} /> Roadmap items are shown as future work, not as completed capabilities. Status follows the official whitepaper and services directory.</p>
+      </section>
+
       <div className="metric-grid nodes-metrics">
         {data.supply !== null && <MetricCard icon={<Coins size={19} />} label="Circulating" value={displayNumber(data.supply, true)} sub="ZKAS issued" />}
         {data.reward !== null && <MetricCard icon={<CircleDollarSign size={19} />} label="Gross emission" value={`${displayNumber(data.reward)} ZKAS`} sub="Per block" />}
