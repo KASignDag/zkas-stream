@@ -1,5 +1,15 @@
 const commonTradeArrays = ['trades', 'data', 'results', 'items', 'completedTrades', 'completed_trades'];
 
+// One-time, count-guarded recovery for the five reviewed Sep. 3 trades.
+// Remove after production storage reports 492 rows.
+const reviewedSep3AfternoonTrades = [
+  { timestamp: 1788463260000, side: 'buy', zkasAmount: 225000, priceKas: 0.02014666, totalKas: 4532.9985 },
+  { timestamp: 1788460320000, side: 'sell', zkasAmount: 36000, priceKas: 0.025, totalKas: 900 },
+  { timestamp: 1788460260000, side: 'sell', zkasAmount: 10000, priceKas: 0.025, totalKas: 250 },
+  { timestamp: 1788445800000, side: 'sell', zkasAmount: 90000, priceKas: 0.025, totalKas: 2250 },
+  { timestamp: 1788445740000, side: 'sell', zkasAmount: 100000, priceKas: 0.024, totalKas: 2400 },
+];
+
 function first(record, keys) {
   for (const key of keys) {
     if (record[key] !== undefined && record[key] !== null && record[key] !== '') return record[key];
@@ -77,7 +87,11 @@ async function handleGet({ request, env, waitUntil }) {
   const endpoint = env.ZKAS_OTC_API_URL;
   if (!endpoint) {
     if (env.OTC_TRADES) {
-      const stored = await env.OTC_TRADES.get('trades:v1', 'json');
+      let stored = await env.OTC_TRADES.get('trades:v1', 'json');
+      if (Array.isArray(stored?.trades) && stored.trades.length === 487) {
+        stored = { schemaVersion: 1, updatedAt, trades: [...stored.trades, ...reviewedSep3AfternoonTrades] };
+        await env.OTC_TRADES.put('trades:v1', JSON.stringify(stored));
+      }
       const trades = Array.isArray(stored?.trades) ? stored.trades.map(normalizeTrade).filter(Boolean).slice(-5000) : [];
       if (trades.length) {
         return json({ schemaVersion: 1, status: 'live', source: 'screenshot-import', updatedAt: stored.updatedAt || updatedAt, trades }, 200, 'public, max-age=10, s-maxage=30, stale-while-revalidate=120');
