@@ -18,6 +18,7 @@ import {
   MessageCircle,
   Moon,
   Network,
+  Play,
   Search,
   Send,
   Server,
@@ -43,8 +44,9 @@ import { MetricCard } from './components/MetricCard';
 import { OtcMarketPage } from './components/OtcMarketPage';
 import { OtcScreenshotImporter } from './components/OtcScreenshotImporter';
 import { SparkChart } from './components/SparkChart';
+import { VideosPage } from './components/VideosPage';
 
-type Tab = 'intelligence' | 'merged' | 'health' | 'nodes' | 'events' | 'otc' | 'importer' | 'history' | 'supply' | 'reference';
+type Tab = 'intelligence' | 'merged' | 'health' | 'nodes' | 'events' | 'otc' | 'importer' | 'history' | 'supply' | 'reference' | 'videos';
 
 const tabHashes: Record<Tab, string> = {
   intelligence: '',
@@ -57,6 +59,7 @@ const tabHashes: Record<Tab, string> = {
   history: 'history',
   supply: 'supply-privacy',
   reference: 'reference',
+  videos: 'videos',
 };
 
 function tabFromHash(hash: string): Tab {
@@ -567,6 +570,7 @@ const heroTitles: Record<Tab, string> = {
   history: 'Historical intelligence',
   supply: 'Supply & privacy intelligence',
   reference: 'ZKas quick reference',
+  videos: 'ZKAS videos',
 };
 
 const heroDescriptions: Record<Tab, string> = {
@@ -580,6 +584,7 @@ const heroDescriptions: Record<Tab, string> = {
   history: 'Chain-derived work history and observer history, kept separate so unavailable historical data is never invented.',
   supply: 'Consensus supply, emission and aggregate shielded-activity intelligence without exposing individual holders.',
   reference: 'Convenient public chain information and links to the official ZKas explorer.',
+  videos: 'Short videos about ZKAS speed, privacy and the network, collected in one growing library.',
 };
 
 function App() {
@@ -732,6 +737,7 @@ function App() {
     ['history', 'History'],
     ['supply', 'Supply & Privacy'],
     ['reference', 'Reference'],
+    ['videos', 'Videos'],
   ];
 
   return (
@@ -787,14 +793,14 @@ function App() {
                 </div>
               </details>
             </div>
-            {tab !== 'otc' && tab !== 'importer' && <div className="sync-box">
+            {tab !== 'otc' && tab !== 'importer' && tab !== 'videos' && <div className="sync-box">
               <span>Network</span><b>{data.network}</b>
               <span>Updated</span><b>{new Date(data.updatedAt).toLocaleTimeString()}</b>
             </div>}
           </div>
         </section>
 
-        {tab !== 'otc' && tab !== 'importer' && <>
+        {tab !== 'otc' && tab !== 'importer' && tab !== 'videos' && <>
           <form className="searchbar" onSubmit={onSearch}>
             <Search size={21} />
             <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search public block hash or transaction ID" aria-label="Search public block hash or transaction ID" />
@@ -802,11 +808,11 @@ function App() {
           </form>
           {searchError && <div className="inline-error">{searchError}</div>}
         </>}
-        {tab !== 'otc' && tab !== 'importer' && status === 'stale' && <div className="demo-banner"><b>Live refresh delayed.</b> Showing the last good public mainnet snapshot while the API retries. {error && <span>{error}</span>}</div>}
-        {tab !== 'otc' && tab !== 'importer' && status === 'connecting' && <div className="demo-banner"><b>Connecting to ZKas mainnet.</b> Waiting for the first public API snapshot. {error && <span>{error}</span>}</div>}
+        {tab !== 'otc' && tab !== 'importer' && tab !== 'videos' && status === 'stale' && <div className="demo-banner"><b>Live refresh delayed.</b> Showing the last good public mainnet snapshot while the API retries. {error && <span>{error}</span>}</div>}
+        {tab !== 'otc' && tab !== 'importer' && tab !== 'videos' && status === 'connecting' && <div className="demo-banner"><b>Connecting to ZKas mainnet.</b> Waiting for the first public API snapshot. {error && <span>{error}</span>}</div>}
 
         {tab === 'intelligence' && (
-          <IntelligenceHome data={data} txValues={txValues} pulseTimes={pulseTimes} onReference={() => navigateToTab('reference')} />
+          <IntelligenceHome data={data} txValues={txValues} pulseTimes={pulseTimes} onReference={() => navigateToTab('reference')} onVideos={() => navigateToTab('videos')} />
         )}
 
         {tab === 'merged' && <MergedIntelligencePage data={data} />}
@@ -818,6 +824,7 @@ function App() {
         {tab === 'history' && <HistoryPage data={data} history={history} range={historyRange} onRange={setHistoryRange} />}
         {tab === 'supply' && <SupplyPrivacyPage data={data} history={history} range={historyRange} onRange={setHistoryRange} />}
         {tab === 'reference' && <ReferencePage data={data} txs={txs} onSelect={(value) => void doSearch(value)} />}
+        {tab === 'videos' && <VideosPage />}
       </main>
 
       <footer>
@@ -906,7 +913,7 @@ function attributionLabel(group: AttributionGroup, index: number) {
   return `${country} · Source ${index + 1}`;
 }
 
-function IntelligenceHome({ data, txValues, pulseTimes, onReference }: { data: DashboardData; txValues: Array<number | null>; pulseTimes: number[]; onReference: () => void }) {
+function IntelligenceHome({ data, txValues, pulseTimes, onReference, onVideos }: { data: DashboardData; txValues: Array<number | null>; pulseTimes: number[]; onReference: () => void; onVideos: () => void }) {
   const groups = attributionGroups(data);
   const attributedBlocks = data.merged.attributionMatched ?? (groups.reduce((sum, g) => sum + g.blocks, 0) || null);
   const weightedConfidence = weightedAttributionConfidence(groups);
@@ -978,6 +985,16 @@ function IntelligenceHome({ data, txValues, pulseTimes, onReference }: { data: D
       <section className="two-col intel-charts">
         <div className="panel"><div className="panel-head"><div><span className="panel-icon"><Waves size={20} /></span><h2>Transaction activity</h2></div><span className="range-chip">15M</span></div><SparkChart values={txValues} labels={pulseTimes} /></div>
         <MergedCountryBreakdown data={data} />
+      </section>
+
+      <section className="panel latest-video-strip">
+        <div className="latest-video-icon"><Play size={24} fill="currentColor" /></div>
+        <div>
+          <span className="eyebrow">LATEST ZKAS VIDEO · 15 SEC</span>
+          <h2>Private by default. Built for speed.</h2>
+          <p>Watch the new ZKAS speed and privacy comparison, then find future releases in the video library.</p>
+        </div>
+        <button className="primary-link" onClick={onVideos}>Watch video →</button>
       </section>
 
       <section className="panel reference-strip">
