@@ -26,6 +26,7 @@ import {
   Sun,
   TimerReset,
   TrendingUp,
+  UsersRound,
   Waves,
   X,
   Zap,
@@ -830,6 +831,7 @@ function App() {
       <footer>
         <div className="footer-brand"><ShieldCheck size={17} /> ZKAS Stream <span>v0.8.0</span></div>
         <div>Merged-mining, network & OTC intelligence • Public display • Private API credentials remain server-side</div>
+        <VisitorCounter />
         <div className="footer-socials">
           <a className="footer-social" href="https://x.com/zkas_x" target="_blank" rel="noreferrer"><span className="x-mark" aria-hidden="true">X</span> Follow @zkas_x</a>
           <a className="footer-social" href="https://discord.gg/kJCYVtGEe" target="_blank" rel="noreferrer"><MessageCircle size={15} /> Join ZKAS Discord</a>
@@ -838,6 +840,35 @@ function App() {
       </footer>
 
       {detail && <DetailDrawer detail={detail} onClose={() => setDetail(null)} />}
+    </div>
+  );
+}
+
+function VisitorCounter() {
+  const [visitors, setVisitors] = useState<number | null>(null);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    fetch('https://counterapi.com/api/zkas.stream/view/site-visitors?unique=true', {
+      signal: controller.signal,
+    })
+      .then((response) => {
+        if (!response.ok) throw new Error('Visitor counter unavailable');
+        return response.json() as Promise<{ value?: number }>;
+      })
+      .then((result) => {
+        if (Number.isFinite(result.value)) setVisitors(result.value ?? null);
+      })
+      .catch(() => undefined);
+
+    return () => controller.abort();
+  }, []);
+
+  return (
+    <div className="desktop-visitor-count" title="Unique visitors counted since September 2026">
+      <UsersRound size={15} />
+      <span>Visitors</span>
+      <b>{visitors === null ? '—' : visitors.toLocaleString()}</b>
     </div>
   );
 }
