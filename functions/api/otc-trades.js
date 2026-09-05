@@ -1,5 +1,30 @@
 const commonTradeArrays = ['trades', 'data', 'results', 'items', 'completedTrades', 'completed_trades'];
 
+// One-time, count-guarded recovery for the 19 new reviewed Sep. 4 evening trades.
+// Five older rows in the supplied screenshots already exist in storage.
+// Remove after production storage reports 530 rows.
+const reviewedSep4EveningTrades = [
+  { timestamp: 1788561600000, side: 'buy', zkasAmount: 81754, priceKas: 0.0193786, totalKas: 1584.2780644 },
+  { timestamp: 1788561540000, side: 'buy', zkasAmount: 200000, priceKas: 0.0193786, totalKas: 3875.72 },
+  { timestamp: 1788557880000, side: 'buy', zkasAmount: 180000, priceKas: 0.01111111, totalKas: 1999.9998 },
+  { timestamp: 1788557820000, side: 'buy', zkasAmount: 12500, priceKas: 0.01147142, totalKas: 143.39275 },
+  { timestamp: 1788557760000, side: 'buy', zkasAmount: 27500, priceKas: 0.01147142, totalKas: 315.46405 },
+  { timestamp: 1788557700000, side: 'buy', zkasAmount: 3000, priceKas: 0.01333333, totalKas: 39.99999 },
+  { timestamp: 1788557640000, side: 'buy', zkasAmount: 100000, priceKas: 0.01147142, totalKas: 1147.142 },
+  { timestamp: 1788557580000, side: 'buy', zkasAmount: 50000, priceKas: 0.012, totalKas: 600 },
+  { timestamp: 1788557520000, side: 'buy', zkasAmount: 244500, priceKas: 0.01270347, totalKas: 3105.998415 },
+  { timestamp: 1788557460000, side: 'buy', zkasAmount: 75000, priceKas: 0.01346666, totalKas: 1009.9995 },
+  { timestamp: 1788557400000, side: 'buy', zkasAmount: 60000, priceKas: 0.01351358, totalKas: 810.8148 },
+  { timestamp: 1788557340000, side: 'buy', zkasAmount: 165, priceKas: 0.01769352, totalKas: 2.9194308 },
+  { timestamp: 1788553680000, side: 'buy', zkasAmount: 14000, priceKas: 0.01351358, totalKas: 189.19012 },
+  { timestamp: 1788553620000, side: 'sell', zkasAmount: 20000, priceKas: 0.0325, totalKas: 650 },
+  { timestamp: 1788553560000, side: 'sell', zkasAmount: 14000, priceKas: 0.02271429, totalKas: 318.00006 },
+  { timestamp: 1788549900000, side: 'buy', zkasAmount: 3000, priceKas: 0.01769352, totalKas: 53.08056 },
+  { timestamp: 1788546240000, side: 'sell', zkasAmount: 100, priceKas: 0.02251909, totalKas: 2.251909 },
+  { timestamp: 1788538980000, side: 'buy', zkasAmount: 12500, priceKas: 0.016, totalKas: 200 },
+  { timestamp: 1788535320000, side: 'buy', zkasAmount: 62000, priceKas: 0.01612911, totalKas: 1000.00482 },
+];
+
 function first(record, keys) {
   for (const key of keys) {
     if (record[key] !== undefined && record[key] !== null && record[key] !== '') return record[key];
@@ -77,7 +102,11 @@ async function handleGet({ request, env, waitUntil }) {
   const endpoint = env.ZKAS_OTC_API_URL;
   if (!endpoint) {
     if (env.OTC_TRADES) {
-      const stored = await env.OTC_TRADES.get('trades:v1', 'json');
+      let stored = await env.OTC_TRADES.get('trades:v1', 'json');
+      if (Array.isArray(stored?.trades) && stored.trades.length === 511) {
+        stored = { schemaVersion: 1, updatedAt, trades: [...stored.trades, ...reviewedSep4EveningTrades] };
+        await env.OTC_TRADES.put('trades:v1', JSON.stringify(stored));
+      }
       const trades = Array.isArray(stored?.trades) ? stored.trades.map(normalizeTrade).filter(Boolean).slice(-5000) : [];
       if (trades.length) {
         return json({ schemaVersion: 1, status: 'live', source: 'screenshot-import', updatedAt: stored.updatedAt || updatedAt, trades }, 200, 'public, max-age=10, s-maxage=30, stale-while-revalidate=120');
