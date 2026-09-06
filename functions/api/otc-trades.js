@@ -1,22 +1,5 @@
 const commonTradeArrays = ['trades', 'data', 'results', 'items', 'completedTrades', 'completed_trades'];
 
-// One-time, count-guarded import for 9 reviewed Sep. 6 trades newer than the
-// already-stored 30,875 ZKAS trade. The Discord desk reports 717 total rows,
-// including 11 historical test/outlier rows intentionally excluded here, so
-// the expected public total after this migration is 706. Remove after the
-// production KV confirms the new total.
-const reviewedSep6LateAfternoonTrades = [
-  { timestamp: Date.parse('2026-09-06T18:45:00Z'), side: 'sell', zkasAmount: 51063, totalKas: 2833.9965 },
-  { timestamp: Date.parse('2026-09-06T18:38:00Z'), side: 'buy', zkasAmount: 70000, totalKas: 2800 },
-  { timestamp: Date.parse('2026-09-06T18:35:00Z'), side: 'buy', zkasAmount: 140000, totalKas: 5609.9988 },
-  { timestamp: Date.parse('2026-09-06T18:34:00Z'), side: 'sell', zkasAmount: 100000, totalKas: 5650 },
-  { timestamp: Date.parse('2026-09-06T18:33:00Z'), side: 'sell', zkasAmount: 144137, totalKas: 8432.0145 },
-  { timestamp: Date.parse('2026-09-06T18:19:00Z'), side: 'sell', zkasAmount: 31325, totalKas: 1826.181091 },
-  { timestamp: Date.parse('2026-09-06T18:10:00Z'), side: 'sell', zkasAmount: 40000, totalKas: 2340 },
-  { timestamp: Date.parse('2026-09-06T18:06:00Z'), side: 'sell', zkasAmount: 3400, totalKas: 952 },
-  { timestamp: Date.parse('2026-09-06T17:54:00Z'), side: 'sell', zkasAmount: 31800, totalKas: 1853.872584 },
-].map((trade) => ({ ...trade, priceKas: trade.totalKas / trade.zkasAmount }));
-
 function first(record, keys) {
   for (const key of keys) {
     if (record[key] !== undefined && record[key] !== null && record[key] !== '') return record[key];
@@ -94,12 +77,7 @@ async function handleGet({ request, env, waitUntil }) {
   const endpoint = env.ZKAS_OTC_API_URL;
   if (!endpoint) {
     if (env.OTC_TRADES) {
-      let stored = await env.OTC_TRADES.get('trades:v1', 'json');
-      if (Array.isArray(stored?.trades) && stored.trades.length === 697) {
-        const trades = [...stored.trades, ...reviewedSep6LateAfternoonTrades].sort((a, b) => a.timestamp - b.timestamp);
-        stored = { schemaVersion: 1, updatedAt, trades };
-        await env.OTC_TRADES.put('trades:v1', JSON.stringify(stored));
-      }
+      const stored = await env.OTC_TRADES.get('trades:v1', 'json');
       const trades = Array.isArray(stored?.trades) ? stored.trades.map(normalizeTrade).filter(Boolean).slice(-5000) : [];
       if (trades.length) {
         return json({ schemaVersion: 1, status: 'live', source: 'screenshot-import', updatedAt: stored.updatedAt || updatedAt, trades }, 200, 'public, max-age=10, s-maxage=30, stale-while-revalidate=120');
