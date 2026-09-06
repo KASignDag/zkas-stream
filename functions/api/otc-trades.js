@@ -1,5 +1,31 @@
 const commonTradeArrays = ['trades', 'data', 'results', 'items', 'completedTrades', 'completed_trades'];
 
+// One-time, count-guarded import for 18 reviewed Sep. 6 trades newer than the
+// already-stored 3,500 ZKAS trade. The Discord desk reports 708 total rows,
+// including 11 historical test/outlier rows intentionally excluded here, so
+// the expected public total after this migration is 697. Remove after the
+// production KV confirms the new total.
+const reviewedSep6AfternoonTrades = [
+  { timestamp: Date.parse('2026-09-06T17:36:00Z'), side: 'sell', zkasAmount: 30875, totalKas: 1799.947045 },
+  { timestamp: Date.parse('2026-09-06T16:25:00Z'), side: 'sell', zkasAmount: 15863, totalKas: 927.9855 },
+  { timestamp: Date.parse('2026-09-06T15:25:00Z'), side: 'sell', zkasAmount: 9050, totalKas: 533.95 },
+  { timestamp: Date.parse('2026-09-06T15:24:00Z'), side: 'sell', zkasAmount: 100, totalKas: 5.9 },
+  { timestamp: Date.parse('2026-09-06T15:23:00Z'), side: 'sell', zkasAmount: 300, totalKas: 17.7 },
+  { timestamp: Date.parse('2026-09-06T15:22:00Z'), side: 'sell', zkasAmount: 3000, totalKas: 177 },
+  { timestamp: Date.parse('2026-09-06T15:21:00Z'), side: 'sell', zkasAmount: 5000, totalKas: 295 },
+  { timestamp: Date.parse('2026-09-06T15:20:00Z'), side: 'sell', zkasAmount: 1000, totalKas: 59 },
+  { timestamp: Date.parse('2026-09-06T14:25:00Z'), side: 'sell', zkasAmount: 52000, totalKas: 3068 },
+  { timestamp: Date.parse('2026-09-06T14:24:00Z'), side: 'sell', zkasAmount: 550, totalKas: 32.45 },
+  { timestamp: Date.parse('2026-09-06T14:23:00Z'), side: 'sell', zkasAmount: 29000, totalKas: 1711 },
+  { timestamp: Date.parse('2026-09-06T14:22:00Z'), side: 'sell', zkasAmount: 52511, totalKas: 2660.55750837 },
+  { timestamp: Date.parse('2026-09-06T14:21:00Z'), side: 'sell', zkasAmount: 245862, totalKas: 12091.57429446 },
+  { timestamp: Date.parse('2026-09-06T13:25:00Z'), side: 'sell', zkasAmount: 100000, totalKas: 5000 },
+  { timestamp: Date.parse('2026-09-06T13:24:00Z'), side: 'sell', zkasAmount: 1000, totalKas: 49.18033 },
+  { timestamp: Date.parse('2026-09-06T13:23:00Z'), side: 'sell', zkasAmount: 38200, totalKas: 1878.688606 },
+  { timestamp: Date.parse('2026-09-06T13:22:00Z'), side: 'sell', zkasAmount: 500, totalKas: 24.590165 },
+  { timestamp: Date.parse('2026-09-06T12:25:00Z'), side: 'sell', zkasAmount: 19438, totalKas: 955.96725454 },
+].map((trade) => ({ ...trade, priceKas: trade.totalKas / trade.zkasAmount }));
+
 function first(record, keys) {
   for (const key of keys) {
     if (record[key] !== undefined && record[key] !== null && record[key] !== '') return record[key];
@@ -77,7 +103,12 @@ async function handleGet({ request, env, waitUntil }) {
   const endpoint = env.ZKAS_OTC_API_URL;
   if (!endpoint) {
     if (env.OTC_TRADES) {
-      const stored = await env.OTC_TRADES.get('trades:v1', 'json');
+      let stored = await env.OTC_TRADES.get('trades:v1', 'json');
+      if (Array.isArray(stored?.trades) && stored.trades.length === 679) {
+        const trades = [...stored.trades, ...reviewedSep6AfternoonTrades].sort((a, b) => a.timestamp - b.timestamp);
+        stored = { schemaVersion: 1, updatedAt, trades };
+        await env.OTC_TRADES.put('trades:v1', JSON.stringify(stored));
+      }
       const trades = Array.isArray(stored?.trades) ? stored.trades.map(normalizeTrade).filter(Boolean).slice(-5000) : [];
       if (trades.length) {
         return json({ schemaVersion: 1, status: 'live', source: 'screenshot-import', updatedAt: stored.updatedAt || updatedAt, trades }, 200, 'public, max-age=10, s-maxage=30, stale-while-revalidate=120');
