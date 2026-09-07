@@ -17,6 +17,8 @@ import {
 
 const FUNDRAISER_WALLET = '0x08F7C6a1c064E2d8Abe46525e57911B3df02548F';
 const BLOCKSCOUT_API = `https://arbitrum.blockscout.com/api/v2/addresses/${FUNDRAISER_WALLET}/token-transfers`;
+const BLOCKSCOUT_BALANCES_API = `https://arbitrum.blockscout.com/api/v2/addresses/${FUNDRAISER_WALLET}/token-balances`;
+const BLOCKSCOUT_ADDRESS_API = `https://arbitrum.blockscout.com/api/v2/addresses/${FUNDRAISER_WALLET}`;
 const BLOCKSCOUT_WALLET_URL = `https://arbitrum.blockscout.com/address/${FUNDRAISER_WALLET}`;
 const SUPPORTERS_ACCESS_KEY = 'zkas-supporters-preview-access';
 const SUPPORTERS_PASSCODE_HASH = '36a71a5bca2513f92fc85544531b1605c3515ee5f6039882db0b17b05082652f';
@@ -41,6 +43,11 @@ type BlockscoutTransfer = {
 type TransferPage = {
   items?: BlockscoutTransfer[];
   next_page_params?: Record<string, string | number> | null;
+};
+type AddressBalance = { coin_balance?: string | null; exchange_rate?: string | null };
+type TokenBalance = {
+  value?: string | null;
+  token?: TokenRef & { exchange_rate?: string | null };
 };
 type FundTransfer = {
   id: string;
@@ -110,6 +117,29 @@ async function fetchFundTransfers(signal: AbortSignal): Promise<FundTransfer[]> 
   });
 }
 
+async function fetchWalletValue(signal: AbortSignal): Promise<number> {
+  const [addressResponse, tokenResponse] = await Promise.all([
+    fetch(BLOCKSCOUT_ADDRESS_API, { signal, headers: { accept: 'application/json' } }),
+    fetch(BLOCKSCOUT_BALANCES_API, { signal, headers: { accept: 'application/json' } }),
+  ]);
+  if (!addressResponse.ok || !tokenResponse.ok) throw new Error('Wallet balance feed unavailable');
+
+  const address = await addressResponse.json() as AddressBalance;
+  const tokenBalances = await tokenResponse.json() as TokenBalance[];
+  const nativeBalance = Number(address.coin_balance ?? 0) / 1e18;
+  const nativeValue = nativeBalance * Number(address.exchange_rate ?? 0);
+  const tokenValue = tokenBalances.reduce((sum, row) => {
+    const tokenAddress = row.token?.address_hash?.toLowerCase() ?? '';
+    if (!acceptedTokens[tokenAddress]) return sum;
+    const raw = Number(row.value ?? 0);
+    const decimals = Number(row.token?.decimals ?? 0);
+    const rate = Number(row.token?.exchange_rate ?? 0);
+    if (![raw, decimals, rate].every(Number.isFinite)) return sum;
+    return sum + ((raw / (10 ** decimals)) * rate);
+  }, 0);
+  return nativeValue + tokenValue;
+}
+
 function formatMoney(value: number) {
   return new Intl.NumberFormat('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(value);
 }
@@ -127,13 +157,19 @@ export function GenesisSupportersPage() {
   const [transfers, setTransfers] = useState<FundTransfer[]>([]);
   const [feedState, setFeedState] = useState<'loading' | 'live' | 'error'>('loading');
   const [updatedAt, setUpdatedAt] = useState<number | null>(null);
+  const [walletValue, setWalletValue] = useState<number | null>(null);
   const [copied, setCopied] = useState(false);
 
   const refresh = useCallback(async (signal?: AbortSignal) => {
     const ownController = signal ? null : new AbortController();
     try {
-      const next = await fetchFundTransfers(signal ?? ownController!.signal);
-      setTransfers(next);
+      const activeSignal = signal ?? ownController!.signal;
+      const [nextTransfers, nextWalletValue] = await Promise.all([
+        fetchFundTransfers(activeSignal),
+        fetchWalletValue(activeSignal),
+      ]);
+      setTransfers(nextTransfers);
+      setWalletValue(nextWalletValue);
       setUpdatedAt(Date.now());
       setFeedState('live');
     } catch (error) {
@@ -156,7 +192,7 @@ export function GenesisSupportersPage() {
   const totals = useMemo(() => {
     const deposits = transfers.filter((row) => row.direction === 'deposit').reduce((sum, row) => sum + row.amount, 0);
     const withdrawals = transfers.filter((row) => row.direction === 'withdrawal').reduce((sum, row) => sum + row.amount, 0);
-    return { deposits, withdrawals, balance: deposits - withdrawals };
+    return { deposits, withdrawals };
   }, [transfers]);
 
   async function copyWallet() {
@@ -183,6 +219,7 @@ export function GenesisSupportersPage() {
     setUnlocked(false);
     setFeedState('loading');
     setTransfers([]);
+    setWalletValue(null);
   }
 
   if (!unlocked) {
@@ -244,9 +281,9 @@ export function GenesisSupportersPage() {
           <small>Public outgoing transfers</small>
         </article>
         <article className="panel supporters-metric accent">
-          <span><WalletCards size={17} /> Wallet balance</span>
-          <b>{formatMoney(totals.balance)} USD</b>
-          <small>Token-transfer balance shown by this ledger</small>
+          <span><WalletCards size={17} /> Current wallet value</span>
+          <b>{walletValue === null ? '—' : `${formatMoney(walletValue)} USD`}</b>
+          <small>Live Arbitrum One value · USDC, USDT and ETH</small>
         </article>
         <article className="panel supporters-metric">
           <span><Trophy size={17} /> Genesis supporters</span>
