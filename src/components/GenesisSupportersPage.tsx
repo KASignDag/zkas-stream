@@ -257,9 +257,9 @@ export function GenesisSupportersPage() {
 
       <section className="supporters-primary-grid">
         <article className="panel donation-panel">
-          <div className="panel-head">
+          <div className="donation-network-banner"><ShieldCheck size={22} /><strong>ARBITRUM ONLY</strong></div>
+          <div className="panel-head donation-wallet-heading">
             <div><span className="panel-icon"><WalletCards size={20} /></span><h2>Community fund wallet</h2></div>
-            <span className="range-chip donation-network-chip"><ShieldCheck size={18} /> ARBITRUM ONLY</span>
           </div>
           <p className="donation-intro">Funds go directly to the wallet controlled by the ZKAS team. ZKAS.stream can read public activity but cannot move funds.</p>
           <div className="wallet-preview">
