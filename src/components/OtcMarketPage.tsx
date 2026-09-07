@@ -329,18 +329,20 @@ function OtcPriceChart({ trades, range, change, zkasUsd }: { trades: OtcTrade[];
     const container = scrollRef.current;
     if (!container) return;
     container.scrollLeft = container.scrollWidth - container.clientWidth;
-  }, [points.length]);
+  }, [points.length, range]);
 
   if (!points.length) {
     return <div className="otc-chart-empty"><TrendingUp size={30} /><b>Waiting for completed trades</b><span>The secure chart connection is built and ready for Ronnie’s API details.</span></div>;
   }
 
   const left = 84;
-  const right = 122;
+  const right = 108;
   const top = 24;
   const bottom = 52;
-  const pointGap = 9;
-  const width = Math.max(920, left + right + Math.max(1, points.length - 1) * pointGap);
+  const preferredPointGap = range === '4H' ? 24 : range === '6H' ? 18 : range === '1D' ? 13 : 9;
+  const minimumPlotWidth = 728;
+  const plotWidth = Math.max(minimumPlotWidth, Math.max(1, points.length - 1) * preferredPointGap);
+  const width = left + plotWidth + right;
   const height = 360;
   const values = points.map((point) => point.value);
   const rawMin = Math.min(...values);
@@ -348,6 +350,7 @@ function OtcPriceChart({ trades, range, change, zkasUsd }: { trades: OtcTrade[];
   const spread = rawMax - rawMin || Math.max(Math.abs(rawMax) * 0.08, 0.000001);
   const min = Math.max(0, rawMin - spread * 0.14);
   const max = rawMax + spread * 0.14;
+  const pointGap = points.length > 1 ? plotWidth / (points.length - 1) : 0;
   const xFor = (_point: typeof points[number], index: number) => left + index * pointGap;
   const yFor = (value: number) => top + ((max - value) / Math.max(max - min, Number.EPSILON)) * (height - top - bottom);
   const coordinates = points.map((point, index) => ({ ...point, x: xFor(point, index), y: yFor(point.value) }));
@@ -364,7 +367,7 @@ function OtcPriceChart({ trades, range, change, zkasUsd }: { trades: OtcTrade[];
     return { y: top + ratio * (height - top - bottom), value: max - ratio * (max - min) };
   });
   const xLabels = [coordinates[0], coordinates[Math.floor((coordinates.length - 1) / 2)], coordinates.at(-1)!];
-  const plotRight = width - right;
+  const plotRight = left + plotWidth;
   const dayGroups = coordinates.reduce<Array<{ key: string; start: number; end: number }>>((groups, point, index) => {
     if (point.trade.timestamp === null) return groups;
     const date = new Date(point.trade.timestamp);
@@ -418,8 +421,8 @@ function OtcPriceChart({ trades, range, change, zkasUsd }: { trades: OtcTrade[];
         {coloredSegments.map((segment, index) => (
           <line key={`trade-segment-${index}`} className={`otc-segment ${segment.direction}`} x1={segment.from.x} y1={segment.from.y} x2={segment.to.x} y2={segment.to.y} />
         ))}
-        <line className="otc-current-line" x1={left} x2={width - 18} y1={latest.y} y2={latest.y} />
-        <rect className="otc-current-tag" x={plotRight + 6} y={latest.y - 20} width={right - 8} height={40} rx="8" />
+        <line className="otc-current-line" x1={left} x2={width - 14} y1={latest.y} y2={latest.y} />
+        <rect className="otc-current-tag" x={plotRight + 6} y={latest.y - 20} width={right - 12} height={40} rx="8" />
         <text className="otc-current-label" x={plotRight + 14} y={latest.y - 5}>LAST TRADE</text>
         <text className="otc-current-text" x={plotRight + 14} y={latest.y + 10}>{latest.value.toLocaleString('en-US', { minimumFractionDigits: 6, maximumFractionDigits: 6 })}</text>
         {coordinates.map((point, index) => <circle key={`${point.trade.timestamp ?? 'undated'}-${index}`} className={`otc-point ${point.trade.side}`} cx={point.x} cy={point.y} r="4.5"><title>{`${dateText(point.trade.timestamp)} · ${priceText(point.value)}`}</title></circle>)}
