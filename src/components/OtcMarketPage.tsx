@@ -2,14 +2,14 @@ import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { Activity, CalendarDays, CircleDollarSign, Clock3, Coins, RefreshCw, TrendingUp, Trophy } from 'lucide-react';
 import { fetchKasUsd, fetchOtcTrades, type OtcTrade, type OtcTradeFeed } from '../otc';
 
-type Range = '1D' | '7D' | '14D' | '30D' | 'ALL';
+type Range = '4H' | '6H' | '1D' | '7D' | 'ALL';
 type TradeTableRange = '1D' | '3D' | '7D' | 'ALL';
 
 const rangeMs: Record<Exclude<Range, 'ALL'>, number> = {
+  '4H': 4 * 60 * 60 * 1000,
+  '6H': 6 * 60 * 60 * 1000,
   '1D': 24 * 60 * 60 * 1000,
   '7D': 7 * 24 * 60 * 60 * 1000,
-  '14D': 14 * 24 * 60 * 60 * 1000,
-  '30D': 30 * 24 * 60 * 60 * 1000,
 };
 
 const tradeTableRangeMs: Record<Exclude<TradeTableRange, 'ALL'>, number> = {
@@ -56,10 +56,10 @@ function dateText(timestamp: number | null) {
 }
 
 function rangeLabel(range: Range) {
+  if (range === '4H') return 'Past 4 hours';
+  if (range === '6H') return 'Past 6 hours';
   if (range === '1D') return 'Past 24 hours';
   if (range === '7D') return 'Past 7 days';
-  if (range === '14D') return 'Past 14 days';
-  if (range === '30D') return 'Past 30 days';
   return 'All recorded trades';
 }
 
@@ -88,7 +88,7 @@ export function OtcMarketPage({ circulatingSupply }: { circulatingSupply: number
   const [feed, setFeed] = useState<OtcTradeFeed | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
-  const [range, setRange] = useState<Range>('7D');
+  const [range, setRange] = useState<Range>('4H');
   const [tradeTableRange, setTradeTableRange] = useState<TradeTableRange>('1D');
   const [tradeTablePage, setTradeTablePage] = useState(0);
   const [kasUsd, setKasUsd] = useState<number | null>(null);
@@ -174,6 +174,7 @@ export function OtcMarketPage({ circulatingSupply }: { circulatingSupply: number
   const firstPrice = pricedTrades.length ? pricedTrades[0].priceKas : null;
   const lastPrice = pricedTrades.length ? pricedTrades[pricedTrades.length - 1].priceKas : null;
   const latestMarketPrice = allPricedTrades.length ? allPricedTrades[allPricedTrades.length - 1].priceKas : null;
+  const latestMarketUsd = latestMarketPrice !== null && kasUsd !== null ? latestMarketPrice * kasUsd : null;
   const change = changePercent(firstPrice, lastPrice);
   const zkasUsd = lastPrice !== null && kasUsd !== null ? lastPrice * kasUsd : null;
   const marketCapKas = latestMarketPrice !== null && circulatingSupply !== null ? latestMarketPrice * circulatingSupply : null;
@@ -212,6 +213,11 @@ export function OtcMarketPage({ circulatingSupply }: { circulatingSupply: number
         <span className="otc-refresh"><RefreshCw size={13} className={loading ? 'spinning' : ''} /> {refreshLabel}</span>
       </div>
 
+      <div className="otc-price-dock" aria-live="polite">
+        <div><span>ZKAS / KAS OTC</span><small>Completed-trade market</small></div>
+        <div className="otc-price-dock-value"><small>LAST TRADE</small><strong>{priceText(latestMarketPrice)}</strong>{usdPriceText(latestMarketUsd) && <em>≈ {usdPriceText(latestMarketUsd)}</em>}</div>
+      </div>
+
       <section className="otc-summary-grid">
         <OtcSummary icon={<TrendingUp size={18} />} label="Latest ZKAS price" value={priceText(lastPrice)} detail={usdPriceText(zkasUsd) ? `≈ ${usdPriceText(zkasUsd)} USD per ZKAS` : 'ZKAS/KAS · KAS per ZKAS'} />
         <OtcSummary icon={<Activity size={18} />} label={`${range} price change`} value={change === null ? '—' : `${change >= 0 ? '+' : ''}${change.toFixed(2)}%`} detail={rangeLabel(range)} tone={change === null ? undefined : change >= 0 ? 'positive' : 'negative'} />
@@ -228,7 +234,7 @@ export function OtcMarketPage({ circulatingSupply }: { circulatingSupply: number
             <p>Each point shows the price of one ZKAS, quoted in KAS.</p>
           </div>
           <div className="segmented" aria-label="OTC chart time range">
-            {(['1D', '7D', '14D', '30D', 'ALL'] as Range[]).map((item) => (
+            {(['4H', '6H', '1D', '7D', 'ALL'] as Range[]).map((item) => (
               <button key={item} className={range === item ? 'on' : ''} onClick={() => setRange(item)}>{item}</button>
             ))}
           </div>
@@ -329,8 +335,8 @@ function OtcPriceChart({ trades, range, change, zkasUsd }: { trades: OtcTrade[];
     return <div className="otc-chart-empty"><TrendingUp size={30} /><b>Waiting for completed trades</b><span>The secure chart connection is built and ready for Ronnie’s API details.</span></div>;
   }
 
-  const left = 76;
-  const right = 112;
+  const left = 84;
+  const right = 122;
   const top = 24;
   const bottom = 52;
   const pointGap = 9;
@@ -386,12 +392,18 @@ function OtcPriceChart({ trades, range, change, zkasUsd }: { trades: OtcTrade[];
       <div className="otc-chart-overview">
         <div>
           <strong>ZKAS / KAS</strong>
-          <span>{range === '1D' ? '24H' : range} &nbsp; {priceText(latest.value)} &nbsp; {usdPriceText(zkasUsd) ? `≈ ${usdPriceText(zkasUsd)}` : ''} &nbsp; {change === null ? '' : `${change >= 0 ? '+' : ''}${change.toFixed(1)}%`}</span>
+          <span>{range} &nbsp; {priceText(latest.value)} &nbsp; {usdPriceText(zkasUsd) ? `≈ ${usdPriceText(zkasUsd)}` : ''} &nbsp; {change === null ? '' : `${change >= 0 ? '+' : ''}${change.toFixed(1)}%`}</span>
         </div>
         <b>{amountFormat.format(points.length)} TRADES</b>
       </div>
-      <div className="otc-chart-wrap" ref={scrollRef}>
-        <svg className="otc-chart" style={{ width: `${width}px`, minWidth: `${width}px` }} viewBox={`0 0 ${width} ${height}`} role="img" aria-label="ZKAS KAS trading pair chart, quoted in KAS per ZKAS">
+      <div className="otc-chart-stage">
+        <div className="otc-chart-fixed-axis" aria-hidden="true">
+          <svg viewBox={`0 0 ${left} ${height}`}>
+            {grid.map((line) => <text key={line.y} className="otc-axis-label" x={left - 10} y={line.y + 4} textAnchor="end">{priceText(line.value)}</text>)}
+          </svg>
+        </div>
+        <div className="otc-chart-wrap" ref={scrollRef}>
+          <svg className="otc-chart" style={{ width: `${width}px`, minWidth: `${width}px` }} viewBox={`0 0 ${width} ${height}`} role="img" aria-label="ZKAS KAS trading pair chart, quoted in KAS per ZKAS">
         <defs>
           <linearGradient id="otc-area" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="currentColor" stopOpacity=".22" /><stop offset="100%" stopColor="currentColor" stopOpacity="0" /></linearGradient>
         </defs>
@@ -401,17 +413,19 @@ function OtcPriceChart({ trades, range, change, zkasUsd }: { trades: OtcTrade[];
         {dayBands.slice(1).map((day) => (
           <line key={`day-separator-${day.key}`} className="otc-day-separator" x1={day.startX} x2={day.startX} y1={top} y2={height - bottom} />
         ))}
-        {grid.map((line) => <g key={line.y}><line className="otc-grid" x1={left} x2={plotRight} y1={line.y} y2={line.y} /><text className="otc-axis-label" x={plotRight + 10} y={line.y + 4} textAnchor="start">{priceText(line.value)}</text></g>)}
+        {grid.map((line) => <line key={line.y} className="otc-grid" x1={left} x2={plotRight} y1={line.y} y2={line.y} />)}
         <path className="otc-area" d={areaPath} />
         {coloredSegments.map((segment, index) => (
           <line key={`trade-segment-${index}`} className={`otc-segment ${segment.direction}`} x1={segment.from.x} y1={segment.from.y} x2={segment.to.x} y2={segment.to.y} />
         ))}
         <line className="otc-current-line" x1={left} x2={width - 18} y1={latest.y} y2={latest.y} />
-        <rect className="otc-current-tag" x={plotRight + 6} y={latest.y - 16} width={right - 8} height={32} rx="8" />
-        <text className="otc-current-text" x={plotRight + 14} y={latest.y + 5}>{latest.value.toFixed(5)}</text>
+        <rect className="otc-current-tag" x={plotRight + 6} y={latest.y - 20} width={right - 8} height={40} rx="8" />
+        <text className="otc-current-label" x={plotRight + 14} y={latest.y - 5}>LAST TRADE</text>
+        <text className="otc-current-text" x={plotRight + 14} y={latest.y + 10}>{latest.value.toLocaleString('en-US', { minimumFractionDigits: 6, maximumFractionDigits: 6 })}</text>
         {coordinates.map((point, index) => <circle key={`${point.trade.timestamp ?? 'undated'}-${index}`} className={`otc-point ${point.trade.side}`} cx={point.x} cy={point.y} r="4.5"><title>{`${dateText(point.trade.timestamp)} · ${priceText(point.value)}`}</title></circle>)}
         {xLabels.map((point, index) => <text key={`${point.trade.timestamp ?? 'undated'}-${index}`} className="otc-axis-label" x={point.x} y={height - 18} textAnchor={index === 0 ? 'start' : index === 2 ? 'end' : 'middle'}>{point.trade.timestamp === null ? `Trade ${index + 1}` : new Date(point.trade.timestamp).toLocaleDateString([], { month: 'short', day: 'numeric' })}</text>)}
-        </svg>
+          </svg>
+        </div>
       </div>
     </div>
   );
