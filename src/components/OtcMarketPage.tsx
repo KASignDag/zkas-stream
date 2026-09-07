@@ -350,23 +350,37 @@ function OtcPriceChart({ trades, range, change, zkasUsd }: { trades: OtcTrade[];
   const height = 360;
   const values = points.map((point) => point.value);
   const rawMax = Math.max(...values);
+  const focusScale = range === '4H' || range === '6H' || range === '1D';
   const steppedCeilings = [0.1, 0.15, 0.2, 0.25, 0.3, 0.5, 0.8, 1];
-  const max = steppedCeilings.find((ceiling) => ceiling >= rawMax * 1.08)
-    ?? Math.ceil(rawMax * 1.08 * 10) / 10;
+  const max = focusScale
+    ? 0.1
+    : steppedCeilings.find((ceiling) => ceiling >= rawMax * 1.08)
+      ?? Math.ceil(rawMax * 1.08 * 10) / 10;
   const min = 0;
   const pointGap = points.length > 1 ? plotWidth / (points.length - 1) : 0;
   const xFor = (_point: typeof points[number], index: number) => left + index * pointGap;
   const yFor = (value: number) => top + ((max - value) / Math.max(max - min, Number.EPSILON)) * (height - top - bottom);
-  const coordinates = points.map((point, index) => ({ ...point, x: xFor(point, index), y: yFor(point.value) }));
-  const coloredSegments = coordinates.slice(0, -1).map((from, index) => {
+  const coordinates = points.map((point, index) => ({
+    ...point,
+    x: xFor(point, index),
+    y: yFor(Math.min(point.value, max)),
+    offScale: point.value > max,
+  }));
+  const coloredSegments = coordinates.slice(0, -1).flatMap((from, index) => {
     const to = coordinates[index + 1];
+    if (from.offScale || to.offScale) return [];
     const direction = to.value > from.value ? 'up' : to.value < from.value ? 'down' : 'flat';
-    return { from, to, direction };
+    return [{ from, to, direction }];
   });
-  const path = coordinates.map((point, index) => `${index ? 'L' : 'M'} ${point.x.toFixed(2)} ${point.y.toFixed(2)}`).join(' ');
-  const areaPath = `${path} L ${coordinates.at(-1)?.x ?? left} ${height - bottom} L ${coordinates[0]?.x ?? left} ${height - bottom} Z`;
+  const inScaleCoordinates = coordinates.filter((point) => !point.offScale);
+  const path = inScaleCoordinates.map((point, index) => `${index ? 'L' : 'M'} ${point.x.toFixed(2)} ${point.y.toFixed(2)}`).join(' ');
+  const areaPath = inScaleCoordinates.length
+    ? `${path} L ${inScaleCoordinates.at(-1)?.x ?? left} ${height - bottom} L ${inScaleCoordinates[0]?.x ?? left} ${height - bottom} Z`
+    : '';
+  const offScaleCount = coordinates.filter((point) => point.offScale).length;
   const latest = coordinates.at(-1)!;
-  const preferredGridValues = max <= 0.1 ? [0, 0.02, 0.04, 0.06, 0.08, 0.1]
+  const preferredGridValues = focusScale ? [0, 0.05, 0.06, 0.07, 0.08, 0.09, 0.1]
+    : max <= 0.1 ? [0, 0.02, 0.04, 0.06, 0.08, 0.1]
     : max <= 0.15 ? [0, 0.03, 0.06, 0.09, 0.12, 0.15]
       : max <= 0.2 ? [0, 0.04, 0.08, 0.12, 0.16, 0.2]
         : max <= 0.25 ? [0, 0.05, 0.1, 0.15, 0.2, 0.25]
@@ -407,7 +421,7 @@ function OtcPriceChart({ trades, range, change, zkasUsd }: { trades: OtcTrade[];
           <strong>ZKAS / KAS</strong>
           <span>{range} &nbsp; {priceText(latest.value)} &nbsp; {usdPriceText(zkasUsd) ? `≈ ${usdPriceText(zkasUsd)}` : ''} &nbsp; {change === null ? '' : `${change >= 0 ? '+' : ''}${change.toFixed(1)}%`}</span>
         </div>
-        <b>{amountFormat.format(points.length)} TRADES</b>
+        <b>{amountFormat.format(points.length)} TRADES{offScaleCount ? ` · ${offScaleCount} OFF SCALE` : ''}</b>
       </div>
       <div className="otc-chart-stage">
         <div className="otc-chart-fixed-axis" aria-hidden="true">
@@ -427,7 +441,7 @@ function OtcPriceChart({ trades, range, change, zkasUsd }: { trades: OtcTrade[];
           <line key={`day-separator-${day.key}`} className="otc-day-separator" x1={day.startX} x2={day.startX} y1={top} y2={height - bottom} />
         ))}
         {grid.map((line) => <line key={line.y} className="otc-grid" x1={left} x2={plotRight} y1={line.y} y2={line.y} />)}
-        <path className="otc-area" d={areaPath} />
+        {areaPath && <path className="otc-area" d={areaPath} />}
         {coloredSegments.map((segment, index) => (
           <line key={`trade-segment-${index}`} className={`otc-segment ${segment.direction}`} x1={segment.from.x} y1={segment.from.y} x2={segment.to.x} y2={segment.to.y} />
         ))}
@@ -435,7 +449,9 @@ function OtcPriceChart({ trades, range, change, zkasUsd }: { trades: OtcTrade[];
         <rect className="otc-current-tag" x={plotRight + 6} y={latest.y - 20} width={right - 12} height={40} rx="8" />
         <text className="otc-current-label" x={plotRight + 14} y={latest.y - 5}>LAST TRADE</text>
         <text className="otc-current-text" x={plotRight + 14} y={latest.y + 10}>{latest.value.toLocaleString('en-US', { minimumFractionDigits: 6, maximumFractionDigits: 6 })}</text>
-        {coordinates.map((point, index) => <circle key={`${point.trade.timestamp ?? 'undated'}-${index}`} className={`otc-point ${point.trade.side}`} cx={point.x} cy={point.y} r="4.5"><title>{`${dateText(point.trade.timestamp)} · ${priceText(point.value)}`}</title></circle>)}
+        {coordinates.map((point, index) => point.offScale
+          ? <path key={`${point.trade.timestamp ?? 'undated'}-${index}`} className={`otc-point ${point.trade.side}`} d={`M ${point.x - 4} ${top + 8} L ${point.x} ${top} L ${point.x + 4} ${top + 8} Z`}><title>{`${dateText(point.trade.timestamp)} · ${priceText(point.value)} · off scale`}</title></path>
+          : <circle key={`${point.trade.timestamp ?? 'undated'}-${index}`} className={`otc-point ${point.trade.side}`} cx={point.x} cy={point.y} r="4.5"><title>{`${dateText(point.trade.timestamp)} · ${priceText(point.value)}`}</title></circle>)}
         {xLabels.map((point, index) => <text key={`${point.trade.timestamp ?? 'undated'}-${index}`} className="otc-axis-label" x={point.x} y={height - 18} textAnchor={index === 0 ? 'start' : index === 2 ? 'end' : 'middle'}>{point.trade.timestamp === null ? `Trade ${index + 1}` : new Date(point.trade.timestamp).toLocaleDateString([], { month: 'short', day: 'numeric' })}</text>)}
           </svg>
         </div>
