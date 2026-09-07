@@ -18,7 +18,6 @@ import {
   MessageCircle,
   Moon,
   Network,
-  Play,
   Search,
   Send,
   Server,
@@ -45,9 +44,9 @@ import { MetricCard } from './components/MetricCard';
 import { OtcMarketPage } from './components/OtcMarketPage';
 import { OtcScreenshotImporter } from './components/OtcScreenshotImporter';
 import { SparkChart } from './components/SparkChart';
-import { VideosPage } from './components/VideosPage';
+import { GenesisSupportersPage } from './components/GenesisSupportersPage';
 
-type Tab = 'intelligence' | 'merged' | 'health' | 'nodes' | 'events' | 'otc' | 'importer' | 'history' | 'supply' | 'reference' | 'videos';
+type Tab = 'intelligence' | 'merged' | 'health' | 'nodes' | 'events' | 'otc' | 'importer' | 'history' | 'supply' | 'reference' | 'supporters';
 
 const tabHashes: Record<Tab, string> = {
   intelligence: '',
@@ -60,7 +59,7 @@ const tabHashes: Record<Tab, string> = {
   history: 'history',
   supply: 'supply-privacy',
   reference: 'reference',
-  videos: 'videos',
+  supporters: 'genesis-supporters',
 };
 
 function tabFromHash(hash: string): Tab {
@@ -571,7 +570,7 @@ const heroTitles: Record<Tab, string> = {
   history: 'Historical intelligence',
   supply: 'Supply & privacy intelligence',
   reference: 'ZKas quick reference',
-  videos: 'ZKAS videos',
+  supporters: 'Genesis Supporters',
 };
 
 const heroDescriptions: Record<Tab, string> = {
@@ -585,7 +584,7 @@ const heroDescriptions: Record<Tab, string> = {
   history: 'Chain-derived work history and observer history, kept separate so unavailable historical data is never invented.',
   supply: 'Consensus supply, emission and aggregate shielded-activity intelligence without exposing individual holders.',
   reference: 'Convenient public chain information and links to the official ZKas explorer.',
-  videos: 'Short videos about ZKAS speed, privacy and the network, collected in one growing library.',
+  supporters: 'A transparent view of the ZKAS community fund, supporter recognition and public wallet activity.',
 };
 
 function App() {
@@ -738,7 +737,7 @@ function App() {
     ['history', 'History'],
     ['supply', 'Supply & Privacy'],
     ['reference', 'Reference'],
-    ['videos', 'Videos'],
+    ['supporters', 'Supporters'],
   ];
 
   return (
@@ -794,14 +793,14 @@ function App() {
                 </div>
               </details>
             </div>
-            {tab !== 'otc' && tab !== 'importer' && tab !== 'videos' && <div className="sync-box">
+            {tab !== 'otc' && tab !== 'importer' && tab !== 'supporters' && <div className="sync-box">
               <span>Network</span><b>{data.network}</b>
               <span>Updated</span><b>{new Date(data.updatedAt).toLocaleTimeString()}</b>
             </div>}
           </div>
         </section>
 
-        {tab !== 'otc' && tab !== 'importer' && tab !== 'videos' && <>
+        {tab !== 'otc' && tab !== 'importer' && tab !== 'supporters' && <>
           <form className="searchbar" onSubmit={onSearch}>
             <Search size={21} />
             <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search public block hash or transaction ID" aria-label="Search public block hash or transaction ID" />
@@ -809,11 +808,11 @@ function App() {
           </form>
           {searchError && <div className="inline-error">{searchError}</div>}
         </>}
-        {tab !== 'otc' && tab !== 'importer' && tab !== 'videos' && status === 'stale' && <div className="demo-banner"><b>Live refresh delayed.</b> Showing the last good public mainnet snapshot while the API retries. {error && <span>{error}</span>}</div>}
-        {tab !== 'otc' && tab !== 'importer' && tab !== 'videos' && status === 'connecting' && <div className="demo-banner"><b>Connecting to ZKas mainnet.</b> Waiting for the first public API snapshot. {error && <span>{error}</span>}</div>}
+        {tab !== 'otc' && tab !== 'importer' && tab !== 'supporters' && status === 'stale' && <div className="demo-banner"><b>Live refresh delayed.</b> Showing the last good public mainnet snapshot while the API retries. {error && <span>{error}</span>}</div>}
+        {tab !== 'otc' && tab !== 'importer' && tab !== 'supporters' && status === 'connecting' && <div className="demo-banner"><b>Connecting to ZKas mainnet.</b> Waiting for the first public API snapshot. {error && <span>{error}</span>}</div>}
 
         {tab === 'intelligence' && (
-          <IntelligenceHome data={data} txValues={txValues} pulseTimes={pulseTimes} onReference={() => navigateToTab('reference')} onVideos={() => navigateToTab('videos')} />
+          <IntelligenceHome data={data} txValues={txValues} pulseTimes={pulseTimes} onReference={() => navigateToTab('reference')} onSupporters={() => navigateToTab('supporters')} />
         )}
 
         {tab === 'merged' && <MergedIntelligencePage data={data} />}
@@ -825,7 +824,7 @@ function App() {
         {tab === 'history' && <HistoryPage data={data} history={history} range={historyRange} onRange={setHistoryRange} />}
         {tab === 'supply' && <SupplyPrivacyPage data={data} history={history} range={historyRange} onRange={setHistoryRange} />}
         {tab === 'reference' && <ReferencePage data={data} txs={txs} onSelect={(value) => void doSearch(value)} />}
-        {tab === 'videos' && <VideosPage />}
+        {tab === 'supporters' && <GenesisSupportersPage />}
       </main>
 
       <footer>
@@ -944,7 +943,7 @@ function attributionLabel(group: AttributionGroup, index: number) {
   return `${country} · Source ${index + 1}`;
 }
 
-function IntelligenceHome({ data, txValues, pulseTimes, onReference, onVideos }: { data: DashboardData; txValues: Array<number | null>; pulseTimes: number[]; onReference: () => void; onVideos: () => void }) {
+function IntelligenceHome({ data, txValues, pulseTimes, onReference, onSupporters }: { data: DashboardData; txValues: Array<number | null>; pulseTimes: number[]; onReference: () => void; onSupporters: () => void }) {
   const groups = attributionGroups(data);
   const attributedBlocks = data.merged.attributionMatched ?? (groups.reduce((sum, g) => sum + g.blocks, 0) || null);
   const weightedConfidence = weightedAttributionConfidence(groups);
@@ -1032,13 +1031,13 @@ function IntelligenceHome({ data, txValues, pulseTimes, onReference, onVideos }:
       </section>
 
       <section className="panel latest-video-strip">
-        <div className="latest-video-icon"><Play size={24} fill="currentColor" /></div>
+        <div className="latest-video-icon"><CircleDollarSign size={24} /></div>
         <div>
-          <span className="eyebrow">LATEST ZKAS VIDEO · 20 SEC</span>
-          <h2>Built from Kaspa. Enhanced for privacy.</h2>
-          <p>See how ZKAS was built from a Kaspa fork and what that foundation brings to the network.</p>
+          <span className="eyebrow">ZKAS COMMUNITY FUND</span>
+          <h2>Genesis Supporters</h2>
+          <p>Follow the proposed fundraiser, supporter levels and public wallet activity in one transparent view.</p>
         </div>
-        <button className="primary-link" onClick={onVideos}>Watch video →</button>
+        <button className="primary-link" onClick={onSupporters}>Open supporters →</button>
       </section>
 
       <section className="panel reference-strip">
