@@ -815,6 +815,14 @@ footer { width: min(1320px, calc(100% - 40px)); margin: 0 auto; padding: 22px 0 
 .otc-summary .metric-value.positive { color: var(--accent); }
 .otc-summary .metric-value.negative { color: var(--danger); }
 
+.otc-price-dock { position: sticky; top: 76px; z-index: 40; min-height: 56px; display: flex; align-items: center; justify-content: space-between; gap: 18px; padding: 10px 16px; border: 1px solid color-mix(in srgb, var(--accent) 28%, var(--border)); border-radius: 13px; background: color-mix(in srgb, var(--surface) 92%, transparent); box-shadow: 0 8px 22px rgba(5, 23, 18, .1); backdrop-filter: blur(14px); font-variant-numeric: tabular-nums; }
+.otc-price-dock > div:first-child { display: grid; gap: 2px; }
+.otc-price-dock span { color: var(--accent); font-size: 12px; font-weight: 900; letter-spacing: 1.1px; }
+.otc-price-dock small { color: var(--muted); font-size: 9px; font-style: normal; font-weight: 800; letter-spacing: .8px; }
+.otc-price-dock-value { display: flex; align-items: baseline; justify-content: flex-end; gap: 9px; text-align: right; }
+.otc-price-dock-value strong { color: var(--text); font-size: 18px; letter-spacing: -.3px; }
+.otc-price-dock-value em { color: var(--muted); font-size: 10px; font-style: normal; font-weight: 750; }
+
 .otc-chart-panel { padding: 0; overflow: hidden; }
 .otc-chart-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 22px; padding: 21px 22px 0; }
 .otc-chart-head h2 { margin: 8px 0 5px; font-size: 22px; letter-spacing: -.5px; }
@@ -824,6 +832,9 @@ footer { width: min(1320px, calc(100% - 40px)); margin: 0 auto; padding: 22px 0 
 .otc-chart-overview strong { display: block; font-size: 20px; font-weight: 650; letter-spacing: 2px; }
 .otc-chart-overview span { display: block; margin-top: 5px; color: #91a69e; font-size: 11px; letter-spacing: 1px; }
 .otc-chart-overview > b { color: #82958e; font-size: 10px; font-weight: 650; letter-spacing: 1.5px; white-space: nowrap; }
+.otc-chart-stage { position: relative; }
+.otc-chart-fixed-axis { position: absolute; z-index: 3; left: 0; top: 0; width: 84px; height: 360px; pointer-events: none; background: linear-gradient(90deg, #06100d 82%, rgba(6, 16, 13, 0)); }
+.otc-chart-fixed-axis svg { display: block; width: 84px; height: 360px; overflow: visible; }
 .otc-chart-wrap { width: 100%; padding: 0 8px 5px; overflow-x: auto; overflow-y: hidden; scrollbar-width: thin; scrollbar-color: #24483e transparent; }
 .otc-chart { width: 100%; height: auto; min-height: 300px; display: block; color: #2ed49f; overflow: visible; }
 .otc-grid { stroke: #19322b; stroke-width: 1; stroke-dasharray: none; }
@@ -838,6 +849,7 @@ footer { width: min(1320px, calc(100% - 40px)); margin: 0 auto; padding: 22px 0 
 .otc-segment.flat { stroke: #5a8c7d; }
 .otc-current-line { stroke: #64e6bb; stroke-width: 1; stroke-dasharray: 5 5; opacity: .55; }
 .otc-current-tag { fill: #66e0b5; }
+.otc-current-label { fill: #17644f; font-size: 7px; font-weight: 900; letter-spacing: .8px; font-family: Inter, ui-sans-serif, system-ui, sans-serif; }
 .otc-current-text { fill: #062219; font-size: 11px; font-weight: 900; font-family: Inter, ui-sans-serif, system-ui, sans-serif; }
 .otc-point { stroke: #07130f; stroke-width: 1.5; }
 .otc-point.buy { fill: #34d6a2; }
@@ -892,6 +904,10 @@ footer { width: min(1320px, calc(100% - 40px)); margin: 0 auto; padding: 22px 0 
   .otc-chart { width: 820px; min-height: 300px; }
   .otc-chart-empty { margin: 14px 16px 2px; min-height: 260px; }
   .otc-trades-head { flex-direction: column; }
+  .otc-price-dock { top: 66px; padding: 9px 12px; }
+  .otc-price-dock-value { gap: 6px; }
+  .otc-price-dock-value strong { font-size: 15px; }
+  .otc-price-dock-value em { display: none; }
 }
 @media (max-width: 480px) {
   .otc-summary-grid { grid-template-columns: 1fr 1fr; gap: 9px; }
