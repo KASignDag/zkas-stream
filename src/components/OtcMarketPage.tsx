@@ -39,6 +39,10 @@ function usdValueText(value: number | null) {
   return `$${value.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
+function chartAxisText(value: number) {
+  return value.toLocaleString('en-US', { minimumFractionDigits: 5, maximumFractionDigits: 5 });
+}
+
 function marketCapText(value: number | null, unit: 'USD' | 'KAS') {
   if (value === null || !Number.isFinite(value)) return '—';
   const formatted = compactFormat.format(value);
@@ -345,11 +349,11 @@ function OtcPriceChart({ trades, range, change, zkasUsd }: { trades: OtcTrade[];
   const width = left + plotWidth + right;
   const height = 360;
   const values = points.map((point) => point.value);
-  const rawMin = Math.min(...values);
   const rawMax = Math.max(...values);
-  const spread = rawMax - rawMin || Math.max(Math.abs(rawMax) * 0.08, 0.000001);
-  const min = Math.max(0, rawMin - spread * 0.14);
-  const max = rawMax + spread * 0.14;
+  const steppedCeilings = [0.1, 0.15, 0.2, 0.25, 0.3, 0.5, 0.8, 1];
+  const max = steppedCeilings.find((ceiling) => ceiling >= rawMax * 1.08)
+    ?? Math.ceil(rawMax * 1.08 * 10) / 10;
+  const min = 0;
   const pointGap = points.length > 1 ? plotWidth / (points.length - 1) : 0;
   const xFor = (_point: typeof points[number], index: number) => left + index * pointGap;
   const yFor = (value: number) => top + ((max - value) / Math.max(max - min, Number.EPSILON)) * (height - top - bottom);
@@ -362,10 +366,16 @@ function OtcPriceChart({ trades, range, change, zkasUsd }: { trades: OtcTrade[];
   const path = coordinates.map((point, index) => `${index ? 'L' : 'M'} ${point.x.toFixed(2)} ${point.y.toFixed(2)}`).join(' ');
   const areaPath = `${path} L ${coordinates.at(-1)?.x ?? left} ${height - bottom} L ${coordinates[0]?.x ?? left} ${height - bottom} Z`;
   const latest = coordinates.at(-1)!;
-  const grid = Array.from({ length: 5 }, (_, index) => {
-    const ratio = index / 4;
-    return { y: top + ratio * (height - top - bottom), value: max - ratio * (max - min) };
-  });
+  const preferredGridValues = max <= 0.1 ? [0, 0.02, 0.04, 0.06, 0.08, 0.1]
+    : max <= 0.15 ? [0, 0.03, 0.06, 0.09, 0.12, 0.15]
+      : max <= 0.2 ? [0, 0.04, 0.08, 0.12, 0.16, 0.2]
+        : max <= 0.25 ? [0, 0.05, 0.1, 0.15, 0.2, 0.25]
+          : max <= 0.3 ? [0, 0.05, 0.1, 0.15, 0.2, 0.25, 0.3]
+            : max <= 0.5 ? [0, 0.1, 0.2, 0.3, 0.4, 0.5]
+              : max <= 0.8 ? [0, 0.2, 0.4, 0.6, 0.8]
+                : max <= 1 ? [0, 0.2, 0.4, 0.6, 0.8, 1]
+                  : Array.from({ length: 6 }, (_, index) => (max / 5) * index);
+  const grid = [...preferredGridValues].reverse().map((value) => ({ y: yFor(value), value }));
   const xLabels = [coordinates[0], coordinates[Math.floor((coordinates.length - 1) / 2)], coordinates.at(-1)!];
   const plotRight = left + plotWidth;
   const dayGroups = coordinates.reduce<Array<{ key: string; start: number; end: number }>>((groups, point, index) => {
@@ -402,7 +412,7 @@ function OtcPriceChart({ trades, range, change, zkasUsd }: { trades: OtcTrade[];
       <div className="otc-chart-stage">
         <div className="otc-chart-fixed-axis" aria-hidden="true">
           <svg viewBox={`0 0 ${left} ${height}`}>
-            {grid.map((line) => <text key={line.y} className="otc-axis-label" x={left - 10} y={line.y + 4} textAnchor="end">{priceText(line.value)}</text>)}
+            {grid.map((line) => <text key={line.y} className="otc-axis-label" x={left - 10} y={line.y + 4} textAnchor="end">{chartAxisText(line.value)}</text>)}
           </svg>
         </div>
         <div className="otc-chart-wrap" ref={scrollRef}>
