@@ -15,7 +15,7 @@ import {
   WalletCards,
 } from 'lucide-react';
 
-const FUNDRAISER_WALLET = '0x08F7C6a1c064E2d8Abe46525e57911B3df02548F';
+const FUNDRAISER_WALLET = '0xD8F7C6a1c064E2d8Abe46625e579f1B3df02548F';
 const BLOCKSCOUT_API = `https://arbitrum.blockscout.com/api/v2/addresses/${FUNDRAISER_WALLET}/token-transfers`;
 const BLOCKSCOUT_BALANCES_API = `https://arbitrum.blockscout.com/api/v2/addresses/${FUNDRAISER_WALLET}/token-balances`;
 const BLOCKSCOUT_ADDRESS_API = `https://arbitrum.blockscout.com/api/v2/addresses/${FUNDRAISER_WALLET}`;
