@@ -137,6 +137,22 @@ main { width: min(1320px, calc(100% - 40px)); margin: 0 auto; padding: 36px 0 58
 .latest-video-strip .primary-link { white-space: nowrap; }
 
 /* v0.9 — Genesis Supporters and transparent community-fund ledger */
+.supporters-gate-wrap { min-height: min(660px, calc(100vh - 190px)); display: grid; place-items: center; padding: 32px 16px; }
+.supporters-gate { width: min(100%, 470px); padding: 36px; text-align: center; border-color: color-mix(in srgb, var(--accent) 36%, var(--border)); background: linear-gradient(145deg, var(--surface), color-mix(in srgb, var(--accent-soft) 55%, var(--surface))); }
+.supporters-gate-icon { width: 64px; height: 64px; display: grid; place-items: center; margin: 0 auto 18px; border-radius: 18px; color: #fff; background: linear-gradient(135deg, var(--accent-2), var(--accent)); box-shadow: 0 12px 30px color-mix(in srgb, var(--accent) 24%, transparent); }
+.supporters-gate h2 { margin: 7px 0 8px; font-size: 28px; letter-spacing: -.65px; }
+.supporters-gate > p { margin: 0 auto 24px; color: var(--muted); font-size: 14px; line-height: 1.55; }
+.supporters-gate form { text-align: left; }
+.supporters-gate label { display: block; margin-bottom: 7px; color: var(--muted); font-size: 11px; font-weight: 850; letter-spacing: .7px; text-transform: uppercase; }
+.supporters-gate-controls { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 9px; }
+.supporters-gate input { width: 100%; min-width: 0; border: 1px solid var(--border); border-radius: 9px; padding: 12px 13px; color: var(--text); background: var(--surface); font: inherit; font-size: 16px; letter-spacing: .2em; outline: none; }
+.supporters-gate input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+.supporters-gate .primary-link { border: 0; cursor: pointer; }
+.supporters-gate-error { display: block; margin-top: 9px; color: #c44747; font-size: 12px; }
+.supporters-access-bar { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 9px 12px; border: 1px solid var(--border); border-radius: 10px; color: var(--muted); background: var(--surface); font-size: 10px; font-weight: 750; }
+.supporters-access-bar span { display: inline-flex; align-items: center; gap: 6px; }
+.supporters-access-bar svg { color: var(--accent); }
+.supporters-access-bar button { border: 0; padding: 4px; color: var(--accent); background: transparent; font: inherit; font-weight: 850; cursor: pointer; }
 .supporters-page { max-width: 1220px; margin: 0 auto; }
 .supporters-status { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 16px; border-color: color-mix(in srgb, var(--accent) 35%, var(--border)); background: linear-gradient(135deg, var(--surface), color-mix(in srgb, var(--accent-soft) 58%, var(--surface))); }
 .supporters-status-icon { width: 50px; height: 50px; display: grid; place-items: center; border-radius: 15px; color: #fff; background: linear-gradient(135deg, var(--accent-2), var(--accent)); box-shadow: 0 10px 25px color-mix(in srgb, var(--accent) 20%, transparent); }
@@ -229,6 +245,9 @@ main { width: min(1320px, calc(100% - 40px)); margin: 0 auto; padding: 36px 0 58
 }
 
 @media (max-width: 520px) {
+  .supporters-gate { padding: 28px 20px; }
+  .supporters-gate-controls { grid-template-columns: 1fr; }
+  .supporters-gate .primary-link { width: 100%; }
   .supporters-status { grid-template-columns: 1fr; }
   .supporters-status-icon { width: 44px; height: 44px; }
   .supporters-summary-grid, .supporter-tiers { grid-template-columns: 1fr; }
