@@ -257,11 +257,11 @@ export function GenesisSupportersPage() {
 
       <section className="supporters-primary-grid">
         <article className="panel donation-panel">
-          <div className="donation-network-banner"><ShieldCheck size={22} /><strong>ARBITRUM ONLY</strong></div>
+          <div className="donation-network-banner"><ShieldCheck size={22} /><strong>ARBITRUM ONE NETWORK ONLY</strong></div>
           <div className="panel-head donation-wallet-heading">
             <div><span className="panel-icon"><WalletCards size={20} /></span><h2>Community fund wallet</h2></div>
           </div>
-          <p className="donation-intro">Funds go directly to the wallet controlled by the ZKAS team. ZKAS.stream can read public activity but cannot move funds.</p>
+          <p className="donation-intro">Send USDC or USDT using Arbitrum One. Funds sent through another network may be lost.</p>
           <div className="wallet-preview">
             <div className="wallet-preview-mark"><WalletCards size={28} /></div>
             <div>
