@@ -171,6 +171,9 @@ main { width: min(1320px, calc(100% - 40px)); margin: 0 auto; padding: 36px 0 58
 
 .supporters-primary-grid { display: grid; grid-template-columns: 1.08fr .92fr; gap: 18px; }
 .donation-panel, .allocation-panel { min-height: 100%; }
+.donation-panel .panel-head h2 { font-size: 15px; letter-spacing: -.15px; }
+.donation-network-chip { display: inline-flex; align-items: center; gap: 8px; padding: 11px 14px; border-color: color-mix(in srgb, var(--accent) 60%, var(--border)); color: #fff; background: linear-gradient(135deg, var(--accent-2), var(--accent)); box-shadow: 0 8px 20px color-mix(in srgb, var(--accent) 22%, transparent); font-size: 13px; letter-spacing: 1px; }
+.donation-network-chip svg { flex: 0 0 auto; }
 .donation-intro { margin: -3px 0 15px; color: var(--muted); font-size: 12px; line-height: 1.55; }
 .wallet-preview { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: 13px; padding: 15px; border: 1px solid color-mix(in srgb, var(--accent) 28%, var(--border)); border-radius: 12px; background: var(--surface-2); }
 .wallet-preview-mark { width: 46px; height: 46px; display: grid; place-items: center; border-radius: 12px; color: var(--accent); background: var(--accent-soft); }
@@ -258,6 +261,9 @@ main { width: min(1320px, calc(100% - 40px)); margin: 0 auto; padding: 36px 0 58
   .wallet-actions { flex-direction: column; }
   .wallet-actions .primary-link, .wallet-actions .secondary-link { width: 100%; }
   .wallet-ledger-head { align-items: flex-start; flex-direction: column; }
+  .donation-panel .panel-head { align-items: center; }
+  .donation-panel .panel-head h2 { font-size: 14px; }
+  .donation-network-chip { padding: 12px 14px; font-size: 13px; }
 }
 
 
