@@ -233,7 +233,7 @@ export function OtcMarketPage({ circulatingSupply }: { circulatingSupply: number
             ))}
           </div>
         </div>
-        <OtcPriceChart trades={pricedTrades} />
+        <OtcPriceChart trades={pricedTrades} range={range} change={change} zkasUsd={zkasUsd} />
         <div className="otc-legend"><span><i className="buy" /> Buy</span><span><i className="sell" /> Sell</span><span><i className="unknown" /> Unclassified trade</span></div>
       </section>
 
@@ -313,7 +313,7 @@ function OtcSummary({ icon, label, value, detail, tone }: { icon: ReactNode; lab
   );
 }
 
-function OtcPriceChart({ trades }: { trades: OtcTrade[] }) {
+function OtcPriceChart({ trades, range, change, zkasUsd }: { trades: OtcTrade[]; range: Range; change: number | null; zkasUsd: number | null }) {
   const points = trades
     .map((trade) => ({ trade, value: trade.priceKas }))
     .filter((point): point is { trade: OtcTrade; value: number } => point.value !== null && Number.isFinite(point.value));
@@ -382,8 +382,16 @@ function OtcPriceChart({ trades }: { trades: OtcTrade[] }) {
   });
 
   return (
-    <div className="otc-chart-wrap" ref={scrollRef}>
-      <svg className="otc-chart" style={{ width: `${width}px`, minWidth: `${width}px` }} viewBox={`0 0 ${width} ${height}`} role="img" aria-label="ZKAS KAS trading pair chart, quoted in KAS per ZKAS">
+    <div className="otc-chart-shell">
+      <div className="otc-chart-overview">
+        <div>
+          <strong>ZKAS / KAS</strong>
+          <span>{range === '1D' ? '24H' : range} &nbsp; {priceText(latest.value)} &nbsp; {usdPriceText(zkasUsd) ? `≈ ${usdPriceText(zkasUsd)}` : ''} &nbsp; {change === null ? '' : `${change >= 0 ? '+' : ''}${change.toFixed(1)}%`}</span>
+        </div>
+        <b>{amountFormat.format(points.length)} TRADES</b>
+      </div>
+      <div className="otc-chart-wrap" ref={scrollRef}>
+        <svg className="otc-chart" style={{ width: `${width}px`, minWidth: `${width}px` }} viewBox={`0 0 ${width} ${height}`} role="img" aria-label="ZKAS KAS trading pair chart, quoted in KAS per ZKAS">
         <defs>
           <linearGradient id="otc-area" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="currentColor" stopOpacity=".22" /><stop offset="100%" stopColor="currentColor" stopOpacity="0" /></linearGradient>
         </defs>
@@ -400,10 +408,11 @@ function OtcPriceChart({ trades }: { trades: OtcTrade[] }) {
         ))}
         <line className="otc-current-line" x1={left} x2={width - 18} y1={latest.y} y2={latest.y} />
         <rect className="otc-current-tag" x={plotRight + 6} y={latest.y - 16} width={right - 8} height={32} rx="8" />
-        <text className="otc-current-text" x={plotRight + 14} y={latest.y + 5}>{priceText(latest.value)}</text>
+        <text className="otc-current-text" x={plotRight + 14} y={latest.y + 5}>{latest.value.toFixed(5)}</text>
         {coordinates.map((point, index) => <circle key={`${point.trade.timestamp ?? 'undated'}-${index}`} className={`otc-point ${point.trade.side}`} cx={point.x} cy={point.y} r="4.5"><title>{`${dateText(point.trade.timestamp)} · ${priceText(point.value)}`}</title></circle>)}
         {xLabels.map((point, index) => <text key={`${point.trade.timestamp ?? 'undated'}-${index}`} className="otc-axis-label" x={point.x} y={height - 18} textAnchor={index === 0 ? 'start' : index === 2 ? 'end' : 'middle'}>{point.trade.timestamp === null ? `Trade ${index + 1}` : new Date(point.trade.timestamp).toLocaleDateString([], { month: 'short', day: 'numeric' })}</text>)}
-      </svg>
+        </svg>
+      </div>
     </div>
   );
 }
