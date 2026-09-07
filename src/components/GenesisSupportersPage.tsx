@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ArrowDownToLine,
   ArrowUpFromLine,
@@ -7,6 +7,7 @@ import {
   Copy,
   ExternalLink,
   Gem,
+  LockKeyhole,
   Medal,
   RefreshCw,
   ShieldCheck,
@@ -17,6 +18,8 @@ import {
 const FUNDRAISER_WALLET = '0x08F7C6a1c064E2d8Abe46525e57911B3df02548F';
 const BLOCKSCOUT_API = `https://arbitrum.blockscout.com/api/v2/addresses/${FUNDRAISER_WALLET}/token-transfers`;
 const BLOCKSCOUT_WALLET_URL = `https://arbitrum.blockscout.com/address/${FUNDRAISER_WALLET}`;
+const SUPPORTERS_ACCESS_KEY = 'zkas-supporters-preview-access';
+const SUPPORTERS_PASSCODE_HASH = '36a71a5bca2513f92fc85544531b1605c3515ee5f6039882db0b17b05082652f';
 
 const acceptedTokens: Record<string, { symbol: string; label: string }> = {
   '0xaf88d065e77c8cc2239327c5edb3a432268e5831': { symbol: 'USDC', label: 'Native USDC' },
@@ -111,7 +114,16 @@ function formatMoney(value: number) {
   return new Intl.NumberFormat('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(value);
 }
 
+async function hashPasscode(value: string) {
+  const bytes = new TextEncoder().encode(value);
+  const digest = await crypto.subtle.digest('SHA-256', bytes);
+  return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, '0')).join('');
+}
+
 export function GenesisSupportersPage() {
+  const [unlocked, setUnlocked] = useState(() => window.sessionStorage.getItem(SUPPORTERS_ACCESS_KEY) === 'granted');
+  const [passcode, setPasscode] = useState('');
+  const [accessError, setAccessError] = useState('');
   const [transfers, setTransfers] = useState<FundTransfer[]>([]);
   const [feedState, setFeedState] = useState<'loading' | 'live' | 'error'>('loading');
   const [updatedAt, setUpdatedAt] = useState<number | null>(null);
@@ -131,6 +143,7 @@ export function GenesisSupportersPage() {
   }, []);
 
   useEffect(() => {
+    if (!unlocked) return undefined;
     const controller = new AbortController();
     void refresh(controller.signal);
     const interval = window.setInterval(() => void refresh(), 30_000);
@@ -138,7 +151,7 @@ export function GenesisSupportersPage() {
       controller.abort();
       window.clearInterval(interval);
     };
-  }, [refresh]);
+  }, [refresh, unlocked]);
 
   const totals = useMemo(() => {
     const deposits = transfers.filter((row) => row.direction === 'deposit').reduce((sum, row) => sum + row.amount, 0);
@@ -152,8 +165,63 @@ export function GenesisSupportersPage() {
     window.setTimeout(() => setCopied(false), 1800);
   }
 
+  async function unlockPage(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const submittedHash = await hashPasscode(passcode.trim());
+    if (submittedHash !== SUPPORTERS_PASSCODE_HASH) {
+      setAccessError('That passcode is not correct.');
+      return;
+    }
+    window.sessionStorage.setItem(SUPPORTERS_ACCESS_KEY, 'granted');
+    setAccessError('');
+    setPasscode('');
+    setUnlocked(true);
+  }
+
+  function lockPage() {
+    window.sessionStorage.removeItem(SUPPORTERS_ACCESS_KEY);
+    setUnlocked(false);
+    setFeedState('loading');
+    setTransfers([]);
+  }
+
+  if (!unlocked) {
+    return (
+      <div className="supporters-gate-wrap">
+        <section className="panel supporters-gate" aria-labelledby="supporters-gate-title">
+          <span className="supporters-gate-icon"><LockKeyhole size={30} /></span>
+          <span className="eyebrow">PRIVATE REVIEW</span>
+          <h2 id="supporters-gate-title">Genesis Supporters</h2>
+          <p>This preview is limited to reviewers with the access code.</p>
+          <form onSubmit={(event) => void unlockPage(event)}>
+            <label htmlFor="supporters-passcode">Passcode</label>
+            <div className="supporters-gate-controls">
+              <input
+                id="supporters-passcode"
+                type="password"
+                inputMode="numeric"
+                autoComplete="current-password"
+                value={passcode}
+                onChange={(event) => {
+                  setPasscode(event.target.value);
+                  setAccessError('');
+                }}
+                aria-invalid={Boolean(accessError)}
+                aria-describedby={accessError ? 'supporters-access-error' : undefined}
+                autoFocus
+              />
+              <button type="submit" className="primary-link">View page</button>
+            </div>
+            {accessError && <span id="supporters-access-error" className="supporters-gate-error" role="alert">{accessError}</span>}
+          </form>
+        </section>
+      </div>
+    );
+  }
+
   return (
     <div className="supporters-page page-stack">
+      <div className="supporters-access-bar"><span><LockKeyhole size={14} /> Private review unlocked</span><button type="button" onClick={lockPage}>Lock page</button></div>
       <section className="supporters-status panel">
         <div className="supporters-status-icon"><ShieldCheck size={24} /></div>
         <div>
