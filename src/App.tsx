@@ -1043,6 +1043,7 @@ function IntelligenceHome({ data, txValues, pulseTimes, onReference }: { data: D
           <a className="primary-link" href="https://github.com/KASignDag/stream-wallet/releases/download/v0.3.11-android-beta/Stream-Wallet-Android-Community-Test.apk"><Download size={15} /> Download Android APK</a>
           <a className="secondary-link" href="https://github.com/KASignDag/stream-wallet" target="_blank" rel="noreferrer"><CodeXml size={15} /> View on GitHub</a>
         </div>
+        <WalletFeedbackForm />
       </section>
 
       <section className="panel reference-strip">
@@ -1057,6 +1058,49 @@ function IntelligenceHome({ data, txValues, pulseTimes, onReference }: { data: D
         </div>
       </section>
     </>
+  );
+}
+
+function WalletFeedbackForm() {
+  const [feedbackStatus, setFeedbackStatus] = useState<'idle' | 'sending' | 'sent' | 'error'>('idle');
+  const [feedbackMessage, setFeedbackMessage] = useState('');
+
+  async function submitFeedback(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const form = event.currentTarget;
+    setFeedbackStatus('sending');
+    setFeedbackMessage('');
+    try {
+      const response = await fetch('/api/wallet-feedback', { method: 'POST', body: new FormData(form) });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(result?.message || 'Feedback could not be sent.');
+      form.reset();
+      setFeedbackStatus('sent');
+      setFeedbackMessage('Thank you—your report was sent to the Stream Wallet testing channel.');
+    } catch (error) {
+      setFeedbackStatus('error');
+      setFeedbackMessage(error instanceof Error ? error.message : 'Feedback could not be sent.');
+    }
+  }
+
+  return (
+    <details className="wallet-feedback">
+      <summary><MessageCircle size={16} /> Send feedback or screenshots</summary>
+      <form onSubmit={submitFeedback}>
+        <div className="wallet-feedback-grid">
+          <label><span>Name or Discord username <small>optional</small></span><input name="name" maxLength={80} autoComplete="nickname" /></label>
+          <label><span>Android phone and version</span><input name="device" maxLength={120} placeholder="Example: Pixel 8 · Android 15" required /></label>
+        </div>
+        <label><span>What happened?</span><textarea name="message" maxLength={1500} rows={4} placeholder="Tell us what you tested and what went wrong." required /></label>
+        <label className="wallet-feedback-files"><span>Attach screenshots <small>optional · up to 3 images, 6 MB total</small></span><input name="screenshots" type="file" accept="image/png,image/jpeg,image/webp" multiple /></label>
+        <label className="feedback-honeypot" aria-hidden="true">Website<input name="website" tabIndex={-1} autoComplete="off" /></label>
+        <p className="feedback-safety"><ShieldCheck size={14} /> Never attach or type your recovery phrase, private key or wallet password.</p>
+        <div className="wallet-feedback-submit">
+          <button className="primary-link" disabled={feedbackStatus === 'sending'}>{feedbackStatus === 'sending' ? 'Sending…' : 'Send feedback'}</button>
+          {feedbackMessage && <span className={feedbackStatus === 'sent' ? 'feedback-success' : 'feedback-error'} role="status">{feedbackMessage}</span>}
+        </div>
+      </form>
+    </details>
   );
 }
 
