@@ -178,10 +178,24 @@ export function OtcMarketPage({ circulatingSupply }: { circulatingSupply: number
   const firstPrice = pricedTrades.length ? pricedTrades[0].priceKas : null;
   const lastPrice = pricedTrades.length ? pricedTrades[pricedTrades.length - 1].priceKas : null;
   const latestMarketPrice = allPricedTrades.length ? allPricedTrades[allPricedTrades.length - 1].priceKas : null;
+  const newestPricedTimestamp = allPricedTrades.reduce<number | null>((newest, trade) => {
+    if (trade.timestamp === null) return newest;
+    return newest === null ? trade.timestamp : Math.max(newest, trade.timestamp);
+  }, null);
+  const marketCapReferenceTrades = newestPricedTimestamp === null
+    ? []
+    : allPricedTrades.filter((trade) => trade.timestamp !== null
+      && trade.timestamp >= newestPricedTimestamp - 24 * 60 * 60 * 1000
+      && trade.zkasAmount !== null
+      && trade.zkasAmount > 0
+      && trade.totalKas !== null);
+  const marketCapReferenceZkas = marketCapReferenceTrades.reduce((sum, trade) => sum + (trade.zkasAmount ?? 0), 0);
+  const marketCapReferenceKas = marketCapReferenceTrades.reduce((sum, trade) => sum + (trade.totalKas ?? 0), 0);
+  const marketCapReferencePrice = marketCapReferenceZkas > 0 ? marketCapReferenceKas / marketCapReferenceZkas : null;
   const latestMarketUsd = latestMarketPrice !== null && kasUsd !== null ? latestMarketPrice * kasUsd : null;
   const change = changePercent(firstPrice, lastPrice);
   const zkasUsd = lastPrice !== null && kasUsd !== null ? lastPrice * kasUsd : null;
-  const marketCapKas = latestMarketPrice !== null && circulatingSupply !== null ? latestMarketPrice * circulatingSupply : null;
+  const marketCapKas = marketCapReferencePrice !== null && circulatingSupply !== null ? marketCapReferencePrice * circulatingSupply : null;
   const marketCapUsd = marketCapKas !== null && kasUsd !== null ? marketCapKas * kasUsd : null;
   const zkasVolume = filteredTrades.reduce((sum, trade) => sum + (trade.zkasAmount ?? 0), 0);
   const kasVolume = filteredTrades.reduce((sum, trade) => sum + (trade.totalKas ?? 0), 0);
@@ -225,7 +239,7 @@ export function OtcMarketPage({ circulatingSupply }: { circulatingSupply: number
       <section className="otc-summary-grid">
         <OtcSummary icon={<TrendingUp size={18} />} label="Latest ZKAS price" value={priceText(lastPrice)} detail={usdPriceText(zkasUsd) ? `≈ ${usdPriceText(zkasUsd)} USD per ZKAS` : 'ZKAS/KAS · KAS per ZKAS'} />
         <OtcSummary icon={<Activity size={18} />} label={`${range} price change`} value={change === null ? '—' : `${change >= 0 ? '+' : ''}${change.toFixed(2)}%`} detail={rangeLabel(range)} tone={change === null ? undefined : change >= 0 ? 'positive' : 'negative'} />
-        <OtcSummary icon={<CircleDollarSign size={18} />} label="Estimated market cap" value={marketCapText(marketCapUsd, 'USD')} detail={marketCapKas === null ? 'Waiting for live price and supply' : `${marketCapText(marketCapKas, 'KAS')} · ${compactFormat.format(circulatingSupply as number)} circulating`} />
+        <OtcSummary icon={<CircleDollarSign size={18} />} label="Estimated OTC market cap" value={marketCapText(marketCapUsd, 'USD')} detail={marketCapKas === null ? 'Waiting for trade history and supply' : `24H VWAP · ${compactFormat.format(circulatingSupply as number)} circulating`} />
         <OtcSummary icon={<Coins size={18} />} label="ZKAS volume" value={zkasVolume ? compactFormat.format(zkasVolume) : '—'} detail={`${amountFormat.format(kasVolume)} KAS exchanged`} />
         <OtcSummary icon={<Clock3 size={18} />} label="Completed trades" value={filteredTrades.length ? amountFormat.format(filteredTrades.length) : '—'} detail={rangeLabel(range)} />
       </section>
