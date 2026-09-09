@@ -6,7 +6,9 @@ import {
   CircleDollarSign,
   Clock3,
   Coins,
+  CodeXml,
   Database,
+  Download,
   Gauge,
   GitMerge,
   Globe2,
@@ -1027,6 +1029,19 @@ function IntelligenceHome({ data, txValues, pulseTimes, onReference, onSupporter
           <div><span>Speed</span><b>~1 second target</b><small>Fast block production for practical payments.</small></div>
           <div><span>Proof system</span><b>No trusted setup</b><small>Halo 2 removes the need for a trusted ceremony.</small></div>
           <div><span>Security</span><b>Kaspa merged mining</b><small>The same kHeavyHash work can secure both networks.</small></div>
+        </div>
+      </section>
+
+      <section className="panel latest-video-strip wallet-download-strip">
+        <div className="latest-video-icon"><Download size={24} /></div>
+        <div>
+          <span className="eyebrow">STREAM WALLET</span>
+          <h2>Android community test</h2>
+          <p>Install the public Android test build directly, or review the open-source wallet on GitHub. Use only 1–2 ZKAS during the pilot.</p>
+        </div>
+        <div className="wallet-download-actions">
+          <a className="primary-link" href="https://github.com/KASignDag/stream-wallet/releases/download/v0.3.11-android-beta/Stream-Wallet-Android-Community-Test.apk"><Download size={15} /> Download Android APK</a>
+          <a className="secondary-link" href="https://github.com/KASignDag/stream-wallet" target="_blank" rel="noreferrer"><CodeXml size={15} /> View on GitHub</a>
         </div>
       </section>
 
