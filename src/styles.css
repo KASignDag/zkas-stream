@@ -135,6 +135,8 @@ main { width: min(1320px, calc(100% - 40px)); margin: 0 auto; padding: 36px 0 58
 .latest-video-strip h2 { margin: 5px 0 4px; font-size: 20px; }
 .latest-video-strip p { margin: 0; color: var(--muted); font-size: 12px; line-height: 1.5; }
 .latest-video-strip .primary-link { white-space: nowrap; }
+.wallet-download-actions { display: flex; align-items: center; justify-content: flex-end; flex-wrap: wrap; gap: 9px; }
+.wallet-download-actions a { gap: 7px; }
 
 /* v0.9 — Genesis Supporters and transparent community-fund ledger */
 .supporters-gate-wrap { min-height: min(660px, calc(100vh - 190px)); display: grid; place-items: center; padding: 32px 16px; }
@@ -391,6 +393,8 @@ footer { width: min(1320px, calc(100% - 40px)); margin: 0 auto; padding: 22px 0 
   .panel { padding: 15px; }
   .latest-video-strip { grid-template-columns: auto 1fr; gap: 13px; }
   .latest-video-strip .primary-link { grid-column: 1 / -1; width: 100%; }
+  .wallet-download-actions { grid-column: 1 / -1; width: 100%; flex-direction: column; }
+  .wallet-download-actions .primary-link, .wallet-download-actions .secondary-link { width: 100%; }
   .video-library-head { align-items: flex-start; flex-direction: column; gap: 12px; }
   .video-library-head h2 { font-size: 23px; }
   .video-gallery { grid-template-columns: 1fr; }
