@@ -814,7 +814,7 @@ function App() {
         {tab !== 'otc' && tab !== 'importer' && tab !== 'supporters' && status === 'connecting' && <div className="demo-banner"><b>Connecting to ZKas mainnet.</b> Waiting for the first public API snapshot. {error && <span>{error}</span>}</div>}
 
         {tab === 'intelligence' && (
-          <IntelligenceHome data={data} txValues={txValues} pulseTimes={pulseTimes} onReference={() => navigateToTab('reference')} onSupporters={() => navigateToTab('supporters')} />
+          <IntelligenceHome data={data} txValues={txValues} pulseTimes={pulseTimes} onReference={() => navigateToTab('reference')} />
         )}
 
         {tab === 'merged' && <MergedIntelligencePage data={data} />}
@@ -945,7 +945,7 @@ function attributionLabel(group: AttributionGroup, index: number) {
   return `${country} · Source ${index + 1}`;
 }
 
-function IntelligenceHome({ data, txValues, pulseTimes, onReference, onSupporters }: { data: DashboardData; txValues: Array<number | null>; pulseTimes: number[]; onReference: () => void; onSupporters: () => void }) {
+function IntelligenceHome({ data, txValues, pulseTimes, onReference }: { data: DashboardData; txValues: Array<number | null>; pulseTimes: number[]; onReference: () => void }) {
   const groups = attributionGroups(data);
   const attributedBlocks = data.merged.attributionMatched ?? (groups.reduce((sum, g) => sum + g.blocks, 0) || null);
   const weightedConfidence = weightedAttributionConfidence(groups);
@@ -1043,16 +1043,6 @@ function IntelligenceHome({ data, txValues, pulseTimes, onReference, onSupporter
           <a className="primary-link" href="https://github.com/KASignDag/stream-wallet/releases/download/v0.3.11-android-beta/Stream-Wallet-Android-Community-Test.apk"><Download size={15} /> Download Android APK</a>
           <a className="secondary-link" href="https://github.com/KASignDag/stream-wallet" target="_blank" rel="noreferrer"><CodeXml size={15} /> View on GitHub</a>
         </div>
-      </section>
-
-      <section className="panel latest-video-strip">
-        <div className="latest-video-icon"><CircleDollarSign size={24} /></div>
-        <div>
-          <span className="eyebrow">ZKAS COMMUNITY FUND</span>
-          <h2>Genesis Supporters</h2>
-          <p>Follow the proposed fundraiser, supporter levels and public wallet activity in one transparent view.</p>
-        </div>
-        <button className="primary-link" onClick={onSupporters}>Open supporters →</button>
       </section>
 
       <section className="panel reference-strip">
