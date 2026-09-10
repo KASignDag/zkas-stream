@@ -1,5 +1,13 @@
 const commonTradeArrays = ['trades', 'data', 'results', 'items', 'completedTrades', 'completed_trades'];
 
+// One-time, count-guarded import for the 2 newest reviewed Discord trades.
+// The desk reports 908 rows; the public history excludes 11 historical
+// test/outlier rows, so this advances the stored public total from 895 to 897.
+const reviewedSep10EarlyTrades = [
+  { timestamp: Date.parse('2026-09-10T00:11:00Z'), side: 'sell', zkasAmount: 100000, totalKas: 6600, priceKas: 6600 / 100000 },
+  { timestamp: Date.parse('2026-09-10T00:46:00Z'), side: 'sell', zkasAmount: 51000, totalKas: 2890.00017, priceKas: 2890.00017 / 51000 },
+];
+
 function first(record, keys) {
   for (const key of keys) {
     if (record[key] !== undefined && record[key] !== null && record[key] !== '') return record[key];
@@ -77,7 +85,12 @@ async function handleGet({ request, env, waitUntil }) {
   const endpoint = env.ZKAS_OTC_API_URL;
   if (!endpoint) {
     if (env.OTC_TRADES) {
-      const stored = await env.OTC_TRADES.get('trades:v1', 'json');
+      let stored = await env.OTC_TRADES.get('trades:v1', 'json');
+      if (Array.isArray(stored?.trades) && stored.trades.length === 895) {
+        const trades = [...stored.trades, ...reviewedSep10EarlyTrades].sort((a, b) => a.timestamp - b.timestamp);
+        stored = { schemaVersion: 1, updatedAt, trades };
+        await env.OTC_TRADES.put('trades:v1', JSON.stringify(stored));
+      }
       const trades = Array.isArray(stored?.trades) ? stored.trades.map(normalizeTrade).filter(Boolean).slice(-5000) : [];
       if (trades.length) {
         return json({ schemaVersion: 1, status: 'live', source: 'screenshot-import', updatedAt: stored.updatedAt || updatedAt, trades }, 200, 'public, max-age=10, s-maxage=30, stale-while-revalidate=120');
