@@ -33,9 +33,11 @@ import {
   Zap,
 } from 'lucide-react';
 import {
+  fetchBlockRelationships,
   fetchDashboard,
   fetchMiningDistribution,
   searchChain,
+  type BlockRelationships,
   type BlockRow,
   type DashboardData,
   type MiningDistributionData,
@@ -1988,6 +1990,8 @@ function MergedPanel({ data }: { data: DashboardData }) {
 
 type ExplorerView = 'dag' | 'blocks' | 'transactions';
 
+const dagRelationshipCache = new Map<string, BlockRelationships>();
+
 function ExplorerPage({ data, txs, onSelect }: {
   data: DashboardData;
   txs: Array<TxRow & { blockHash: string; timestamp: number }>;
@@ -2028,14 +2032,79 @@ function ExplorerPage({ data, txs, onSelect }: {
 }
 
 function DagSnapshot({ blocks, onSelect }: { blocks: BlockRow[]; onSelect: (hash: string) => void }) {
-  const rows = useMemo(() => {
+  const graphBlocks = useMemo(() => blocks.slice(0, 18), [blocks]);
+  const graphKey = graphBlocks.map((block) => block.hash).join('|');
+  const [relationships, setRelationships] = useState<Map<string, BlockRelationships>>(() => new Map());
+  const [pending, setPending] = useState(0);
+  const [failed, setFailed] = useState(0);
+  const [showAllParents, setShowAllParents] = useState(false);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    const missing = graphBlocks.map((block) => block.hash).filter((hash) => !dagRelationshipCache.has(hash));
+    setRelationships(new Map(dagRelationshipCache));
+    setPending(missing.length);
+    setFailed(0);
+    if (!missing.length) return () => controller.abort();
+
+    let cursor = 0;
+    const worker = async () => {
+      while (!controller.signal.aborted && cursor < missing.length) {
+        const hash = missing[cursor++];
+        try {
+          const relation = await fetchBlockRelationships(hash, controller.signal);
+          dagRelationshipCache.set(hash, relation);
+          setRelationships((current) => new Map(current).set(hash, relation));
+        } catch {
+          if (!controller.signal.aborted) setFailed((count) => count + 1);
+        } finally {
+          if (!controller.signal.aborted) setPending((count) => Math.max(0, count - 1));
+        }
+      }
+    };
+    void Promise.all(Array.from({ length: Math.min(5, missing.length) }, worker));
+    return () => controller.abort();
+  }, [graphKey]);
+
+  const graph = useMemo(() => {
     const groups = new Map<string, BlockRow[]>();
-    blocks.forEach((block) => {
+    graphBlocks.forEach((block) => {
       const key = block.daaScore === null ? 'Unknown' : String(block.daaScore);
       groups.set(key, [...(groups.get(key) ?? []), block]);
     });
-    return [...groups.entries()].slice(0, 16);
-  }, [blocks]);
+    const rows = [...groups.entries()].sort(([a], [b]) => {
+      if (a === 'Unknown') return 1;
+      if (b === 'Unknown') return -1;
+      return Number(b) - Number(a);
+    });
+    const positions = new Map<string, { x: number; y: number; parallel: boolean }>();
+    let visualRow = 0;
+
+    rows.forEach(([, rowBlocks]) => {
+      for (let start = 0; start < rowBlocks.length; start += 3) {
+        const chunk = rowBlocks.slice(start, start + 3);
+        const lanes = chunk.length === 1 ? [520] : chunk.length === 2 ? [335, 705] : [205, 520, 835];
+        chunk.forEach((block, blockIndex) => {
+          positions.set(block.hash, { x: lanes[blockIndex], y: 78 + visualRow * 116, parallel: rowBlocks.length > 1 });
+        });
+        visualRow += 1;
+      }
+    });
+    const height = Math.max(230, visualRow * 116 + 36);
+
+    const edges = graphBlocks.flatMap((block) => {
+      const child = positions.get(block.hash);
+      const relation = relationships.get(block.hash);
+      if (!child || !relation) return [];
+      return relation.parents.flatMap((parentHash) => {
+        const parent = positions.get(parentHash);
+        if (!parent) return [];
+        return [{ childHash: block.hash, parentHash, child, parent, selected: relation.selectedParent === parentHash }];
+      });
+    });
+
+    return { rows, height, positions, edges };
+  }, [graphBlocks, relationships]);
 
   return (
     <section className="panel dag-panel">
@@ -2044,30 +2113,53 @@ function DagSnapshot({ blocks, onSelect }: { blocks: BlockRow[]; onSelect: (hash
         <span className="live-mini"><i /> LIVE SNAPSHOT</span>
       </div>
       <div className="dag-key">
-        <span><i className="dag-key-dot single" /> One block at this DAA score</span>
-        <span><i className="dag-key-dot parallel" /> Parallel blocks observed</span>
+        <span><i className="dag-key-line selected" /> Selected-parent link</span>
+        <span><i className="dag-key-line parent" /> Direct parent link</span>
+        <span><i className="dag-key-dot parallel" /> Parallel DAA score</span>
       </div>
-      <div className="dag-scroll">
-        <div className="dag-flow-label"><span>Newest</span><i /><span>Earlier</span></div>
-        <div className="dag-rows">
-          {rows.map(([score, scoreBlocks]) => (
-            <div className="dag-row" key={score}>
-              <div className="dag-score"><span>DAA</span><b>{score === 'Unknown' ? '—' : compact.format(Number(score))}</b></div>
-              <div className={`dag-nodes ${scoreBlocks.length > 1 ? 'parallel' : ''}`}>
-                {scoreBlocks.map((block) => (
-                  <button key={block.hash} className="dag-node" onClick={() => onSelect(block.hash)} title={`Inspect block ${block.hash}`}>
-                    <Hash size={13} />
-                    <b>{short(block.hash, 6)}</b>
-                    <span>{block.txCount} tx</span>
-                  </button>
-                ))}
-              </div>
-            </div>
-          ))}
-          {!rows.length && <div className="empty-cell">Waiting for recent public BlockDAG data.</div>}
+      <div className="dag-link-filter" role="group" aria-label="Visible DAG links">
+        <button className={!showAllParents ? 'on' : ''} aria-pressed={!showAllParents} onClick={() => setShowAllParents(false)}>Selected links</button>
+        <button className={showAllParents ? 'on' : ''} aria-pressed={showAllParents} onClick={() => setShowAllParents(true)}>All parent links</button>
+      </div>
+      {graphBlocks.length ? (
+        <div className="dag-graph-scroll">
+          <div className="dag-graph-status">
+            <span><i /> Newest</span>
+            <b>{pending ? `Verifying ${pending} parent record${pending === 1 ? '' : 's'}…` : failed ? `${failed} parent record${failed === 1 ? '' : 's'} unavailable` : 'Parent links verified'}</b>
+          </div>
+          <div className="dag-graph" style={{ height: graph.height }}>
+            <svg viewBox={`0 0 1000 ${graph.height}`} preserveAspectRatio="none" aria-hidden="true">
+              {graph.edges.filter((edge) => showAllParents || edge.selected).map((edge) => {
+                const bend = (edge.child.y + edge.parent.y) / 2;
+                return (
+                  <path
+                    key={`${edge.childHash}-${edge.parentHash}`}
+                    className={edge.selected ? 'selected' : 'parent'}
+                    d={`M ${edge.child.x} ${edge.child.y + 30} C ${edge.child.x} ${bend}, ${edge.parent.x} ${bend}, ${edge.parent.x} ${edge.parent.y - 30}`}
+                  />
+                );
+              })}
+            </svg>
+            {[...graph.positions.entries()].map(([hash, position], index) => {
+              const block = graphBlocks.find((candidate) => candidate.hash === hash)!;
+              return (
+                <button
+                  key={hash}
+                  className={`dag-graph-node ${position.parallel ? 'parallel' : ''} ${index === 0 ? 'tip' : ''}`}
+                  style={{ left: `${position.x / 10}%`, top: position.y }}
+                  onClick={() => onSelect(hash)}
+                  title={`Inspect block ${hash}`}
+                >
+                  <span><Hash size={12} /> {short(hash, 5)}</span>
+                  <b>DAA {block.daaScore === null ? '—' : fmt.format(block.daaScore)}</b>
+                  <small>{block.txCount} tx{block.txCount === 1 ? '' : 's'}</small>
+                </button>
+              );
+            })}
+          </div>
         </div>
-      </div>
-      <p className="table-footnote">Blocks sharing a DAA score are grouped to show recently observed parallel activity. Select any block to inspect its authoritative parent and merge-set fields from the public explorer API.</p>
+      ) : <div className="empty-cell dag-empty">Waiting for recent public BlockDAG data.</div>}
+      <p className="table-footnote">Selected-parent links are shown by default for a clearer view. Choose “All parent links” to add every direct parent relationship reported by the ZKas explorer API. Select a block for its complete public consensus record.</p>
     </section>
   );
 }
