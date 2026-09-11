@@ -48,7 +48,7 @@ import { OtcScreenshotImporter } from './components/OtcScreenshotImporter';
 import { SparkChart } from './components/SparkChart';
 import { GenesisSupportersPage } from './components/GenesisSupportersPage';
 
-type Tab = 'intelligence' | 'merged' | 'health' | 'nodes' | 'events' | 'otc' | 'importer' | 'history' | 'supply' | 'reference' | 'supporters';
+type Tab = 'intelligence' | 'merged' | 'health' | 'nodes' | 'events' | 'explorer' | 'otc' | 'importer' | 'history' | 'supply' | 'reference' | 'supporters';
 
 const tabHashes: Record<Tab, string> = {
   intelligence: '',
@@ -56,6 +56,7 @@ const tabHashes: Record<Tab, string> = {
   health: 'network-health',
   nodes: 'nodes',
   events: 'events',
+  explorer: 'explorer',
   otc: 'otc',
   importer: 'otc-import',
   history: 'history',
@@ -567,6 +568,7 @@ const heroTitles: Record<Tab, string> = {
   health: 'Network health signals',
   nodes: 'Public node view',
   events: 'Live event intelligence',
+  explorer: 'Privacy-aware chain explorer',
   otc: 'ZKAS OTC market price',
   importer: 'OTC screenshot importer',
   history: 'Historical intelligence',
@@ -581,6 +583,7 @@ const heroDescriptions: Record<Tab, string> = {
   health: 'Current public network capacity, consensus activity, peer reachability and relay health in one view.',
   nodes: 'Privacy-aware observations of the public nodes currently visible to the ZKas network scanner.',
   events: 'Recent public block and network activity, organized into stable signals instead of a reconstructed animated DAG.',
+  explorer: 'Inspect recent BlockDAG activity, blocks and transactions without exposing shielded addresses, balances or transferred amounts.',
   otc: 'Completed ZKAS OTC trades, actual traded prices and volume—prepared to update automatically from the private trade-log connection.',
   importer: 'Privately read trade-log screenshots, review the detected facts and publish completed trades to the OTC chart.',
   history: 'Chain-derived work history and observer history, kept separate so unavailable historical data is never invented.',
@@ -735,6 +738,7 @@ function App() {
     ['merged', 'Merged Mining'],
     ['health', 'Network Health'],
     ['events', 'Events'],
+    ['explorer', 'Explorer'],
     ['otc', 'OTC Price'],
     ['history', 'History'],
     ['supply', 'Supply & Privacy'],
@@ -821,6 +825,7 @@ function App() {
         {tab === 'health' && <NetworkHealthPage data={data} diffValues={diffValues} txValues={txValues} pulseTimes={pulseTimes} onOpenNodes={() => navigateToTab('nodes')} />}
         {tab === 'nodes' && <NodesPage data={data} />}
         {tab === 'events' && <EventsPage data={data} history={history} />}
+        {tab === 'explorer' && <ExplorerPage data={data} txs={txs} onSelect={(value) => void doSearch(value)} />}
         {tab === 'otc' && <OtcMarketPage circulatingSupply={data.supply} />}
         {tab === 'importer' && <OtcScreenshotImporter />}
         {tab === 'history' && <HistoryPage data={data} history={history} range={historyRange} onRange={setHistoryRange} />}
@@ -840,7 +845,7 @@ function App() {
         </div>
       </footer>
 
-      {detail && <DetailDrawer detail={detail} onClose={() => setDetail(null)} />}
+      {detail && <DetailDrawer detail={detail} onClose={() => setDetail(null)} onSelect={(value) => void doSearch(value)} />}
     </div>
   );
 }
@@ -1981,6 +1986,92 @@ function MergedPanel({ data }: { data: DashboardData }) {
   );
 }
 
+type ExplorerView = 'dag' | 'blocks' | 'transactions';
+
+function ExplorerPage({ data, txs, onSelect }: {
+  data: DashboardData;
+  txs: Array<TxRow & { blockHash: string; timestamp: number }>;
+  onSelect: (value: string) => void;
+}) {
+  const [view, setView] = useState<ExplorerView>('dag');
+  const recentBlocks = data.blocks.slice(0, 48);
+  const recentTxs = txs.slice(0, 100);
+
+  return (
+    <section className="page-stack explorer-page">
+      <div className="privacy-callout">
+        <LockKeyhole size={21} />
+        <div>
+          <b>Explore the public chain without weakening ZKas privacy</b>
+          <span>Block hashes, transaction IDs and consensus relationships are public. Wallet balances, sender and recipient identities, and transferred amounts remain shielded.</span>
+        </div>
+      </div>
+
+      <div className="metric-grid explorer-metrics">
+        <MetricCard icon={<Boxes size={19} />} label="Recent blocks" value={displayNumber(recentBlocks.length)} sub="Current explorer window" accent />
+        <MetricCard icon={<LockKeyhole size={19} />} label="Recent transactions" value={displayNumber(recentTxs.length)} sub="Public transaction IDs" />
+        <MetricCard icon={<Activity size={19} />} label="Block flow" value={data.bps === null ? '—' : `${fmt.format(data.bps)} BPS`} sub="15m observed" />
+        <MetricCard icon={<Gauge size={19} />} label="DAA tip" value={displayNumber(data.daaScore, true)} sub="Current consensus score" />
+      </div>
+
+      <div className="explorer-switcher" role="tablist" aria-label="Explorer views">
+        <button role="tab" aria-selected={view === 'dag'} className={view === 'dag' ? 'on' : ''} onClick={() => setView('dag')}><GitMerge size={16} /> DAG snapshot</button>
+        <button role="tab" aria-selected={view === 'blocks'} className={view === 'blocks' ? 'on' : ''} onClick={() => setView('blocks')}><Boxes size={16} /> Blocks</button>
+        <button role="tab" aria-selected={view === 'transactions'} className={view === 'transactions' ? 'on' : ''} onClick={() => setView('transactions')}><LockKeyhole size={16} /> Transactions</button>
+      </div>
+
+      {view === 'dag' && <DagSnapshot blocks={recentBlocks} onSelect={onSelect} />}
+      {view === 'blocks' && <BlocksPage blocks={recentBlocks} onSelect={onSelect} />}
+      {view === 'transactions' && <TransactionsPage txs={recentTxs} onSelect={onSelect} />}
+    </section>
+  );
+}
+
+function DagSnapshot({ blocks, onSelect }: { blocks: BlockRow[]; onSelect: (hash: string) => void }) {
+  const rows = useMemo(() => {
+    const groups = new Map<string, BlockRow[]>();
+    blocks.forEach((block) => {
+      const key = block.daaScore === null ? 'Unknown' : String(block.daaScore);
+      groups.set(key, [...(groups.get(key) ?? []), block]);
+    });
+    return [...groups.entries()].slice(0, 16);
+  }, [blocks]);
+
+  return (
+    <section className="panel dag-panel">
+      <div className="panel-head">
+        <div><span className="panel-icon"><GitMerge size={20} /></span><h2>Recent BlockDAG snapshot</h2></div>
+        <span className="live-mini"><i /> LIVE SNAPSHOT</span>
+      </div>
+      <div className="dag-key">
+        <span><i className="dag-key-dot single" /> One block at this DAA score</span>
+        <span><i className="dag-key-dot parallel" /> Parallel blocks observed</span>
+      </div>
+      <div className="dag-scroll">
+        <div className="dag-flow-label"><span>Newest</span><i /><span>Earlier</span></div>
+        <div className="dag-rows">
+          {rows.map(([score, scoreBlocks]) => (
+            <div className="dag-row" key={score}>
+              <div className="dag-score"><span>DAA</span><b>{score === 'Unknown' ? '—' : compact.format(Number(score))}</b></div>
+              <div className={`dag-nodes ${scoreBlocks.length > 1 ? 'parallel' : ''}`}>
+                {scoreBlocks.map((block) => (
+                  <button key={block.hash} className="dag-node" onClick={() => onSelect(block.hash)} title={`Inspect block ${block.hash}`}>
+                    <Hash size={13} />
+                    <b>{short(block.hash, 6)}</b>
+                    <span>{block.txCount} tx</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          ))}
+          {!rows.length && <div className="empty-cell">Waiting for recent public BlockDAG data.</div>}
+        </div>
+      </div>
+      <p className="table-footnote">Blocks sharing a DAA score are grouped to show recently observed parallel activity. Select any block to inspect its authoritative parent and merge-set fields from the public explorer API.</p>
+    </section>
+  );
+}
+
 function BlocksPage({ blocks, onSelect }: { blocks: BlockRow[]; onSelect: (hash: string) => void }) {
   const [filter, setFilter] = useState('');
   const visible = blocks.filter((b) => b.hash.toLowerCase().includes(filter.trim().toLowerCase()));
@@ -2109,12 +2200,86 @@ function TransactionsTable({ txs, onSelect, expanded = false }: { txs: Array<TxR
   );
 }
 
-function DetailDrawer({ detail, onClose }: { detail: Detail; onClose: () => void }) {
+function recordValue(value: unknown): Record<string, unknown> {
+  return value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : {};
+}
+
+function stringList(value: unknown): string[] {
+  return Array.isArray(value) ? value.filter((item): item is string => typeof item === 'string') : [];
+}
+
+function blockRelationships(data: unknown) {
+  const root = recordValue(data);
+  const header = recordValue(root.header);
+  const verbose = recordValue(root.verboseData);
+  const parentGroups = Array.isArray(header.parents) ? header.parents : [];
+  const parents = [...new Set(parentGroups.flatMap((group) => stringList(recordValue(group).parentHashes)))];
+  return {
+    header,
+    verbose,
+    parents,
+    selectedParent: typeof verbose.selectedParentHash === 'string' ? verbose.selectedParentHash : null,
+    mergeBlues: stringList(verbose.mergeSetBluesHashes),
+    mergeReds: stringList(verbose.mergeSetRedsHashes),
+    children: stringList(verbose.childrenHashes),
+  };
+}
+
+function RelationshipHashes({ label, values, onSelect }: { label: string; values: string[]; onSelect: (value: string) => void }) {
+  return (
+    <div className="relationship-group">
+      <span>{label}</span>
+      <div>
+        {values.slice(0, 16).map((value) => <button key={value} onClick={() => onSelect(value)}><Hash size={12} />{short(value, 7)}</button>)}
+        {!values.length && <em>None reported</em>}
+      </div>
+    </div>
+  );
+}
+
+function BlockDetailContent({ data, onSelect }: { data: unknown; onSelect: (value: string) => void }) {
+  const relationships = blockRelationships(data);
+  const { header, verbose } = relationships;
+  const txs = Array.isArray(recordValue(data).transactions) ? recordValue(data).transactions as unknown[] : [];
+  const timestamp = typeof header.timestamp === 'number' || typeof header.timestamp === 'string'
+    ? new Date(normalizeDetailTimestamp(header.timestamp)).toLocaleString()
+    : '—';
+
+  return (
+    <div className="block-detail-content">
+      <div className="detail-summary-grid">
+        <div><span>DAA score</span><b>{String(header.daaScore ?? '—')}</b></div>
+        <div><span>Blue score</span><b>{String(header.blueScore ?? '—')}</b></div>
+        <div><span>Transactions</span><b>{txs.length}</b></div>
+        <div><span>Timestamp</span><b>{timestamp}</b></div>
+      </div>
+      {relationships.selectedParent && <div className="selected-parent"><span>Selected parent</span><button onClick={() => onSelect(relationships.selectedParent!)}><GitMerge size={14} />{short(relationships.selectedParent, 10)}</button></div>}
+      <RelationshipHashes label="Unique parents" values={relationships.parents} onSelect={onSelect} />
+      <RelationshipHashes label="Merge-set blues" values={relationships.mergeBlues} onSelect={onSelect} />
+      <RelationshipHashes label="Merge-set reds" values={relationships.mergeReds} onSelect={onSelect} />
+      <RelationshipHashes label="Children" values={relationships.children} onSelect={onSelect} />
+      <p className="privacy-note"><ShieldCheck size={16} /> These are public consensus relationships. Shielded wallet identities, balances and transferred amounts are not shown.</p>
+    </div>
+  );
+}
+
+function normalizeDetailTimestamp(value: string | number) {
+  const n = Number(value);
+  if (Number.isFinite(n)) return n < 10_000_000_000 ? n * 1000 : n;
+  const parsed = Date.parse(String(value));
+  return Number.isFinite(parsed) ? parsed : Date.now();
+}
+
+function DetailDrawer({ detail, onClose, onSelect }: { detail: Detail; onClose: () => void; onSelect: (value: string) => void }) {
   return (
     <div className="drawer-backdrop" onMouseDown={(e) => { if (e.currentTarget === e.target) onClose(); }}>
       <aside className="drawer" role="dialog" aria-modal="true" aria-label="Search result">
         <div className="drawer-head"><div><span className="eyebrow">{detail.type === 'privacy' ? 'Privacy notice' : `${detail.type} result`}</span><h2>{short(detail.query, 14)}</h2></div><button className="icon-btn" onClick={onClose} aria-label="Close"><X size={20} /></button></div>
-        {detail.type === 'privacy' ? <div className="privacy-result"><ShieldCheck size={34} /><h3>Address activity stays private</h3><p>{String((detail.data as { message?: string }).message || '')}</p></div> : <div className="detail-list">{objectEntries(detail.data).map(([key, value]) => <div key={key}><span>{key}</span><code>{value}</code></div>)}</div>}
+        {detail.type === 'privacy'
+          ? <div className="privacy-result"><ShieldCheck size={34} /><h3>Address activity stays private</h3><p>{String((detail.data as { message?: string }).message || '')}</p></div>
+          : detail.type === 'block'
+            ? <BlockDetailContent data={detail.data} onSelect={onSelect} />
+            : <div className="detail-list">{objectEntries(detail.data).map(([key, value]) => <div key={key}><span>{key}</span><code>{value}</code></div>)}</div>}
       </aside>
     </div>
   );
