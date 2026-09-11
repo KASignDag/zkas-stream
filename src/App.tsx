@@ -33,6 +33,7 @@ import {
   Zap,
 } from 'lucide-react';
 import {
+  API_BASE,
   fetchBlockRelationships,
   fetchDashboard,
   fetchMiningDistribution,
@@ -1990,6 +1991,64 @@ function MergedPanel({ data }: { data: DashboardData }) {
 
 type ExplorerView = 'dag' | 'blocks' | 'transactions';
 
+type HashrateComparisonPoint = {
+  time: number;
+  kaspa: number | null;
+  zkas: number | null;
+};
+
+const KASPA_HASHRATE_HISTORY_URL = 'https://api.kaspa.org/info/hashrate/history';
+const ZKAS_LAUNCH_TIME = Date.parse('2026-07-26T00:00:00Z');
+const HASHRATE_HISTORY_START = Date.parse('2026-07-20T00:00:00Z');
+
+function record(value: unknown): Record<string, unknown> {
+  return value !== null && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : {};
+}
+
+function finiteNumber(value: unknown) {
+  if (typeof value === 'number' && Number.isFinite(value)) return value;
+  if (typeof value === 'string' && value.trim()) {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : null;
+  }
+  return null;
+}
+
+function timeNumber(value: unknown) {
+  const numeric = finiteNumber(value);
+  if (numeric !== null) return numeric < 10_000_000_000 ? numeric * 1000 : numeric;
+  if (typeof value === 'string') {
+    const parsed = Date.parse(value);
+    return Number.isFinite(parsed) ? parsed : null;
+  }
+  return null;
+}
+
+function utcDate(time: number) {
+  return new Date(time).toISOString().slice(0, 10);
+}
+
+function dailyAverage(rows: Array<{ time: number; value: number }>) {
+  const days = new Map<string, { sum: number; count: number }>();
+  rows.forEach(({ time, value }) => {
+    if (!Number.isFinite(time) || !Number.isFinite(value) || value <= 0) return;
+    const day = utcDate(time);
+    const current = days.get(day) ?? { sum: 0, count: 0 };
+    current.sum += value;
+    current.count += 1;
+    days.set(day, current);
+  });
+  return [...days.entries()]
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([day, value]) => ({ day, time: Date.parse(`${day}T12:00:00Z`), value: value.sum / value.count }));
+}
+
+function compactTerahash(value: number) {
+  if (value >= 1_000_000) return `${fmt.format(value / 1_000_000)}M T`;
+  if (value >= 1_000) return `${fmt.format(value / 1_000)}K T`;
+  return `${fmt.format(value)} T`;
+}
+
 const dagRelationshipCache = new Map<string, BlockRelationships>();
 
 function ExplorerPage({ data, txs, onSelect }: {
@@ -2024,9 +2083,155 @@ function ExplorerPage({ data, txs, onSelect }: {
         <button role="tab" aria-selected={view === 'transactions'} className={view === 'transactions' ? 'on' : ''} onClick={() => setView('transactions')}><LockKeyhole size={16} /> Transactions</button>
       </div>
 
-      {view === 'dag' && <DagSnapshot blocks={recentBlocks} onSelect={onSelect} />}
+      {view === 'dag' && <>
+        <DagSnapshot blocks={recentBlocks} onSelect={onSelect} />
+        <HashrateComparison />
+      </>}
       {view === 'blocks' && <BlocksPage blocks={recentBlocks} onSelect={onSelect} />}
       {view === 'transactions' && <TransactionsPage txs={recentTxs} onSelect={onSelect} />}
+    </section>
+  );
+}
+
+function HashrateComparison() {
+  const [points, setPoints] = useState<HashrateComparisonPoint[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [failed, setFailed] = useState(false);
+  const [hovered, setHovered] = useState<number | null>(null);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    setLoading(true);
+    setFailed(false);
+
+    void Promise.all([
+      fetch(KASPA_HASHRATE_HISTORY_URL, { headers: { Accept: 'application/json' }, signal: controller.signal }).then((response) => {
+        if (!response.ok) throw new Error('Kaspa hashrate history unavailable');
+        return response.json() as Promise<unknown>;
+      }),
+      fetch(`${API_BASE}/info/work-history`, { headers: { Accept: 'application/json' }, signal: controller.signal }).then((response) => {
+        if (!response.ok) throw new Error('ZKAS work history unavailable');
+        return response.json() as Promise<unknown>;
+      }),
+    ]).then(([kaspaPayload, zkasPayload]) => {
+      if (controller.signal.aborted) return;
+      const kaspaRows = Array.isArray(kaspaPayload) ? kaspaPayload : [];
+      const zkasRows = Array.isArray(zkasPayload) ? zkasPayload : [];
+      const kaspa = dailyAverage(kaspaRows.flatMap((value) => {
+        const row = record(value);
+        const time = timeNumber(row.timestamp);
+        const kh = finiteNumber(row.hashrate_kh ?? row.hashrateKh);
+        return time !== null && time >= HASHRATE_HISTORY_START && kh !== null ? [{ time, value: kh / 1e9 }] : [];
+      }));
+      const zkas = dailyAverage(zkasRows.flatMap((value) => {
+        const row = record(value);
+        const time = timeNumber(row.timestamp);
+        const difficulty = finiteNumber(row.difficulty);
+        return time !== null && time >= ZKAS_LAUNCH_TIME && difficulty !== null ? [{ time, value: difficulty * 2 / 1e12 }] : [];
+      }));
+      const kaspaByDay = new Map(kaspa.map((point) => [point.day, point.value]));
+      const zkasByDay = new Map(zkas.map((point) => [point.day, point.value]));
+      const days = [...new Set([...kaspaByDay.keys(), ...zkasByDay.keys()])].sort();
+      const merged = days.map((day) => ({
+        time: Date.parse(`${day}T12:00:00Z`),
+        kaspa: kaspaByDay.get(day) ?? null,
+        zkas: zkasByDay.get(day) ?? null,
+      }));
+      setPoints(merged);
+      setHovered(merged.length ? merged.length - 1 : null);
+      setFailed(!merged.some((point) => point.kaspa !== null) || !merged.some((point) => point.zkas !== null));
+    }).catch(() => {
+      if (!controller.signal.aborted) setFailed(true);
+    }).finally(() => {
+      if (!controller.signal.aborted) setLoading(false);
+    });
+
+    return () => controller.abort();
+  }, []);
+
+  const width = 1000;
+  const height = 360;
+  const pad = { left: 82, right: 28, top: 32, bottom: 48 };
+  const chartWidth = width - pad.left - pad.right;
+  const chartHeight = height - pad.top - pad.bottom;
+  const allValues = points.flatMap((point) => [point.kaspa, point.zkas]).filter((value): value is number => value !== null && value > 0);
+  const minTime = points[0]?.time ?? HASHRATE_HISTORY_START;
+  const maxTime = points.at(-1)?.time ?? Date.now();
+  const minValue = allValues.length ? Math.min(...allValues) : 1;
+  const maxValue = allValues.length ? Math.max(...allValues) : 10;
+  const logMin = Math.log10(Math.max(1, minValue * 0.72));
+  const logMax = Math.log10(Math.max(minValue * 1.1, maxValue * 1.18));
+  const x = (time: number) => pad.left + ((time - minTime) / Math.max(1, maxTime - minTime)) * chartWidth;
+  const y = (value: number) => pad.top + (1 - (Math.log10(value) - logMin) / Math.max(0.001, logMax - logMin)) * chartHeight;
+  const pathFor = (key: 'kaspa' | 'zkas') => points.reduce((path, point) => {
+    const value = point[key];
+    if (value === null || value <= 0) return path;
+    return `${path}${path ? ' L' : 'M'} ${x(point.time).toFixed(2)} ${y(value).toFixed(2)}`;
+  }, '');
+  const yTicks = Array.from({ length: 5 }, (_, index) => 10 ** (logMin + ((logMax - logMin) * index) / 4));
+  const xTicks = points.length ? Array.from(new Set([0, Math.floor((points.length - 1) / 4), Math.floor((points.length - 1) / 2), Math.floor(((points.length - 1) * 3) / 4), points.length - 1])) : [];
+  const launchX = x(ZKAS_LAUNCH_TIME);
+  const active = hovered === null ? null : points[hovered] ?? null;
+  const latestKaspa = [...points].reverse().find((point) => point.kaspa !== null)?.kaspa ?? null;
+  const latestZkas = [...points].reverse().find((point) => point.zkas !== null)?.zkas ?? null;
+  const latestShare = latestKaspa && latestZkas ? (latestZkas / latestKaspa) * 100 : null;
+
+  return (
+    <section className="panel hashrate-comparison-panel">
+      <div className="panel-head hashrate-comparison-head">
+        <div><span className="panel-icon"><TrendingUp size={20} /></span><h2>Kaspa vs. ZKAS network hashrate</h2></div>
+        <span className="live-mini"><i /> DAILY LIVE DATA</span>
+      </div>
+      <p className="hashrate-comparison-intro">Daily network hashrate averages since ZKAS launched. The logarithmic scale keeps both networks readable despite their different sizes.</p>
+
+      {loading ? <div className="hashrate-chart-loading">Loading official network history…</div> : failed || points.length < 2 ? (
+        <div className="hashrate-chart-loading error">Historical hashrate data is temporarily unavailable. The chart will retry when the page is reloaded.</div>
+      ) : <>
+        <div className="hashrate-summary-grid">
+          <div><span>Kaspa latest daily average</span><b>{latestKaspa === null ? '—' : compactTerahash(latestKaspa)}</b><small>Official Kaspa REST history</small></div>
+          <div><span>ZKAS latest daily average</span><b>{latestZkas === null ? '—' : compactTerahash(latestZkas)}</b><small>Consensus difficulty estimate</small></div>
+          <div><span>ZKAS share of Kaspa</span><b>{latestShare === null ? '—' : `${fmt.format(latestShare)}%`}</b><small>Hashrate also securing ZKAS</small></div>
+        </div>
+        <div className="hashrate-chart-shell">
+          <div className="hashrate-chart-legend"><span><i className="kaspa" /> Kaspa</span><span><i className="zkas" /> ZKAS</span></div>
+          <svg
+            className="hashrate-comparison-chart"
+            viewBox={`0 0 ${width} ${height}`}
+            role="img"
+            aria-label="Daily Kaspa and ZKAS network hashrate comparison since ZKAS launch"
+            onPointerMove={(event) => {
+              const bounds = event.currentTarget.getBoundingClientRect();
+              const pointerX = ((event.clientX - bounds.left) / bounds.width) * width;
+              const index = Math.round(((pointerX - pad.left) / chartWidth) * (points.length - 1));
+              setHovered(Math.max(0, Math.min(points.length - 1, index)));
+            }}
+            onPointerLeave={() => setHovered(points.length - 1)}
+          >
+            {yTicks.map((tick) => <g key={tick}>
+              <line x1={pad.left} y1={y(tick)} x2={width - pad.right} y2={y(tick)} className="hashrate-grid-line" />
+              <text x={pad.left - 12} y={y(tick) + 5} textAnchor="end" className="hashrate-axis-label">{compactTerahash(tick)}</text>
+            </g>)}
+            {xTicks.map((index) => <text key={points[index].time} x={x(points[index].time)} y={height - 14} textAnchor={index === 0 ? 'start' : index === points.length - 1 ? 'end' : 'middle'} className="hashrate-axis-label">{new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' }).format(points[index].time)}</text>)}
+            {launchX >= pad.left && launchX <= width - pad.right && <g>
+              <line x1={launchX} y1={pad.top} x2={launchX} y2={height - pad.bottom} className="hashrate-launch-line" />
+              <text x={launchX + 9} y={pad.top + 15} className="hashrate-launch-label">ZKAS launch</text>
+            </g>}
+            <path d={pathFor('kaspa')} className="hashrate-series kaspa" />
+            <path d={pathFor('zkas')} className="hashrate-series zkas" />
+            {active && <g className="hashrate-focus">
+              <line x1={x(active.time)} y1={pad.top} x2={x(active.time)} y2={height - pad.bottom} />
+              {active.kaspa !== null && <circle cx={x(active.time)} cy={y(active.kaspa)} r="5" className="kaspa" />}
+              {active.zkas !== null && <circle cx={x(active.time)} cy={y(active.zkas)} r="5" className="zkas" />}
+            </g>}
+          </svg>
+          {active && <div className="hashrate-chart-readout">
+            <b>{new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' }).format(active.time)}</b>
+            <span><i className="kaspa" /> Kaspa {active.kaspa === null ? '—' : compactTerahash(active.kaspa)}</span>
+            <span><i className="zkas" /> ZKAS {active.zkas === null ? '—' : compactTerahash(active.zkas)}</span>
+          </div>}
+        </div>
+        <p className="table-footnote">Kaspa data comes from its official hashrate-history REST endpoint. ZKAS hashrate is derived from accepted-block consensus difficulty. Missing ZKAS samples are omitted rather than displayed as zero.</p>
+      </>}
     </section>
   );
 }
