@@ -1008,3 +1008,43 @@ footer { width: min(1320px, calc(100% - 40px)); margin: 0 auto; padding: 22px 0 
   .otc-status { padding: 12px; }
   .otc-chart-head h2 { font-size: 19px; }
 }
+
+/* Explorer — Kaspa and ZKAS daily network hashrate */
+.hashrate-comparison-panel { overflow: hidden; }
+.hashrate-comparison-head { align-items: center; }
+.hashrate-comparison-intro { max-width: 760px; margin: -1px 0 15px; color: var(--muted); font-size: 12px; line-height: 1.55; }
+.hashrate-summary-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin-bottom: 14px; }
+.hashrate-summary-grid > div { min-width: 0; padding: 12px 13px; border: 1px solid var(--border); border-radius: 11px; background: var(--surface-2); }
+.hashrate-summary-grid span { display: block; color: var(--muted); font-size: 9px; font-weight: 800; letter-spacing: .65px; text-transform: uppercase; }
+.hashrate-summary-grid b { display: block; margin-top: 6px; color: var(--text); font-size: 18px; font-variant-numeric: tabular-nums; }
+.hashrate-summary-grid small { display: block; margin-top: 4px; color: var(--muted); font-size: 9px; line-height: 1.4; }
+.hashrate-chart-shell { position: relative; overflow: hidden; border: 1px solid #22332f; border-radius: 14px; background: #101017; }
+.hashrate-chart-legend { display: flex; justify-content: center; gap: 22px; padding: 14px 14px 0; color: #aeb8b5; font-size: 11px; font-weight: 750; }
+.hashrate-chart-legend span, .hashrate-chart-readout span { display: inline-flex; align-items: center; gap: 7px; }
+.hashrate-chart-legend i, .hashrate-chart-readout i { width: 8px; height: 8px; display: inline-block; border-radius: 50%; }
+.hashrate-chart-legend i.kaspa, .hashrate-chart-readout i.kaspa { background: #62d7c2; }
+.hashrate-chart-legend i.zkas, .hashrate-chart-readout i.zkas { background: #f0a13b; }
+.hashrate-comparison-chart { display: block; width: 100%; height: auto; min-height: 260px; touch-action: pan-y; }
+.hashrate-grid-line { stroke: #292932; stroke-width: 1; }
+.hashrate-axis-label { fill: #858991; font-size: 12px; font-family: Inter, ui-sans-serif, system-ui, sans-serif; }
+.hashrate-launch-line { stroke: #69cdbb; stroke-width: 1.5; stroke-dasharray: 6 7; opacity: .72; }
+.hashrate-launch-label { fill: #69cdbb; font-size: 12px; font-weight: 800; font-family: Inter, ui-sans-serif, system-ui, sans-serif; }
+.hashrate-series { fill: none; stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; }
+.hashrate-series.kaspa { stroke: #62d7c2; }
+.hashrate-series.zkas { stroke: #f0a13b; }
+.hashrate-focus line { stroke: #89918f; stroke-width: 1; stroke-dasharray: 3 5; opacity: .5; }
+.hashrate-focus circle { stroke: #101017; stroke-width: 3; }
+.hashrate-focus circle.kaspa { fill: #62d7c2; }
+.hashrate-focus circle.zkas { fill: #f0a13b; }
+.hashrate-chart-readout { position: absolute; top: 45px; right: 16px; display: grid; gap: 5px; min-width: 185px; padding: 10px 12px; border: 1px solid #363840; border-radius: 10px; background: rgba(16, 16, 23, .9); color: #d9dedc; box-shadow: 0 8px 22px rgba(0,0,0,.22); backdrop-filter: blur(8px); pointer-events: none; font-size: 10px; font-variant-numeric: tabular-nums; }
+.hashrate-chart-readout b { margin-bottom: 2px; color: white; font-size: 11px; }
+.hashrate-chart-loading { min-height: 300px; display: grid; place-items: center; border: 1px dashed var(--border); border-radius: 12px; background: var(--surface-2); color: var(--muted); font-size: 12px; text-align: center; padding: 24px; }
+.hashrate-chart-loading.error { color: var(--danger); }
+
+@media (max-width: 700px) {
+  .hashrate-comparison-head { align-items: flex-start; flex-direction: column; gap: 10px; }
+  .hashrate-summary-grid { grid-template-columns: 1fr; }
+  .hashrate-chart-shell { overflow-x: auto; }
+  .hashrate-comparison-chart { width: 720px; max-width: none; }
+  .hashrate-chart-readout { position: sticky; left: 12px; right: auto; width: 190px; margin: -2px 0 12px 12px; }
+}
