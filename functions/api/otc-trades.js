@@ -1,5 +1,18 @@
 const commonTradeArrays = ['trades', 'data', 'results', 'items', 'completedTrades', 'completed_trades'];
 
+// One-time, count-guarded import for the seven newest reviewed Discord trades.
+// The desk reports 1,025 rows; the public history excludes 11 historical
+// test/outlier rows, so this advances the stored public total from 1,007 to 1,014.
+const reviewedSep11AfternoonTrades = [
+  { timestamp: Date.parse('2026-09-11T14:51:00Z'), side: 'sell', zkasAmount: 20000, totalKas: 1640, priceKas: 1640 / 20000 },
+  { timestamp: Date.parse('2026-09-11T14:52:00Z'), side: 'sell', zkasAmount: 250, totalKas: 20.5, priceKas: 20.5 / 250 },
+  { timestamp: Date.parse('2026-09-11T15:52:00Z'), side: 'sell', zkasAmount: 50, totalKas: 30, priceKas: 30 / 50 },
+  { timestamp: Date.parse('2026-09-11T16:50:00Z'), side: 'buy', zkasAmount: 3407, totalKas: 204.42, priceKas: 204.42 / 3407 },
+  { timestamp: Date.parse('2026-09-11T16:51:00Z'), side: 'sell', zkasAmount: 1072, totalKas: 87.904, priceKas: 87.904 / 1072 },
+  { timestamp: Date.parse('2026-09-11T16:55:00Z'), side: 'sell', zkasAmount: 13, totalKas: 1.066, priceKas: 1.066 / 13 },
+  { timestamp: Date.parse('2026-09-11T17:15:00Z'), side: 'buy', zkasAmount: 100000, totalKas: 6790, priceKas: 6790 / 100000 },
+];
+
 function first(record, keys) {
   for (const key of keys) {
     if (record[key] !== undefined && record[key] !== null && record[key] !== '') return record[key];
@@ -77,7 +90,12 @@ async function handleGet({ request, env, waitUntil }) {
   const endpoint = env.ZKAS_OTC_API_URL;
   if (!endpoint) {
     if (env.OTC_TRADES) {
-      const stored = await env.OTC_TRADES.get('trades:v1', 'json');
+      let stored = await env.OTC_TRADES.get('trades:v1', 'json');
+      if (Array.isArray(stored?.trades) && stored.trades.length === 1007) {
+        const trades = [...stored.trades, ...reviewedSep11AfternoonTrades].sort((a, b) => a.timestamp - b.timestamp);
+        stored = { schemaVersion: 1, updatedAt, trades };
+        await env.OTC_TRADES.put('trades:v1', JSON.stringify(stored));
+      }
       const trades = Array.isArray(stored?.trades) ? stored.trades.map(normalizeTrade).filter(Boolean).slice(-5000) : [];
       if (trades.length) {
         return json({ schemaVersion: 1, status: 'live', source: 'screenshot-import', updatedAt: stored.updatedAt || updatedAt, trades }, 200, 'public, max-age=10, s-maxage=30, stale-while-revalidate=120');
