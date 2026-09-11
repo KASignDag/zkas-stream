@@ -14,6 +14,12 @@ export type BlockRow = {
   txs: TxRow[];
 };
 
+export type BlockRelationships = {
+  hash: string;
+  parents: string[];
+  selectedParent: string | null;
+};
+
 
 export type PulsePoint = {
   time: number;
@@ -720,4 +726,18 @@ export async function searchChain(query: string, signal?: AbortSignal) {
       throw new Error('No matching block or transaction was found.');
     }
   }
+}
+
+export async function fetchBlockRelationships(hash: string, signal?: AbortSignal): Promise<BlockRelationships> {
+  const raw = await getJson(`/blocks/${encodeURIComponent(hash)}`, signal, 15_000);
+  const root = obj(raw);
+  const header = obj(root.header);
+  const firstParentLevel = obj(array(header.parents)[0]);
+  const parents = [...new Set(array(firstParentLevel.parentHashes).map(stringish).filter((value): value is string => value !== null))];
+
+  return {
+    hash: pickString(root, ['block_hash', 'blockHash', 'hash']) || hash,
+    parents,
+    selectedParent: pickString(root, ['verboseData.selectedParentHash']),
+  };
 }

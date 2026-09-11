@@ -33,9 +33,11 @@ import {
   Zap,
 } from 'lucide-react';
 import {
+  fetchBlockRelationships,
   fetchDashboard,
   fetchMiningDistribution,
   searchChain,
+  type BlockRelationships,
   type BlockRow,
   type DashboardData,
   type MiningDistributionData,
@@ -48,7 +50,7 @@ import { OtcScreenshotImporter } from './components/OtcScreenshotImporter';
 import { SparkChart } from './components/SparkChart';
 import { GenesisSupportersPage } from './components/GenesisSupportersPage';
 
-type Tab = 'intelligence' | 'merged' | 'health' | 'nodes' | 'events' | 'otc' | 'importer' | 'history' | 'supply' | 'reference' | 'supporters';
+type Tab = 'intelligence' | 'merged' | 'health' | 'nodes' | 'events' | 'explorer' | 'otc' | 'importer' | 'history' | 'supply' | 'reference' | 'supporters';
 
 const tabHashes: Record<Tab, string> = {
   intelligence: '',
@@ -56,6 +58,7 @@ const tabHashes: Record<Tab, string> = {
   health: 'network-health',
   nodes: 'nodes',
   events: 'events',
+  explorer: 'explorer',
   otc: 'otc',
   importer: 'otc-import',
   history: 'history',
@@ -567,6 +570,7 @@ const heroTitles: Record<Tab, string> = {
   health: 'Network health signals',
   nodes: 'Public node view',
   events: 'Live event intelligence',
+  explorer: 'Privacy-aware chain explorer',
   otc: 'ZKAS OTC market price',
   importer: 'OTC screenshot importer',
   history: 'Historical intelligence',
@@ -581,6 +585,7 @@ const heroDescriptions: Record<Tab, string> = {
   health: 'Current public network capacity, consensus activity, peer reachability and relay health in one view.',
   nodes: 'Privacy-aware observations of the public nodes currently visible to the ZKas network scanner.',
   events: 'Recent public block and network activity, organized into stable signals instead of a reconstructed animated DAG.',
+  explorer: 'Inspect recent BlockDAG activity, blocks and transactions without exposing shielded addresses, balances or transferred amounts.',
   otc: 'Completed ZKAS OTC trades, actual traded prices and volume—prepared to update automatically from the private trade-log connection.',
   importer: 'Privately read trade-log screenshots, review the detected facts and publish completed trades to the OTC chart.',
   history: 'Chain-derived work history and observer history, kept separate so unavailable historical data is never invented.',
@@ -735,6 +740,7 @@ function App() {
     ['merged', 'Merged Mining'],
     ['health', 'Network Health'],
     ['events', 'Events'],
+    ['explorer', 'Explorer'],
     ['otc', 'OTC Price'],
     ['history', 'History'],
     ['supply', 'Supply & Privacy'],
@@ -821,6 +827,7 @@ function App() {
         {tab === 'health' && <NetworkHealthPage data={data} diffValues={diffValues} txValues={txValues} pulseTimes={pulseTimes} onOpenNodes={() => navigateToTab('nodes')} />}
         {tab === 'nodes' && <NodesPage data={data} />}
         {tab === 'events' && <EventsPage data={data} history={history} />}
+        {tab === 'explorer' && <ExplorerPage data={data} txs={txs} onSelect={(value) => void doSearch(value)} />}
         {tab === 'otc' && <OtcMarketPage circulatingSupply={data.supply} />}
         {tab === 'importer' && <OtcScreenshotImporter />}
         {tab === 'history' && <HistoryPage data={data} history={history} range={historyRange} onRange={setHistoryRange} />}
@@ -840,7 +847,7 @@ function App() {
         </div>
       </footer>
 
-      {detail && <DetailDrawer detail={detail} onClose={() => setDetail(null)} />}
+      {detail && <DetailDrawer detail={detail} onClose={() => setDetail(null)} onSelect={(value) => void doSearch(value)} />}
     </div>
   );
 }
@@ -1981,6 +1988,182 @@ function MergedPanel({ data }: { data: DashboardData }) {
   );
 }
 
+type ExplorerView = 'dag' | 'blocks' | 'transactions';
+
+const dagRelationshipCache = new Map<string, BlockRelationships>();
+
+function ExplorerPage({ data, txs, onSelect }: {
+  data: DashboardData;
+  txs: Array<TxRow & { blockHash: string; timestamp: number }>;
+  onSelect: (value: string) => void;
+}) {
+  const [view, setView] = useState<ExplorerView>('dag');
+  const recentBlocks = data.blocks.slice(0, 48);
+  const recentTxs = txs.slice(0, 100);
+
+  return (
+    <section className="page-stack explorer-page">
+      <div className="privacy-callout">
+        <LockKeyhole size={21} />
+        <div>
+          <b>Explore the public chain without weakening ZKas privacy</b>
+          <span>Block hashes, transaction IDs and consensus relationships are public. Wallet balances, sender and recipient identities, and transferred amounts remain shielded.</span>
+        </div>
+      </div>
+
+      <div className="metric-grid explorer-metrics">
+        <MetricCard icon={<Boxes size={19} />} label="Recent blocks" value={displayNumber(recentBlocks.length)} sub="Current explorer window" accent />
+        <MetricCard icon={<LockKeyhole size={19} />} label="Recent transactions" value={displayNumber(recentTxs.length)} sub="Public transaction IDs" />
+        <MetricCard icon={<Activity size={19} />} label="Block flow" value={data.bps === null ? '—' : `${fmt.format(data.bps)} BPS`} sub="15m observed" />
+        <MetricCard icon={<Gauge size={19} />} label="DAA tip" value={displayNumber(data.daaScore, true)} sub="Current consensus score" />
+      </div>
+
+      <div className="explorer-switcher" role="tablist" aria-label="Explorer views">
+        <button role="tab" aria-selected={view === 'dag'} className={view === 'dag' ? 'on' : ''} onClick={() => setView('dag')}><GitMerge size={16} /> DAG snapshot</button>
+        <button role="tab" aria-selected={view === 'blocks'} className={view === 'blocks' ? 'on' : ''} onClick={() => setView('blocks')}><Boxes size={16} /> Blocks</button>
+        <button role="tab" aria-selected={view === 'transactions'} className={view === 'transactions' ? 'on' : ''} onClick={() => setView('transactions')}><LockKeyhole size={16} /> Transactions</button>
+      </div>
+
+      {view === 'dag' && <DagSnapshot blocks={recentBlocks} onSelect={onSelect} />}
+      {view === 'blocks' && <BlocksPage blocks={recentBlocks} onSelect={onSelect} />}
+      {view === 'transactions' && <TransactionsPage txs={recentTxs} onSelect={onSelect} />}
+    </section>
+  );
+}
+
+function DagSnapshot({ blocks, onSelect }: { blocks: BlockRow[]; onSelect: (hash: string) => void }) {
+  const graphBlocks = useMemo(() => blocks.slice(0, 18), [blocks]);
+  const graphKey = graphBlocks.map((block) => block.hash).join('|');
+  const [relationships, setRelationships] = useState<Map<string, BlockRelationships>>(() => new Map());
+  const [pending, setPending] = useState(0);
+  const [failed, setFailed] = useState(0);
+  const [showAllParents, setShowAllParents] = useState(false);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    const missing = graphBlocks.map((block) => block.hash).filter((hash) => !dagRelationshipCache.has(hash));
+    setRelationships(new Map(dagRelationshipCache));
+    setPending(missing.length);
+    setFailed(0);
+    if (!missing.length) return () => controller.abort();
+
+    let cursor = 0;
+    const worker = async () => {
+      while (!controller.signal.aborted && cursor < missing.length) {
+        const hash = missing[cursor++];
+        try {
+          const relation = await fetchBlockRelationships(hash, controller.signal);
+          dagRelationshipCache.set(hash, relation);
+          setRelationships((current) => new Map(current).set(hash, relation));
+        } catch {
+          if (!controller.signal.aborted) setFailed((count) => count + 1);
+        } finally {
+          if (!controller.signal.aborted) setPending((count) => Math.max(0, count - 1));
+        }
+      }
+    };
+    void Promise.all(Array.from({ length: Math.min(5, missing.length) }, worker));
+    return () => controller.abort();
+  }, [graphKey]);
+
+  const graph = useMemo(() => {
+    const groups = new Map<string, BlockRow[]>();
+    graphBlocks.forEach((block) => {
+      const key = block.daaScore === null ? 'Unknown' : String(block.daaScore);
+      groups.set(key, [...(groups.get(key) ?? []), block]);
+    });
+    const rows = [...groups.entries()].sort(([a], [b]) => {
+      if (a === 'Unknown') return 1;
+      if (b === 'Unknown') return -1;
+      return Number(b) - Number(a);
+    });
+    const positions = new Map<string, { x: number; y: number; parallel: boolean }>();
+    let visualRow = 0;
+
+    rows.forEach(([, rowBlocks]) => {
+      for (let start = 0; start < rowBlocks.length; start += 3) {
+        const chunk = rowBlocks.slice(start, start + 3);
+        const lanes = chunk.length === 1 ? [520] : chunk.length === 2 ? [335, 705] : [205, 520, 835];
+        chunk.forEach((block, blockIndex) => {
+          positions.set(block.hash, { x: lanes[blockIndex], y: 78 + visualRow * 116, parallel: rowBlocks.length > 1 });
+        });
+        visualRow += 1;
+      }
+    });
+    const height = Math.max(230, visualRow * 116 + 36);
+
+    const edges = graphBlocks.flatMap((block) => {
+      const child = positions.get(block.hash);
+      const relation = relationships.get(block.hash);
+      if (!child || !relation) return [];
+      return relation.parents.flatMap((parentHash) => {
+        const parent = positions.get(parentHash);
+        if (!parent) return [];
+        return [{ childHash: block.hash, parentHash, child, parent, selected: relation.selectedParent === parentHash }];
+      });
+    });
+
+    return { rows, height, positions, edges };
+  }, [graphBlocks, relationships]);
+
+  return (
+    <section className="panel dag-panel">
+      <div className="panel-head">
+        <div><span className="panel-icon"><GitMerge size={20} /></span><h2>Recent BlockDAG snapshot</h2></div>
+        <span className="live-mini"><i /> LIVE SNAPSHOT</span>
+      </div>
+      <div className="dag-key">
+        <span><i className="dag-key-line selected" /> Selected-parent link</span>
+        <span><i className="dag-key-line parent" /> Direct parent link</span>
+        <span><i className="dag-key-dot parallel" /> Parallel DAA score</span>
+      </div>
+      <div className="dag-link-filter" role="group" aria-label="Visible DAG links">
+        <button className={!showAllParents ? 'on' : ''} aria-pressed={!showAllParents} onClick={() => setShowAllParents(false)}>Selected links</button>
+        <button className={showAllParents ? 'on' : ''} aria-pressed={showAllParents} onClick={() => setShowAllParents(true)}>All parent links</button>
+      </div>
+      {graphBlocks.length ? (
+        <div className="dag-graph-scroll">
+          <div className="dag-graph-status">
+            <span><i /> Newest</span>
+            <b>{pending ? `Verifying ${pending} parent record${pending === 1 ? '' : 's'}…` : failed ? `${failed} parent record${failed === 1 ? '' : 's'} unavailable` : 'Parent links verified'}</b>
+          </div>
+          <div className="dag-graph" style={{ height: graph.height }}>
+            <svg viewBox={`0 0 1000 ${graph.height}`} preserveAspectRatio="none" aria-hidden="true">
+              {graph.edges.filter((edge) => showAllParents || edge.selected).map((edge) => {
+                const bend = (edge.child.y + edge.parent.y) / 2;
+                return (
+                  <path
+                    key={`${edge.childHash}-${edge.parentHash}`}
+                    className={edge.selected ? 'selected' : 'parent'}
+                    d={`M ${edge.child.x} ${edge.child.y + 30} C ${edge.child.x} ${bend}, ${edge.parent.x} ${bend}, ${edge.parent.x} ${edge.parent.y - 30}`}
+                  />
+                );
+              })}
+            </svg>
+            {[...graph.positions.entries()].map(([hash, position], index) => {
+              const block = graphBlocks.find((candidate) => candidate.hash === hash)!;
+              return (
+                <button
+                  key={hash}
+                  className={`dag-graph-node ${position.parallel ? 'parallel' : ''} ${index === 0 ? 'tip' : ''}`}
+                  style={{ left: `${position.x / 10}%`, top: position.y }}
+                  onClick={() => onSelect(hash)}
+                  title={`Inspect block ${hash}`}
+                >
+                  <span><Hash size={12} /> {short(hash, 5)}</span>
+                  <b>DAA {block.daaScore === null ? '—' : fmt.format(block.daaScore)}</b>
+                  <small>{block.txCount} tx{block.txCount === 1 ? '' : 's'}</small>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      ) : <div className="empty-cell dag-empty">Waiting for recent public BlockDAG data.</div>}
+      <p className="table-footnote">Selected-parent links are shown by default for a clearer view. Choose “All parent links” to add every direct parent relationship reported by the ZKas explorer API. Select a block for its complete public consensus record.</p>
+    </section>
+  );
+}
+
 function BlocksPage({ blocks, onSelect }: { blocks: BlockRow[]; onSelect: (hash: string) => void }) {
   const [filter, setFilter] = useState('');
   const visible = blocks.filter((b) => b.hash.toLowerCase().includes(filter.trim().toLowerCase()));
@@ -2109,12 +2292,86 @@ function TransactionsTable({ txs, onSelect, expanded = false }: { txs: Array<TxR
   );
 }
 
-function DetailDrawer({ detail, onClose }: { detail: Detail; onClose: () => void }) {
+function recordValue(value: unknown): Record<string, unknown> {
+  return value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : {};
+}
+
+function stringList(value: unknown): string[] {
+  return Array.isArray(value) ? value.filter((item): item is string => typeof item === 'string') : [];
+}
+
+function blockRelationships(data: unknown) {
+  const root = recordValue(data);
+  const header = recordValue(root.header);
+  const verbose = recordValue(root.verboseData);
+  const parentGroups = Array.isArray(header.parents) ? header.parents : [];
+  const parents = [...new Set(parentGroups.flatMap((group) => stringList(recordValue(group).parentHashes)))];
+  return {
+    header,
+    verbose,
+    parents,
+    selectedParent: typeof verbose.selectedParentHash === 'string' ? verbose.selectedParentHash : null,
+    mergeBlues: stringList(verbose.mergeSetBluesHashes),
+    mergeReds: stringList(verbose.mergeSetRedsHashes),
+    children: stringList(verbose.childrenHashes),
+  };
+}
+
+function RelationshipHashes({ label, values, onSelect }: { label: string; values: string[]; onSelect: (value: string) => void }) {
+  return (
+    <div className="relationship-group">
+      <span>{label}</span>
+      <div>
+        {values.slice(0, 16).map((value) => <button key={value} onClick={() => onSelect(value)}><Hash size={12} />{short(value, 7)}</button>)}
+        {!values.length && <em>None reported</em>}
+      </div>
+    </div>
+  );
+}
+
+function BlockDetailContent({ data, onSelect }: { data: unknown; onSelect: (value: string) => void }) {
+  const relationships = blockRelationships(data);
+  const { header, verbose } = relationships;
+  const txs = Array.isArray(recordValue(data).transactions) ? recordValue(data).transactions as unknown[] : [];
+  const timestamp = typeof header.timestamp === 'number' || typeof header.timestamp === 'string'
+    ? new Date(normalizeDetailTimestamp(header.timestamp)).toLocaleString()
+    : '—';
+
+  return (
+    <div className="block-detail-content">
+      <div className="detail-summary-grid">
+        <div><span>DAA score</span><b>{String(header.daaScore ?? '—')}</b></div>
+        <div><span>Blue score</span><b>{String(header.blueScore ?? '—')}</b></div>
+        <div><span>Transactions</span><b>{txs.length}</b></div>
+        <div><span>Timestamp</span><b>{timestamp}</b></div>
+      </div>
+      {relationships.selectedParent && <div className="selected-parent"><span>Selected parent</span><button onClick={() => onSelect(relationships.selectedParent!)}><GitMerge size={14} />{short(relationships.selectedParent, 10)}</button></div>}
+      <RelationshipHashes label="Unique parents" values={relationships.parents} onSelect={onSelect} />
+      <RelationshipHashes label="Merge-set blues" values={relationships.mergeBlues} onSelect={onSelect} />
+      <RelationshipHashes label="Merge-set reds" values={relationships.mergeReds} onSelect={onSelect} />
+      <RelationshipHashes label="Children" values={relationships.children} onSelect={onSelect} />
+      <p className="privacy-note"><ShieldCheck size={16} /> These are public consensus relationships. Shielded wallet identities, balances and transferred amounts are not shown.</p>
+    </div>
+  );
+}
+
+function normalizeDetailTimestamp(value: string | number) {
+  const n = Number(value);
+  if (Number.isFinite(n)) return n < 10_000_000_000 ? n * 1000 : n;
+  const parsed = Date.parse(String(value));
+  return Number.isFinite(parsed) ? parsed : Date.now();
+}
+
+function DetailDrawer({ detail, onClose, onSelect }: { detail: Detail; onClose: () => void; onSelect: (value: string) => void }) {
   return (
     <div className="drawer-backdrop" onMouseDown={(e) => { if (e.currentTarget === e.target) onClose(); }}>
       <aside className="drawer" role="dialog" aria-modal="true" aria-label="Search result">
         <div className="drawer-head"><div><span className="eyebrow">{detail.type === 'privacy' ? 'Privacy notice' : `${detail.type} result`}</span><h2>{short(detail.query, 14)}</h2></div><button className="icon-btn" onClick={onClose} aria-label="Close"><X size={20} /></button></div>
-        {detail.type === 'privacy' ? <div className="privacy-result"><ShieldCheck size={34} /><h3>Address activity stays private</h3><p>{String((detail.data as { message?: string }).message || '')}</p></div> : <div className="detail-list">{objectEntries(detail.data).map(([key, value]) => <div key={key}><span>{key}</span><code>{value}</code></div>)}</div>}
+        {detail.type === 'privacy'
+          ? <div className="privacy-result"><ShieldCheck size={34} /><h3>Address activity stays private</h3><p>{String((detail.data as { message?: string }).message || '')}</p></div>
+          : detail.type === 'block'
+            ? <BlockDetailContent data={detail.data} onSelect={onSelect} />
+            : <div className="detail-list">{objectEntries(detail.data).map(([key, value]) => <div key={key}><span>{key}</span><code>{value}</code></div>)}</div>}
       </aside>
     </div>
   );
