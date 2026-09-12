@@ -26,6 +26,14 @@ jobs:
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
 
+      - name: Install Protocol Buffers compiler
+        shell: pwsh
+        run: |
+          choco install protoc --no-progress -y
+          $protoc = (Get-Command protoc.exe).Source
+          "PROTOC=$protoc" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          & $protoc --version
+
       - name: Build read-only history checker
         working-directory: zkas-rusty
         run: cargo build --locked --release --package zkas-api --bin zkas-history-status
