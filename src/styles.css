@@ -1070,6 +1070,39 @@ footer { width: min(1320px, calc(100% - 40px)); margin: 0 auto; padding: 22px 0 
 .rustykaspa-allocation-list span { display: inline-flex; align-items: center; gap: 5px; }
 .rustykaspa-allocation-list i { width: 8px; height: 8px; border-radius: 50%; }
 .rustykaspa-allocation-list b { color: var(--text); }
+.miner-lookup-card { margin-top: 12px; border: 1px solid color-mix(in srgb, var(--accent) 28%, var(--border)); border-radius: 13px; padding: 15px; background: linear-gradient(145deg, var(--surface-2), color-mix(in srgb, var(--accent-soft) 36%, var(--surface-2))); }
+.miner-lookup-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
+.miner-lookup-head > div { display: flex; align-items: flex-start; gap: 9px; min-width: 0; }
+.miner-lookup-head h3 { margin: 0; color: var(--text); font-size: 15px; }
+.miner-lookup-head p { margin: 4px 0 0; color: var(--muted); font-size: 10px; line-height: 1.45; }
+.miner-lookup-form { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 9px; margin-top: 14px; }
+.miner-lookup-form input { width: 100%; min-width: 0; box-sizing: border-box; border: 1px solid var(--border); border-radius: 10px; padding: 12px 13px; background: var(--surface); color: var(--text); font: inherit; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; outline: none; }
+.miner-lookup-form input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+.miner-lookup-form button { border: 0; border-radius: 10px; padding: 0 17px; background: var(--accent); color: #07130f; font: inherit; font-size: 11px; font-weight: 900; cursor: pointer; }
+.miner-lookup-form button:disabled { opacity: .5; cursor: wait; }
+.miner-lookup-privacy { display: flex; align-items: flex-start; gap: 6px; margin: 9px 0 0; color: var(--muted); font-size: 9px; line-height: 1.45; }
+.miner-lookup-privacy svg { flex: 0 0 auto; color: var(--accent); }
+.miner-lookup-error { margin: 12px 0 0; padding: 10px 12px; border: 1px solid color-mix(in srgb, var(--danger) 30%, var(--border)); border-radius: 9px; background: color-mix(in srgb, var(--danger) 8%, var(--surface)); color: var(--danger); font-size: 10px; font-weight: 750; }
+.miner-result { margin-top: 14px; border-top: 1px solid var(--border); padding-top: 14px; }
+.miner-result-head { display: flex; align-items: center; justify-content: space-between; gap: 14px; }
+.miner-result-head > div:first-child b, .miner-result-head > div:first-child span { display: block; }
+.miner-result-head > div:first-child b { color: var(--text); font-size: 13px; }
+.miner-result-head > div:first-child span { margin-top: 2px; color: var(--muted); font-size: 9px; }
+.miner-result-badges { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 6px; }
+.miner-result-badges span { border: 1px solid var(--border); border-radius: 999px; padding: 5px 8px; color: var(--muted); background: var(--surface); font-size: 8px; font-weight: 900; letter-spacing: .6px; text-transform: uppercase; }
+.miner-result-badges span.online, .miner-result-badges span.merge-on { border-color: color-mix(in srgb, var(--accent) 34%, var(--border)); color: var(--accent); background: var(--accent-soft); }
+.miner-result-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; margin-top: 11px; }
+.miner-result-grid > div { min-width: 0; padding: 10px; border: 1px solid var(--border); border-radius: 9px; background: var(--surface); }
+.miner-result-grid span { display: block; color: var(--muted); font-size: 8px; font-weight: 800; letter-spacing: .45px; text-transform: uppercase; }
+.miner-result-grid b { display: block; overflow: hidden; margin-top: 5px; color: var(--text); font-size: 13px; text-overflow: ellipsis; white-space: nowrap; }
+.miner-payments { margin-top: 12px; overflow: hidden; border: 1px solid var(--border); border-radius: 10px; background: var(--surface); }
+.miner-payments h4 { margin: 0; padding: 10px 12px; border-bottom: 1px solid var(--border); color: var(--text); font-size: 10px; }
+.miner-payments > div { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; align-items: center; gap: 10px; padding: 9px 12px; border-bottom: 1px solid var(--border); font-size: 9px; }
+.miner-payments > div:last-child { border-bottom: 0; }
+.miner-payments span { overflow: hidden; color: var(--muted); text-overflow: ellipsis; white-space: nowrap; }
+.miner-payments b { color: var(--text); }
+.miner-payments code { color: var(--accent); }
+.miner-payments > p { margin: 0; padding: 13px; color: var(--muted); font-size: 9px; }
 .rustykaspa-pool-foot { display: flex; align-items: center; justify-content: space-between; gap: 20px; margin-top: 14px; }
 .rustykaspa-pool-foot p { display: flex; align-items: flex-start; gap: 7px; max-width: 700px; margin: 0; color: var(--muted); font-size: 10px; line-height: 1.55; }
 .rustykaspa-pool-foot p svg { flex: 0 0 auto; margin-top: 1px; color: var(--accent); }
@@ -1086,4 +1119,11 @@ footer { width: min(1320px, calc(100% - 40px)); margin: 0 auto; padding: 22px 0 
   .rustykaspa-stat-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .rustykaspa-fee-title, .rustykaspa-pool-foot { align-items: flex-start; flex-direction: column; }
   .rustykaspa-fee-totals { flex-wrap: wrap; }
+  .miner-lookup-head, .miner-result-head { align-items: flex-start; flex-direction: column; }
+  .miner-lookup-form { grid-template-columns: 1fr; }
+  .miner-lookup-form button { min-height: 44px; }
+  .miner-result-badges { justify-content: flex-start; }
+  .miner-result-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .miner-payments > div { grid-template-columns: 1fr auto; }
+  .miner-payments code { grid-column: 1 / -1; }
 }

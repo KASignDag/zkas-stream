@@ -2025,6 +2025,27 @@ type RustyKaspaPoolData = {
   stale?: boolean;
 };
 
+type RustyKaspaMinerData = {
+  found: true;
+  fetchedAt: number;
+  status: 'online' | 'offline';
+  currentHashrateHps: number | null;
+  oneHourHashrateHps: number | null;
+  sharesLastHour: number | null;
+  unpaidKas: number | null;
+  totalPaidKas: number | null;
+  totalEarnedKas: number | null;
+  mergeMiningEnabled: boolean;
+  workerCount: number;
+  updatedAt: number | null;
+  recentPayments: Array<{
+    txId: string | null;
+    amountKas: number | null;
+    paidAt: number | null;
+    status: string | null;
+  }>;
+};
+
 const KASPA_HASHRATE_HISTORY_URL = 'https://api.kaspa.org/info/hashrate/history';
 const ZKAS_LAUNCH_TIME = Date.parse('2026-07-26T00:00:00Z');
 const HASHRATE_HISTORY_START = Date.parse('2026-07-20T00:00:00Z');
@@ -2126,6 +2147,10 @@ function RustyKaspaPoolMonitor() {
   const [snapshot, setSnapshot] = useState<RustyKaspaPoolData | null>(null);
   const [loading, setLoading] = useState(true);
   const [failed, setFailed] = useState(false);
+  const [minerAddress, setMinerAddress] = useState('');
+  const [minerResult, setMinerResult] = useState<RustyKaspaMinerData | null>(null);
+  const [minerLoading, setMinerLoading] = useState(false);
+  const [minerError, setMinerError] = useState('');
 
   useEffect(() => {
     let active = true;
@@ -2172,6 +2197,32 @@ function RustyKaspaPoolMonitor() {
     { label: 'Pool fee', value: snapshot.poolFeePercent === null ? '—' : `${fmt.format(snapshot.poolFeePercent)}%`, icon: <Activity size={18} /> },
   ] : [];
 
+  const lookupMiner = (event: FormEvent) => {
+    event.preventDefault();
+    const address = minerAddress.trim();
+    if (!address) return;
+    setMinerLoading(true);
+    setMinerError('');
+    setMinerResult(null);
+    fetch('/api/rustykaspa-miner', {
+      method: 'POST',
+      headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
+      cache: 'no-store',
+      body: JSON.stringify({ address }),
+    }).then(async (response) => {
+      const data = await response.json() as RustyKaspaMinerData | { error?: string };
+      if (!response.ok) {
+        const code = 'error' in data ? data.error : '';
+        if (code === 'invalid_kaspa_address') throw new Error('Enter a valid kaspa: payout address.');
+        if (code === 'miner_not_found') throw new Error('No RustyKaspa PPLNS miner was found for that address.');
+        throw new Error('Miner lookup is temporarily unavailable.');
+      }
+      setMinerResult(data as RustyKaspaMinerData);
+    }).catch((error) => {
+      setMinerError(error instanceof Error ? error.message : 'Miner lookup is temporarily unavailable.');
+    }).finally(() => setMinerLoading(false));
+  };
+
   return (
     <section className="panel rustykaspa-pool-panel">
       <div className="panel-head rustykaspa-pool-head">
@@ -2200,8 +2251,53 @@ function RustyKaspaPoolMonitor() {
           </div>
         </div>
 
+        <div className="miner-lookup-card">
+          <div className="miner-lookup-head">
+            <div><span className="panel-icon"><Search size={19} /></span><div><h3>Look up my miner</h3><p>Enter the Kaspa payout address used on the RustyKaspa PPLNS pool.</p></div></div>
+            <span className="privacy-chip"><ShieldCheck size={14} /> PRIVATE LOOKUP</span>
+          </div>
+          <form className="miner-lookup-form" onSubmit={lookupMiner}>
+            <input
+              value={minerAddress}
+              onChange={(event) => setMinerAddress(event.target.value)}
+              placeholder="kaspa:your-payout-address"
+              aria-label="Kaspa payout address"
+              autoComplete="off"
+              autoCapitalize="none"
+              spellCheck={false}
+            />
+            <button type="submit" disabled={minerLoading || !minerAddress.trim()}>{minerLoading ? 'Looking up…' : 'Look up miner'}</button>
+          </form>
+          <p className="miner-lookup-privacy"><LockKeyhole size={14} /> The address is sent by POST, is not placed in the URL, and is not saved or cached by ZKAS.stream.</p>
+          {minerError && <p className="miner-lookup-error">{minerError}</p>}
+
+          {minerResult && <div className="miner-result">
+            <div className="miner-result-head">
+              <div><b>Miner found</b><span>Updated {minerResult.updatedAt ? age(minerResult.updatedAt) : 'just now'}</span></div>
+              <div className="miner-result-badges"><span className={minerResult.status}>{minerResult.status}</span><span className={minerResult.mergeMiningEnabled ? 'merge-on' : ''}>{minerResult.mergeMiningEnabled ? 'KAS + ZKAS' : 'KAS only'}</span></div>
+            </div>
+            <div className="miner-result-grid">
+              <div><span>Current hashrate</span><b>{displayHashrate(minerResult.currentHashrateHps)}</b></div>
+              <div><span>1-hour hashrate</span><b>{displayHashrate(minerResult.oneHourHashrateHps)}</b></div>
+              <div><span>Shares last hour</span><b>{displayNumber(minerResult.sharesLastHour)}</b></div>
+              <div><span>Workers</span><b>{displayNumber(minerResult.workerCount)}</b></div>
+              <div><span>Unpaid balance</span><b>{displayNumber(minerResult.unpaidKas)} KAS</b></div>
+              <div><span>Total paid</span><b>{displayNumber(minerResult.totalPaidKas)} KAS</b></div>
+              <div><span>Total earned</span><b>{displayNumber(minerResult.totalEarnedKas)} KAS</b></div>
+            </div>
+            <div className="miner-payments">
+              <h4>Recent payments</h4>
+              {minerResult.recentPayments.length ? minerResult.recentPayments.map((payment, index) => <div key={payment.txId || index}>
+                <span>{payment.paidAt ? new Date(payment.paidAt).toLocaleString() : 'Time unavailable'}</span>
+                <b>{displayNumber(payment.amountKas)} KAS</b>
+                <code>{payment.txId ? short(payment.txId, 7) : payment.status || 'sent'}</code>
+              </div>) : <p>No recent payment records were returned for this miner.</p>}
+            </div>
+          </div>}
+        </div>
+
         <div className="rustykaspa-pool-foot">
-          <p><ShieldCheck size={16} /> ZKAS.stream retains and displays pool-wide totals only—never miner addresses, worker names, payment records, or private verification entries. Updated every five minutes{snapshot.fetchedAt ? ` · ${age(snapshot.fetchedAt)}` : ''}.</p>
+          <p><ShieldCheck size={16} /> The public panel contains pool-wide totals only. Individual details appear only after a user enters the exact payout address and are not retained by ZKAS.stream. Pool totals update every five minutes{snapshot.fetchedAt ? ` · ${age(snapshot.fetchedAt)}` : ''}.</p>
           <a href={sourceUrl} target="_blank" rel="noreferrer">Open official pool dashboard <ExternalLink size={15} /></a>
         </div>
       </>}
