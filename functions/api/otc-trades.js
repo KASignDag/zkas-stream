@@ -1,5 +1,68 @@
 const commonTradeArrays = ['trades', 'data', 'results', 'items', 'completedTrades', 'completed_trades'];
 
+// One-time, count-guarded import for the 57 newest reviewed Discord trades.
+// The desk reports 1,082 rows; the public history excludes 11 historical
+// test/outlier rows, so this advances the stored public total from 1,014 to 1,071.
+const reviewedSep12MorningTrades = [
+  { timestamp: Date.parse('2026-09-11T18:20:00Z'), side: 'buy', zkasAmount: 1000, totalKas: 60, priceKas: 60 / 1000 },
+  { timestamp: Date.parse('2026-09-11T18:25:00Z'), side: 'buy', zkasAmount: 140000, totalKas: 8199.9988, priceKas: 8199.9988 / 140000 },
+  { timestamp: Date.parse('2026-09-11T18:26:00Z'), side: 'buy', zkasAmount: 45593, totalKas: 2735.58, priceKas: 2735.58 / 45593 },
+  { timestamp: Date.parse('2026-09-11T18:27:00Z'), side: 'buy', zkasAmount: 31317, totalKas: 1659.801, priceKas: 1659.801 / 31317 },
+  { timestamp: Date.parse('2026-09-11T20:30:00Z'), side: 'sell', zkasAmount: 400000, totalKas: 29900, priceKas: 29900 / 400000 },
+  { timestamp: Date.parse('2026-09-11T20:31:00Z'), side: 'sell', zkasAmount: 14800, totalKas: 1036, priceKas: 1036 / 14800 },
+  { timestamp: Date.parse('2026-09-11T20:32:00Z'), side: 'sell', zkasAmount: 11900, totalKas: 833, priceKas: 833 / 11900 },
+  { timestamp: Date.parse('2026-09-11T20:33:00Z'), side: 'sell', zkasAmount: 29219, totalKas: 2350.00001928, priceKas: 2350.00001928 / 29219 },
+  { timestamp: Date.parse('2026-09-11T20:34:00Z'), side: 'sell', zkasAmount: 2000, totalKas: 140, priceKas: 140 / 2000 },
+  { timestamp: Date.parse('2026-09-11T20:35:00Z'), side: 'buy', zkasAmount: 912, totalKas: 52.07210832, priceKas: 52.07210832 / 912 },
+  { timestamp: Date.parse('2026-09-11T21:30:00Z'), side: 'sell', zkasAmount: 1.12345678, totalKas: 0.08931482, priceKas: 0.08931482 / 1.12345678 },
+  { timestamp: Date.parse('2026-09-11T21:31:00Z'), side: 'sell', zkasAmount: 1.87654321, totalKas: 0.15340741, priceKas: 0.15340741 / 1.87654321 },
+  { timestamp: Date.parse('2026-09-11T21:32:00Z'), side: 'sell', zkasAmount: 25000, totalKas: 1666.66675, priceKas: 1666.66675 / 25000 },
+  { timestamp: Date.parse('2026-09-11T21:33:00Z'), side: 'buy', zkasAmount: 1317, totalKas: 87.79999122, priceKas: 87.79999122 / 1317 },
+  { timestamp: Date.parse('2026-09-11T21:34:00Z'), side: 'buy', zkasAmount: 5000, totalKas: 333.3333, priceKas: 333.3333 / 5000 },
+  { timestamp: Date.parse('2026-09-11T22:30:00Z'), side: 'sell', zkasAmount: 50000, totalKas: 3484.8485, priceKas: 3484.8485 / 50000 },
+  { timestamp: Date.parse('2026-09-11T22:31:00Z'), side: 'sell', zkasAmount: 5500, totalKas: 383.333335, priceKas: 383.333335 / 5500 },
+  { timestamp: Date.parse('2026-09-11T23:30:00Z'), side: 'sell', zkasAmount: 8100, totalKas: 564.545457, priceKas: 564.545457 / 8100 },
+  { timestamp: Date.parse('2026-09-11T23:31:00Z'), side: 'sell', zkasAmount: 15782, totalKas: 1099.95758054, priceKas: 1099.95758054 / 15782 },
+  { timestamp: Date.parse('2026-09-11T23:32:00Z'), side: 'sell', zkasAmount: 100000, totalKas: 7000, priceKas: 7000 / 100000 },
+  { timestamp: Date.parse('2026-09-12T01:30:00Z'), side: 'sell', zkasAmount: 9397, totalKas: 638.996, priceKas: 638.996 / 9397 },
+  { timestamp: Date.parse('2026-09-12T03:30:00Z'), side: 'buy', zkasAmount: 3267, totalKas: 186.53462487, priceKas: 186.53462487 / 3267 },
+  { timestamp: Date.parse('2026-09-12T03:31:00Z'), side: 'sell', zkasAmount: 10000, totalKas: 680, priceKas: 680 / 10000 },
+  { timestamp: Date.parse('2026-09-12T03:32:00Z'), side: 'sell', zkasAmount: 2500, totalKas: 170, priceKas: 170 / 2500 },
+  { timestamp: Date.parse('2026-09-12T05:30:00Z'), side: 'sell', zkasAmount: 28103, totalKas: 1911.004, priceKas: 1911.004 / 28103 },
+  { timestamp: Date.parse('2026-09-12T05:31:00Z'), side: 'sell', zkasAmount: 14000, totalKas: 950.0001, priceKas: 950.0001 / 14000 },
+  { timestamp: Date.parse('2026-09-12T05:32:00Z'), side: 'sell', zkasAmount: 8000, totalKas: 557.57576, priceKas: 557.57576 / 8000 },
+  { timestamp: Date.parse('2026-09-12T06:30:00Z'), side: 'buy', zkasAmount: 13738, totalKas: 784.39322818, priceKas: 784.39322818 / 13738 },
+  { timestamp: Date.parse('2026-09-12T09:10:00Z'), side: 'sell', zkasAmount: 15000, totalKas: 885, priceKas: 885 / 15000 },
+  { timestamp: Date.parse('2026-09-12T09:11:00Z'), side: 'buy', zkasAmount: 30000, totalKas: 1549.9998, priceKas: 1549.9998 / 30000 },
+  { timestamp: Date.parse('2026-09-12T09:12:00Z'), side: 'sell', zkasAmount: 1000, totalKas: 61.8074, priceKas: 61.8074 / 1000 },
+  { timestamp: Date.parse('2026-09-12T09:13:00Z'), side: 'sell', zkasAmount: 2500, totalKas: 154.5185, priceKas: 154.5185 / 2500 },
+  { timestamp: Date.parse('2026-09-12T09:14:00Z'), side: 'buy', zkasAmount: 8524, totalKas: 440.09778532, priceKas: 440.09778532 / 8524 },
+  { timestamp: Date.parse('2026-09-12T09:15:00Z'), side: 'buy', zkasAmount: 65000, totalKas: 3298.9996, priceKas: 3298.9996 / 65000 },
+  { timestamp: Date.parse('2026-09-12T09:16:00Z'), side: 'buy', zkasAmount: 50000, totalKas: 2500, priceKas: 2500 / 50000 },
+  { timestamp: Date.parse('2026-09-12T09:17:00Z'), side: 'buy', zkasAmount: 200000, totalKas: 9528, priceKas: 9528 / 200000 },
+  { timestamp: Date.parse('2026-09-12T09:18:00Z'), side: 'buy', zkasAmount: 311675, totalKas: 14720.647123, priceKas: 14720.647123 / 311675 },
+  { timestamp: Date.parse('2026-09-12T09:19:00Z'), side: 'buy', zkasAmount: 13325, totalKas: 629.349877, priceKas: 629.349877 / 13325 },
+  { timestamp: Date.parse('2026-09-12T09:20:00Z'), side: 'buy', zkasAmount: 25000, totalKas: 1200, priceKas: 1200 / 25000 },
+  { timestamp: Date.parse('2026-09-12T09:21:00Z'), side: 'buy', zkasAmount: 15818, totalKas: 744.37641476, priceKas: 744.37641476 / 15818 },
+  { timestamp: Date.parse('2026-09-12T09:22:00Z'), side: 'buy', zkasAmount: 90000, totalKas: 3999.9996, priceKas: 3999.9996 / 90000 },
+  { timestamp: Date.parse('2026-09-12T09:23:00Z'), side: 'buy', zkasAmount: 59000, totalKas: 2404.99989, priceKas: 2404.99989 / 59000 },
+  { timestamp: Date.parse('2026-09-12T09:24:00Z'), side: 'buy', zkasAmount: 10000, totalKas: 400, priceKas: 400 / 10000 },
+  { timestamp: Date.parse('2026-09-12T09:25:00Z'), side: 'buy', zkasAmount: 121656.925, totalKas: 4812.80026547, priceKas: 4812.80026547 / 121656.925 },
+  { timestamp: Date.parse('2026-09-12T10:20:00Z'), side: 'buy', zkasAmount: 50000, totalKas: 2000, priceKas: 2000 / 50000 },
+  { timestamp: Date.parse('2026-09-12T10:21:00Z'), side: 'buy', zkasAmount: 100000, totalKas: 3956.043, priceKas: 3956.043 / 100000 },
+  { timestamp: Date.parse('2026-09-12T10:22:00Z'), side: 'sell', zkasAmount: 50000, totalKas: 2850, priceKas: 2850 / 50000 },
+  { timestamp: Date.parse('2026-09-12T10:23:00Z'), side: 'sell', zkasAmount: 200000, totalKas: 11500, priceKas: 11500 / 200000 },
+  { timestamp: Date.parse('2026-09-12T11:20:00Z'), side: 'sell', zkasAmount: 100000, totalKas: 5500, priceKas: 5500 / 100000 },
+  { timestamp: Date.parse('2026-09-12T11:21:00Z'), side: 'buy', zkasAmount: 11621, totalKas: 459.73175703, priceKas: 459.73175703 / 11621 },
+  { timestamp: Date.parse('2026-09-12T11:37:00Z'), side: 'sell', zkasAmount: 200000, totalKas: 11800, priceKas: 11800 / 200000 },
+  { timestamp: Date.parse('2026-09-12T11:38:00Z'), side: 'sell', zkasAmount: 100000, totalKas: 6000, priceKas: 6000 / 100000 },
+  { timestamp: Date.parse('2026-09-12T11:39:00Z'), side: 'sell', zkasAmount: 60570, totalKas: 3743.674218, priceKas: 3743.674218 / 60570 },
+  { timestamp: Date.parse('2026-09-12T11:40:00Z'), side: 'sell', zkasAmount: 50000, totalKas: 3150, priceKas: 3150 / 50000 },
+  { timestamp: Date.parse('2026-09-12T11:42:00Z'), side: 'sell', zkasAmount: 100000, totalKas: 6500, priceKas: 6500 / 100000 },
+  { timestamp: Date.parse('2026-09-12T11:48:00Z'), side: 'sell', zkasAmount: 5000, totalKas: 350, priceKas: 350 / 5000 },
+  { timestamp: Date.parse('2026-09-12T12:20:00Z'), side: 'buy', zkasAmount: 1084, totalKas: 44.52141928, priceKas: 44.52141928 / 1084 },
+];
+
 function first(record, keys) {
   for (const key of keys) {
     if (record[key] !== undefined && record[key] !== null && record[key] !== '') return record[key];
@@ -77,7 +140,12 @@ async function handleGet({ request, env, waitUntil }) {
   const endpoint = env.ZKAS_OTC_API_URL;
   if (!endpoint) {
     if (env.OTC_TRADES) {
-      const stored = await env.OTC_TRADES.get('trades:v1', 'json');
+      let stored = await env.OTC_TRADES.get('trades:v1', 'json');
+      if (Array.isArray(stored?.trades) && stored.trades.length === 1014) {
+        const trades = [...stored.trades, ...reviewedSep12MorningTrades].sort((a, b) => a.timestamp - b.timestamp);
+        stored = { schemaVersion: 1, updatedAt, trades };
+        await env.OTC_TRADES.put('trades:v1', JSON.stringify(stored));
+      }
       const trades = Array.isArray(stored?.trades) ? stored.trades.map(normalizeTrade).filter(Boolean).slice(-5000) : [];
       if (trades.length) {
         return json({ schemaVersion: 1, status: 'live', source: 'screenshot-import', updatedAt: stored.updatedAt || updatedAt, trades }, 200, 'public, max-age=10, s-maxage=30, stale-while-revalidate=120');
