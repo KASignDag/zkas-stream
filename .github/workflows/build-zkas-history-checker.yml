@@ -7,7 +7,7 @@ on:
       - .github/workflows/build-zkas-history-checker.yml
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   build-windows:
@@ -38,19 +38,30 @@ jobs:
         working-directory: zkas-rusty
         run: cargo build --locked --release --package zkas-api --bin zkas-history-status
 
-      - name: Record checksum
+      - name: Create verified download package
         shell: pwsh
         run: |
-          Get-FileHash "zkas-rusty/target/release/zkas-history-status.exe" -Algorithm SHA256 |
+          New-Item -ItemType Directory -Path "release-package" -Force | Out-Null
+          Copy-Item "zkas-rusty/target/release/zkas-history-status.exe" "release-package/zkas-history-status.exe"
+          Get-FileHash "release-package/zkas-history-status.exe" -Algorithm SHA256 |
             ForEach-Object { "$($_.Hash.ToLower())  zkas-history-status.exe" } |
-            Set-Content -Encoding ascii "zkas-history-status.sha256"
+            Set-Content -Encoding ascii "release-package/zkas-history-status.sha256"
+          Compress-Archive -Path "release-package/*" -DestinationPath "zkas-history-status-windows-x64.zip" -Force
 
-      - name: Upload Windows checker
+      - name: Upload Actions artifact
         uses: actions/upload-artifact@v4
         with:
           name: zkas-history-status-windows-x64
-          path: |
-            zkas-rusty/target/release/zkas-history-status.exe
-            zkas-history-status.sha256
+          path: zkas-history-status-windows-x64.zip
           if-no-files-found: error
           retention-days: 30
+
+      - name: Publish permanent GitHub Release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $tag = "zkas-history-checker-v1.0.8"
+          $repo = "KASignDag/zkas-stream"
+          $notes = "Read-only Windows x64 checker for the ZKAS shielded-history status RPC. Built from the official firecash/zkas-rusty zkas-v1.0.8 source. The ZIP includes the executable and SHA-256 checksum."
+          gh release create $tag "zkas-history-status-windows-x64.zip" --repo $repo --target "${{ github.sha }}" --title "ZKAS History Status Checker v1.0.8" --notes $notes
