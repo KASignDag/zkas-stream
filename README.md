@@ -41,6 +41,9 @@ The site is **public-network only**. It does not connect to or display a user's 
 - History
   - browser/VPS observer history
   - chain-work backfill where the public API supports it
+  - network-wide mining payout address ranking, search and 50-row pagination
+  - mining-payout tier distribution from Plankton/Shrimp through Aquaman
+  - final ranks only after the archival coinbase backfill reaches 100%
 - Supply & Privacy
   - consensus supply and emission schedule
   - aggregate shielded activity
@@ -82,11 +85,15 @@ ZKAS_OTC_API_KEY=
 ZKAS_OTC_API_HEADER=Authorization
 ZKAS_OTC_API_PREFIX=Bearer
 OTC_IMPORT_SECRET=
+ZKAS_MINING_RANKINGS_API_URL=
+ZKAS_MINING_RANKINGS_API_KEY=
 ```
 
 The API URL and access key are read only by `functions/api/otc-trades.js`. They are never included in the browser bundle or returned to visitors. Live responses are held in a short shared edge cache so website traffic does not create one request to Ronnie's service per visitor. Until the endpoint is configured, the OTC page displays a ready-to-connect state without fabricated trades.
 
 While the official API is unavailable, the unlisted `#otc-import` workspace reads screenshots locally in the browser, requires a human review of every row, and publishes only timestamp, side, ZKAS amount, KAS price and KAS total. Raw screenshots and OCR text are never sent to the server. Configure a Cloudflare KV binding named `OTC_TRADES` and an encrypted `OTC_IMPORT_SECRET` to enable publishing. When Ronnie's API URL is added later, the public feed switches to that source without changing the chart schema.
+
+The all-time mining payout ranking is deliberately separate from the rolling producer-distribution and solo-find tools. `functions/api/mining-rankings.js` reads a completed archival snapshot from an HTTPS service configured with `ZKAS_MINING_RANKINGS_API_URL`, or from a Cloudflare KV binding named `ZKAS_MINING_RANKINGS` at key `all-time:v1`. Snapshot rows contain `address`, `blocks`, `zkasMined`, `firstMinedAt`, and `lastMinedAt`; completion metadata contains `complete`, `processedBlocks`, `targetBlocks`, `updatedAt`, and `indexedThrough`. The UI marks every rank provisional until `complete` is true.
 
 ## Production
 

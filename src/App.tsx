@@ -51,6 +51,7 @@ import { OtcMarketPage } from './components/OtcMarketPage';
 import { OtcScreenshotImporter } from './components/OtcScreenshotImporter';
 import { SparkChart } from './components/SparkChart';
 import { GenesisSupportersPage } from './components/GenesisSupportersPage';
+import { MiningPayoutRanking } from './components/MiningPayoutRanking';
 
 type Tab = 'intelligence' | 'merged' | 'health' | 'nodes' | 'events' | 'explorer' | 'otc' | 'importer' | 'history' | 'supply' | 'reference' | 'supporters';
 
@@ -1708,6 +1709,8 @@ function HistoryPage({ data, history, range, onRange }: { data: DashboardData; h
           <div><b>OBSERVER HISTORY · TRACKING BEGAN {observerStarted.toUpperCase()}</b><span>Visible nodes, countries, mining attribution, confidence and Kaspa co-location are observations from an explorer vantage point. Their history begins when ZKAS.stream recorded them and is not retroactively fabricated.</span></div>
         </div>
       </section>
+
+      <MiningPayoutRanking />
 
       <section className="panel history-toolbar">
         <div>
