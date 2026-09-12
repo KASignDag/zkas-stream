@@ -38,6 +38,7 @@ type RankingData = {
 
 const integer = new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 });
 const amount = new Intl.NumberFormat('en-US', { maximumFractionDigits: 8 });
+const PAGE_SIZE = 20;
 
 function formatAmount(value: string | number) {
   return amount.format(Number(value));
@@ -61,7 +62,7 @@ export function MiningPayoutRanking() {
 
   useEffect(() => {
     const controller = new AbortController();
-    const params = new URLSearchParams({ page: String(page), pageSize: '50' });
+    const params = new URLSearchParams({ page: String(page), pageSize: String(PAGE_SIZE) });
     if (query) params.set('q', query);
     setLoading(true);
     setError('');
@@ -98,12 +99,13 @@ export function MiningPayoutRanking() {
 
       <div className="ranking-boundary"><ShieldCheck size={16} /><span>This ranks where mining rewards were originally sent. It is not a wallet-balance rich list and cannot follow later shielded transfers.</span></div>
 
-      <form className="ranking-search" onSubmit={submit}>
+      <form className="ranking-search" onSubmit={submit} aria-label="Mining payout address ranking lookup">
         <label>
-          <span>Find a mining payout address</span>
-          <div><Search size={17} /><input value={input} onChange={(event) => setInput(event.target.value)} placeholder="zkas:your-mining-payout-address" autoComplete="off" autoCapitalize="none" spellCheck={false} /></div>
+          <span>Search your ZKAS mining payout address</span>
+          <small>Paste the complete address to find its exact all-time rank.</small>
+          <div><Search size={20} /><input aria-label="ZKAS mining payout address" value={input} onChange={(event) => setInput(event.target.value)} placeholder="Paste a full zkas: address here" autoComplete="off" autoCapitalize="none" spellCheck={false} /></div>
         </label>
-        <button type="submit" disabled={loading || !input.trim()}>{loading && query ? 'Searching…' : 'Search ranking'}</button>
+        <button type="submit" disabled={loading || !input.trim()}>{loading && query ? 'Searching…' : 'Find address rank'}</button>
         {query && <button type="button" className="ranking-clear" onClick={() => { setInput(''); setQuery(''); setPage(1); }}>Clear</button>}
       </form>
 
@@ -149,9 +151,9 @@ export function MiningPayoutRanking() {
           </table>
         </div>
         <div className="ranking-pagination">
-          <button type="button" disabled={loading || data.page <= 1} onClick={() => setPage((value) => Math.max(1, value - 1))}>Previous 50</button>
-          <span>Page {data.page} of {data.totalPages || 1}{query ? ' · address result' : ''}</span>
-          <button type="button" disabled={loading || data.page >= data.totalPages} onClick={() => setPage((value) => value + 1)}>Next 50</button>
+          <button type="button" disabled={loading || data.page <= 1} onClick={() => setPage((value) => Math.max(1, value - 1))}>Previous 20</button>
+          <span>Page {data.page} of {data.totalPages || 1}{query ? ' · address result' : ' · 20 per page'}</span>
+          <button type="button" disabled={loading || data.page >= data.totalPages} onClick={() => setPage((value) => value + 1)}>Next 20</button>
         </div>
       </> : !loading && final && <div className="ranking-empty">{query ? 'This address has not received an indexed mining reward.' : 'No indexed mining payout addresses were returned.'}</div>}
 

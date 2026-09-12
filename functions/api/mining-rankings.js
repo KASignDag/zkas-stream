@@ -1,4 +1,4 @@
-const DEFAULT_PAGE_SIZE = 50;
+const DEFAULT_PAGE_SIZE = 20;
 const MAX_PAGE_SIZE = 50;
 const STORAGE_KEY = 'all-time:v1';
 const MAX_UPLOAD_BYTES = 2_000_000;
