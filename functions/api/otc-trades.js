@@ -1,5 +1,15 @@
 const commonTradeArrays = ['trades', 'data', 'results', 'items', 'completedTrades', 'completed_trades'];
 
+// One-time, count-guarded import for the four newest reviewed Discord trades.
+// The desk reports 1,086 rows; the public history excludes 11 historical
+// test/outlier rows, so this advances the stored public total from 1,071 to 1,075.
+const reviewedSep12AfternoonTrades = [
+  { timestamp: Date.parse('2026-09-12T13:20:00Z'), side: 'sell', zkasAmount: 77630, totalKas: 5045.95, priceKas: 5045.95 / 77630 },
+  { timestamp: Date.parse('2026-09-12T13:21:00Z'), side: 'sell', zkasAmount: 11.23, totalKas: 0.72995, priceKas: 0.72995 / 11.23 },
+  { timestamp: Date.parse('2026-09-12T14:20:00Z'), side: 'sell', zkasAmount: 300, totalKas: 19.5, priceKas: 19.5 / 300 },
+  { timestamp: Date.parse('2026-09-12T16:51:00Z'), side: 'buy', zkasAmount: 8200, totalKas: 336.785644, priceKas: 336.785644 / 8200 },
+];
+
 function first(record, keys) {
   for (const key of keys) {
     if (record[key] !== undefined && record[key] !== null && record[key] !== '') return record[key];
@@ -77,7 +87,12 @@ async function handleGet({ request, env, waitUntil }) {
   const endpoint = env.ZKAS_OTC_API_URL;
   if (!endpoint) {
     if (env.OTC_TRADES) {
-      const stored = await env.OTC_TRADES.get('trades:v1', 'json');
+      let stored = await env.OTC_TRADES.get('trades:v1', 'json');
+      if (Array.isArray(stored?.trades) && stored.trades.length === 1071) {
+        const trades = [...stored.trades, ...reviewedSep12AfternoonTrades].sort((a, b) => a.timestamp - b.timestamp);
+        stored = { schemaVersion: 1, updatedAt, trades };
+        await env.OTC_TRADES.put('trades:v1', JSON.stringify(stored));
+      }
       const trades = Array.isArray(stored?.trades) ? stored.trades.map(normalizeTrade).filter(Boolean).slice(-5000) : [];
       if (trades.length) {
         return json({ schemaVersion: 1, status: 'live', source: 'screenshot-import', updatedAt: stored.updatedAt || updatedAt, trades }, 200, 'public, max-age=10, s-maxage=30, stale-while-revalidate=120');
