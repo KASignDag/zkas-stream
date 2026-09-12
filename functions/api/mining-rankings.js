@@ -1,6 +1,8 @@
 const DEFAULT_PAGE_SIZE = 50;
 const MAX_PAGE_SIZE = 50;
 const STORAGE_KEY = 'all-time:v1';
+const MAX_UPLOAD_BYTES = 2_000_000;
+const UPLOAD_TOKEN_SHA256 = 'ade7baad8fb683f5eb9e575f881d2ca54c1058bf428012a45d8c3066ba6e4aa3';
 const SOMPI_PER_ZKAS = 100_000_000n;
 const PAYOUT_TIERS = [
   { key: 'plankton', name: 'Plankton / Shrimp', range: 'Under 100 ZKAS', min: 0n, max: 100n * SOMPI_PER_ZKAS },
@@ -85,14 +87,138 @@ function buildTiers(rows) {
   });
 }
 
-function json(body, status = 200) {
+function json(body, status = 200, cacheControl) {
   return Response.json(body, {
     status,
     headers: {
-      'Cache-Control': status === 200 ? 'public, max-age=30, s-maxage=120, stale-while-revalidate=300' : 'private, no-store',
+      'Cache-Control': cacheControl ?? (status === 200 ? 'public, max-age=30, s-maxage=120, stale-while-revalidate=300' : 'private, no-store'),
       'X-Content-Type-Options': 'nosniff',
     },
   });
+}
+
+function rankingsStore(env) {
+  return env.ZKAS_MINING_RANKINGS || env.OTC_TRADES || null;
+}
+
+function constantTimeEqual(left, right) {
+  let difference = left.length ^ right.length;
+  const length = Math.max(left.length, right.length);
+  for (let index = 0; index < length; index += 1) {
+    difference |= (left.charCodeAt(index) || 0) ^ (right.charCodeAt(index) || 0);
+  }
+  return difference === 0;
+}
+
+async function authorized(request, env) {
+  const token = request.headers.get('Authorization')?.replace(/^Bearer\s+/i, '') || '';
+  if (!token) return false;
+  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(token));
+  const suppliedHash = [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, '0')).join('');
+  const expectedHash = typeof env.ZKAS_MINING_RANKINGS_UPLOAD_SHA256 === 'string'
+    ? env.ZKAS_MINING_RANKINGS_UPLOAD_SHA256.trim().toLowerCase()
+    : UPLOAD_TOKEN_SHA256;
+  return /^[a-f0-9]{64}$/.test(expectedHash) && constantTimeEqual(suppliedHash, expectedHash);
+}
+
+async function readJson(request) {
+  const declaredSize = Number(request.headers.get('Content-Length') || 0);
+  if (declaredSize > MAX_UPLOAD_BYTES) throw new Error('payload_too_large');
+  if (!request.body) throw new Error('invalid_json');
+
+  const reader = request.body.getReader();
+  const chunks = [];
+  let size = 0;
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    size += value.byteLength;
+    if (size > MAX_UPLOAD_BYTES) {
+      await reader.cancel();
+      throw new Error('payload_too_large');
+    }
+    chunks.push(value);
+  }
+  const bytes = new Uint8Array(size);
+  let offset = 0;
+  for (const chunk of chunks) {
+    bytes.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  try {
+    return JSON.parse(new TextDecoder().decode(bytes));
+  } catch {
+    throw new Error('invalid_json');
+  }
+}
+
+function safeNonNegativeInteger(value) {
+  return typeof value === 'number' && Number.isSafeInteger(value) && value >= 0;
+}
+
+function validHash(value) {
+  return typeof value === 'string' && /^[a-f0-9]{64}$/.test(value);
+}
+
+function validateSnapshot(payload) {
+  if (!payload || typeof payload !== 'object' || Array.isArray(payload)) throw new Error('invalid_snapshot');
+  if (payload.schemaVersion !== 1 || payload.status !== 'complete' || payload.complete !== true) throw new Error('snapshot_not_complete');
+  if (payload.source?.historyComplete !== true || payload.source?.historyFromDaaScore !== 0) throw new Error('history_not_complete_from_genesis');
+
+  const checkpointHash = String(payload.source?.checkpointHash || '').toLowerCase();
+  const indexedHash = String(payload.indexedThroughHash || '').toLowerCase();
+  const checkpointDaa = payload.source?.checkpointDaaScore;
+  const indexedDaa = payload.indexedThroughDaaScore;
+  if (!validHash(checkpointHash) || checkpointHash !== indexedHash) throw new Error('checkpoint_hash_mismatch');
+  if (!safeNonNegativeInteger(checkpointDaa) || checkpointDaa !== indexedDaa) throw new Error('checkpoint_daa_mismatch');
+
+  const processedBlocks = payload.backfill?.processedBlocks;
+  const targetBlocks = payload.backfill?.targetBlocks;
+  const coveragePercent = payload.backfill?.coveragePercent;
+  if (!safeNonNegativeInteger(processedBlocks) || processedBlocks < 1 || processedBlocks !== targetBlocks || coveragePercent !== 100) {
+    throw new Error('backfill_not_complete');
+  }
+  if (!Array.isArray(payload.rows) || payload.rows.length < 1 || payload.rows.length > 100_000) throw new Error('invalid_rows');
+
+  const addresses = new Set();
+  let previous = null;
+  const rows = payload.rows.map((value, index) => {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error('invalid_row');
+    const rank = value.rank;
+    const address = normalizeAddress(value.address);
+    const blocks = value.blocks;
+    const sompiText = value.zkasMinedSompi;
+    if (rank !== index + 1 || !/^zkas:[a-z0-9]{30,160}$/.test(address)) throw new Error('invalid_rank_or_address');
+    if (!Number.isSafeInteger(blocks) || blocks < 1 || typeof sompiText !== 'string' || !/^[1-9]\d*$/.test(sompiText)) throw new Error('invalid_mining_totals');
+    if (addresses.has(address)) throw new Error('duplicate_address');
+    addresses.add(address);
+
+    const sompi = BigInt(sompiText);
+    if (value.zkasMined !== formatSompi(sompi)) throw new Error('zkas_total_mismatch');
+    const comparable = { address, blocks, sompi };
+    if (previous && (sompi > previous.sompi
+      || (sompi === previous.sompi && blocks > previous.blocks)
+      || (sompi === previous.sompi && blocks === previous.blocks && address < previous.address))) {
+      throw new Error('rows_not_ranked');
+    }
+    previous = comparable;
+    return { ...value, rank, address, blocks, zkasMined: formatSompi(sompi), zkasMinedSompi: sompiText };
+  });
+
+  return {
+    snapshot: {
+      ...payload,
+      schemaVersion: 1,
+      status: 'complete',
+      complete: true,
+      updatedAt: Date.now(),
+      indexedThroughHash: indexedHash,
+      indexedThroughDaaScore: indexedDaa,
+      source: { ...payload.source, checkpointHash, checkpointDaaScore: checkpointDaa, historyFromDaaScore: 0, historyComplete: true },
+      rows,
+    },
+    summary: { checkpointHash, checkpointDaaScore: checkpointDaa, processedBlocks, addresses: rows.length },
+  };
 }
 
 function positiveInteger(value, fallback) {
@@ -139,8 +265,9 @@ async function loadSnapshot(env, request) {
     }
   }
 
-  if (env.ZKAS_MINING_RANKINGS) {
-    const snapshot = await env.ZKAS_MINING_RANKINGS.get(STORAGE_KEY, 'json');
+  const store = rankingsStore(env);
+  if (store) {
+    const snapshot = await store.get(STORAGE_KEY, 'json');
     if (snapshot) return { snapshot };
   }
 
@@ -214,7 +341,38 @@ export async function onRequestGet(context) {
   });
 }
 
+export async function onRequestPost(context) {
+  if (!(await authorized(context.request, context.env))) return json({ error: 'unauthorized' }, 401);
+  const store = rankingsStore(context.env);
+  if (!store) return json({ error: 'storage_not_configured' }, 503);
+
+  let payload;
+  try {
+    payload = await readJson(context.request);
+  } catch (error) {
+    const reason = error instanceof Error ? error.message : 'invalid_json';
+    return json({ error: reason }, reason === 'payload_too_large' ? 413 : 400);
+  }
+
+  let validated;
+  try {
+    validated = validateSnapshot(payload);
+  } catch (error) {
+    return json({ error: 'invalid_snapshot', reason: error instanceof Error ? error.message : 'validation_failed' }, 422);
+  }
+
+  const existing = await store.get(STORAGE_KEY, 'json');
+  const existingDaa = existing?.source?.checkpointDaaScore ?? existing?.indexedThroughDaaScore;
+  if (safeNonNegativeInteger(existingDaa) && validated.summary.checkpointDaaScore < existingDaa) {
+    return json({ error: 'stale_snapshot', existingDaaScore: existingDaa, incomingDaaScore: validated.summary.checkpointDaaScore }, 409);
+  }
+
+  await store.put(STORAGE_KEY, JSON.stringify(validated.snapshot));
+  return json({ ok: true, ...validated.summary }, 200, 'private, no-store, max-age=0');
+}
+
 export function onRequest(context) {
   if (context.request.method === 'GET') return onRequestGet(context);
+  if (context.request.method === 'POST') return onRequestPost(context);
   return json({ error: 'method_not_allowed' }, 405);
 }
