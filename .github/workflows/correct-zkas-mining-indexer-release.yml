@@ -1,0 +1,19 @@
+name: Correct ZKAS mining indexer release checksum
+
+on:
+  push:
+    paths:
+      - .github/workflows/correct-zkas-mining-indexer-release.yml
+
+permissions:
+  contents: write
+
+jobs:
+  correct:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Correct release notes
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release edit "zkas-mining-indexer-v1.0.8" --repo "KASignDag/zkas-stream" --notes "Read-only network-wide ZKAS mining payout indexer built against official ZKAS v1.0.8. Requires a local node whose shielded history is complete from genesis. The ZIP includes the executable and its SHA-256 checksum. Release ZIP SHA256: 0f51631e37493824522bed8664ff3934b682bede1e35a2249f622d2ea838bbca. EXE SHA256: a35af09a0ca5c569be01af41264a23a75d8d913f0de16d972db5abf35c77b7a3."
