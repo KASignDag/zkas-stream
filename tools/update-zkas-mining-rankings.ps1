@@ -82,7 +82,8 @@ try {
     }
     if ($snapshot.rows.Count -lt 1) { throw "Snapshot contains no payout addresses." }
 
-    $secureToken = Get-Content -LiteralPath $TokenPath -Raw -Encoding ASCII | ConvertTo-SecureString
+    $encryptedToken = (Get-Content -LiteralPath $TokenPath -Raw -Encoding ASCII).Trim()
+    $secureToken = ConvertTo-SecureString $encryptedToken
     $bstr = [Runtime.InteropServices.Marshal]::SecureStringToBSTR($secureToken)
     $token = [Runtime.InteropServices.Marshal]::PtrToStringBSTR($bstr)
 
@@ -100,4 +101,3 @@ try {
     $token = $null
     if ($lock) { $lock.Dispose() }
 }
-
