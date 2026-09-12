@@ -32,4 +32,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release create "zkas-mining-indexer-v1.0.8" --repo "KASignDag/zkas-stream" --target "cf6c5792a0a8595df6d90c009b363f1d31c2ba92" --title "ZKAS Mining Payout Indexer for Windows x64" --notes "Read-only network-wide ZKAS mining payout indexer built against official ZKAS v1.0.8. Requires a local node whose shielded history is complete from genesis. EXE SHA256: 9540391017771a23d5e3b4dc7cd2272dc2627386d9493fb2e626ab8fabaca010" "artifact/zkas-mining-indexer-windows-x64.zip"
+          $tag = "zkas-mining-indexer-v1.0.8"
+          $repo = "KASignDag/zkas-stream"
+          $notes = "Read-only network-wide ZKAS mining payout indexer built against official ZKAS v1.0.8. Requires a local node whose shielded history is complete from genesis. EXE SHA256: 9540391017771a23d5e3b4dc7cd2272dc2627386d9493fb2e626ab8fabaca010"
+          gh release create $tag "artifact/zkas-mining-indexer-windows-x64.zip" --repo $repo --target "${{ github.sha }}" --title "ZKAS Mining Payout Indexer for Windows x64" --notes $notes
