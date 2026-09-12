@@ -1,0 +1,48 @@
+name: Build ZKAS history checker
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - .github/workflows/build-zkas-history-checker.yml
+
+permissions:
+  contents: read
+
+jobs:
+  build-windows:
+    name: Windows x64
+    runs-on: windows-latest
+    timeout-minutes: 60
+
+    steps:
+      - name: Check out official ZKAS source
+        uses: actions/checkout@v4
+        with:
+          repository: firecash/zkas-rusty
+          ref: zkas-v1.0.8
+          path: zkas-rusty
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Build read-only history checker
+        working-directory: zkas-rusty
+        run: cargo build --locked --release --package zkas-api --bin zkas-history-status
+
+      - name: Record checksum
+        shell: pwsh
+        run: |
+          Get-FileHash "zkas-rusty/target/release/zkas-history-status.exe" -Algorithm SHA256 |
+            ForEach-Object { "$($_.Hash.ToLower())  zkas-history-status.exe" } |
+            Set-Content -Encoding ascii "zkas-history-status.sha256"
+
+      - name: Upload Windows checker
+        uses: actions/upload-artifact@v4
+        with:
+          name: zkas-history-status-windows-x64
+          path: |
+            zkas-rusty/target/release/zkas-history-status.exe
+            zkas-history-status.sha256
+          if-no-files-found: error
+          retention-days: 30
