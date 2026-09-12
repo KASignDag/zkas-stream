@@ -9,6 +9,7 @@ import {
   CodeXml,
   Database,
   Download,
+  ExternalLink,
   Gauge,
   GitMerge,
   Globe2,
@@ -1997,6 +1998,33 @@ type HashrateComparisonPoint = {
   zkas: number | null;
 };
 
+type RustyKaspaPoolData = {
+  source: string;
+  sourceUrl: string;
+  fetchedAt: number;
+  status: string;
+  scheme: string;
+  activeMiners: number | null;
+  poolHashrateHps: number | null;
+  blocksMatured: number | null;
+  blocksOrphaned: number | null;
+  totalPaidKas: number | null;
+  totalOwedKas: number | null;
+  sharesLastHour: number | null;
+  lastBlockFoundAt: number | null;
+  poolFeePercent: number | null;
+  totalDistributedKas: number | null;
+  pendingSweepKas: number | null;
+  feeAllocation: Array<{
+    key: string;
+    label: string;
+    percent: number | null;
+    sweptKas: number | null;
+    pendingKas: number | null;
+  }>;
+  stale?: boolean;
+};
+
 const KASPA_HASHRATE_HISTORY_URL = 'https://api.kaspa.org/info/hashrate/history';
 const ZKAS_LAUNCH_TIME = Date.parse('2026-07-26T00:00:00Z');
 const HASHRATE_HISTORY_START = Date.parse('2026-07-20T00:00:00Z');
@@ -2086,9 +2114,97 @@ function ExplorerPage({ data, txs, onSelect }: {
       {view === 'dag' && <>
         <DagSnapshot blocks={recentBlocks} onSelect={onSelect} />
         <HashrateComparison />
+        <RustyKaspaPoolMonitor />
       </>}
       {view === 'blocks' && <BlocksPage blocks={recentBlocks} onSelect={onSelect} />}
       {view === 'transactions' && <TransactionsPage txs={recentTxs} onSelect={onSelect} />}
+    </section>
+  );
+}
+
+function RustyKaspaPoolMonitor() {
+  const [snapshot, setSnapshot] = useState<RustyKaspaPoolData | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [failed, setFailed] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+    let controller = new AbortController();
+
+    const load = () => {
+      controller.abort();
+      controller = new AbortController();
+      fetch('/api/rustykaspa-pool', { headers: { Accept: 'application/json' }, signal: controller.signal })
+        .then((response) => {
+          if (!response.ok) throw new Error('RustyKaspa pool data unavailable');
+          return response.json() as Promise<RustyKaspaPoolData>;
+        })
+        .then((data) => {
+          if (!active) return;
+          setSnapshot(data);
+          setFailed(false);
+        })
+        .catch(() => {
+          if (active && !controller.signal.aborted) setFailed(true);
+        })
+        .finally(() => {
+          if (active) setLoading(false);
+        });
+    };
+
+    load();
+    const interval = window.setInterval(load, 300_000);
+    return () => {
+      active = false;
+      controller.abort();
+      window.clearInterval(interval);
+    };
+  }, []);
+
+  const sourceUrl = snapshot?.sourceUrl || 'https://rkstratum.rustykaspa.org/bridges/rkstratum-pool';
+  const statusLabel = snapshot?.stale ? 'STALE SNAPSHOT' : snapshot?.status === 'online' ? 'ONLINE' : failed ? 'UNAVAILABLE' : 'LOADING';
+  const stats = snapshot ? [
+    { label: 'Active miners', value: displayNumber(snapshot.activeMiners), icon: <UsersRound size={18} /> },
+    { label: 'Pool hashrate', value: displayHashrate(snapshot.poolHashrateHps), icon: <Gauge size={18} /> },
+    { label: 'Blocks matured', value: displayNumber(snapshot.blocksMatured), icon: <Boxes size={18} /> },
+    { label: 'Total paid', value: `${displayNumber(snapshot.totalPaidKas)} KAS`, icon: <CircleDollarSign size={18} /> },
+    { label: 'KAS owed', value: `${displayNumber(snapshot.totalOwedKas)} KAS`, icon: <Coins size={18} /> },
+    { label: 'Pool fee', value: snapshot.poolFeePercent === null ? '—' : `${fmt.format(snapshot.poolFeePercent)}%`, icon: <Activity size={18} /> },
+  ] : [];
+
+  return (
+    <section className="panel rustykaspa-pool-panel">
+      <div className="panel-head rustykaspa-pool-head">
+        <div><span className="panel-icon"><Server size={20} /></span><h2>RustyKaspa community pool</h2></div>
+        <span className={`pool-status ${snapshot?.status === 'online' && !snapshot.stale ? 'online' : ''}`}><i /> {statusLabel}</span>
+      </div>
+      <p className="rustykaspa-pool-intro">Live aggregate statistics for the public KAS + ZKAS {snapshot?.scheme || 'PPLNS'} pool.</p>
+
+      {loading && !snapshot ? <div className="hashrate-chart-loading">Loading public pool statistics…</div> : failed && !snapshot ? (
+        <div className="hashrate-chart-loading error">RustyKaspa pool statistics are temporarily unavailable.</div>
+      ) : snapshot && <>
+        <div className="rustykaspa-stat-grid">
+          {stats.map((stat) => <div key={stat.label}><span>{stat.icon}{stat.label}</span><b>{stat.value}</b></div>)}
+        </div>
+
+        <div className="rustykaspa-fee-card">
+          <div className="rustykaspa-fee-title">
+            <div><span>Pool-fee allocation</span><b>{snapshot.poolFeePercent === null ? '—' : `${fmt.format(snapshot.poolFeePercent)}% of block rewards`}</b></div>
+            <div className="rustykaspa-fee-totals"><span>Distributed <b>{displayNumber(snapshot.totalDistributedKas)} KAS</b></span><span>Pending <b>{displayNumber(snapshot.pendingSweepKas)} KAS</b></span></div>
+          </div>
+          <div className="rustykaspa-allocation-bar" aria-label="Pool fee allocation">
+            {snapshot.feeAllocation.map((item) => <i key={item.key} className={item.key} style={{ width: `${item.percent || 0}%` }} />)}
+          </div>
+          <div className="rustykaspa-allocation-list">
+            {snapshot.feeAllocation.map((item) => <span key={item.key}><i className={item.key} /><b>{item.label}</b> {item.percent === null ? '—' : `${fmt.format(item.percent)}%`}</span>)}
+          </div>
+        </div>
+
+        <div className="rustykaspa-pool-foot">
+          <p><ShieldCheck size={16} /> ZKAS.stream retains and displays pool-wide totals only—never miner addresses, worker names, payment records, or private verification entries. Updated every five minutes{snapshot.fetchedAt ? ` · ${age(snapshot.fetchedAt)}` : ''}.</p>
+          <a href={sourceUrl} target="_blank" rel="noreferrer">Open official pool dashboard <ExternalLink size={15} /></a>
+        </div>
+      </>}
     </section>
   );
 }

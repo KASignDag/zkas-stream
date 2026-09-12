@@ -1041,10 +1041,49 @@ footer { width: min(1320px, calc(100% - 40px)); margin: 0 auto; padding: 22px 0 
 .hashrate-chart-loading { min-height: 300px; display: grid; place-items: center; border: 1px dashed var(--border); border-radius: 12px; background: var(--surface-2); color: var(--muted); font-size: 12px; text-align: center; padding: 24px; }
 .hashrate-chart-loading.error { color: var(--danger); }
 
+/* Explorer — public RustyKaspa pool aggregates */
+.rustykaspa-pool-panel { overflow: hidden; }
+.rustykaspa-pool-head { align-items: center; }
+.rustykaspa-pool-intro { margin: -1px 0 15px; color: var(--muted); font-size: 12px; line-height: 1.55; }
+.pool-status { display: inline-flex; align-items: center; gap: 7px; border: 1px solid var(--border); border-radius: 999px; padding: 6px 10px; color: var(--muted); font-size: 10px; font-weight: 800; letter-spacing: .08em; }
+.pool-status i { width: 7px; height: 7px; border-radius: 50%; background: var(--muted); }
+.pool-status.online { color: var(--accent); border-color: color-mix(in srgb, var(--accent) 40%, transparent); background: color-mix(in srgb, var(--accent) 9%, transparent); }
+.pool-status.online i { background: var(--accent); box-shadow: 0 0 0 5px color-mix(in srgb, var(--accent) 14%, transparent); }
+.rustykaspa-stat-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+.rustykaspa-stat-grid > div { min-width: 0; border: 1px solid var(--border); border-radius: 13px; padding: 14px; background: var(--surface-2); }
+.rustykaspa-stat-grid span { display: flex; align-items: center; gap: 7px; color: var(--muted); font-size: 11px; font-weight: 700; }
+.rustykaspa-stat-grid span svg { color: var(--accent); flex: 0 0 auto; }
+.rustykaspa-stat-grid b { display: block; overflow: hidden; margin-top: 7px; color: var(--text); font-size: clamp(17px, 2.4vw, 24px); text-overflow: ellipsis; white-space: nowrap; }
+.rustykaspa-fee-card { margin-top: 12px; border: 1px solid var(--border); border-radius: 13px; padding: 15px; background: var(--surface-2); }
+.rustykaspa-fee-title { display: flex; align-items: flex-end; justify-content: space-between; gap: 20px; }
+.rustykaspa-fee-title > div:first-child span { display: block; color: var(--muted); font-size: 11px; }
+.rustykaspa-fee-title > div:first-child b { display: block; margin-top: 3px; color: var(--text); font-size: 15px; }
+.rustykaspa-fee-totals { display: flex; gap: 16px; color: var(--muted); font-size: 10px; }
+.rustykaspa-fee-totals b { color: var(--text); }
+.rustykaspa-allocation-bar { display: flex; height: 9px; overflow: hidden; margin-top: 13px; border-radius: 999px; background: var(--border); }
+.rustykaspa-allocation-bar i { height: 100%; }
+.rustykaspa-allocation-bar .community_multisig, .rustykaspa-allocation-list .community_multisig { background: #49eacb; }
+.rustykaspa-allocation-bar .operations, .rustykaspa-allocation-list .operations { background: #79c9bd; }
+.rustykaspa-allocation-bar .rewards, .rustykaspa-allocation-list .rewards { background: #f0a13b; }
+.rustykaspa-allocation-bar .fee_buffer, .rustykaspa-allocation-list .fee_buffer { background: #8b93a7; }
+.rustykaspa-allocation-list { display: flex; flex-wrap: wrap; gap: 8px 17px; margin-top: 11px; color: var(--muted); font-size: 10px; }
+.rustykaspa-allocation-list span { display: inline-flex; align-items: center; gap: 5px; }
+.rustykaspa-allocation-list i { width: 8px; height: 8px; border-radius: 50%; }
+.rustykaspa-allocation-list b { color: var(--text); }
+.rustykaspa-pool-foot { display: flex; align-items: center; justify-content: space-between; gap: 20px; margin-top: 14px; }
+.rustykaspa-pool-foot p { display: flex; align-items: flex-start; gap: 7px; max-width: 700px; margin: 0; color: var(--muted); font-size: 10px; line-height: 1.55; }
+.rustykaspa-pool-foot p svg { flex: 0 0 auto; margin-top: 1px; color: var(--accent); }
+.rustykaspa-pool-foot a { display: inline-flex; align-items: center; gap: 6px; flex: 0 0 auto; color: var(--accent); font-size: 11px; font-weight: 800; text-decoration: none; }
+.rustykaspa-pool-foot a:hover { text-decoration: underline; }
+
 @media (max-width: 700px) {
   .hashrate-comparison-head { align-items: flex-start; flex-direction: column; gap: 10px; }
   .hashrate-summary-grid { grid-template-columns: 1fr; }
   .hashrate-chart-shell { overflow-x: auto; }
   .hashrate-comparison-chart { width: 720px; max-width: none; }
   .hashrate-chart-readout { position: sticky; left: 12px; right: auto; width: 190px; margin: -2px 0 12px 12px; }
+  .rustykaspa-pool-head { align-items: flex-start; flex-direction: column; gap: 10px; }
+  .rustykaspa-stat-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .rustykaspa-fee-title, .rustykaspa-pool-foot { align-items: flex-start; flex-direction: column; }
+  .rustykaspa-fee-totals { flex-wrap: wrap; }
 }
