@@ -1103,6 +1103,16 @@ footer { width: min(1320px, calc(100% - 40px)); margin: 0 auto; padding: 22px 0 
 .miner-payments b { color: var(--text); }
 .miner-payments code { color: var(--accent); }
 .miner-payments > p { margin: 0; padding: 13px; color: var(--muted); font-size: 9px; }
+.solo-lookup-card { border-color: color-mix(in srgb, #f0a13b 30%, var(--border)); background: linear-gradient(145deg, var(--surface-2), color-mix(in srgb, #f0a13b 7%, var(--surface-2))); }
+.solo-lookup-limits { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 12px; }
+.solo-lookup-limits > div { padding: 11px 12px; border: 1px solid var(--border); border-radius: 9px; background: var(--surface); }
+.solo-lookup-limits b, .solo-lookup-limits span { display: block; }
+.solo-lookup-limits b { color: var(--text); font-size: 10px; }
+.solo-lookup-limits span { margin-top: 4px; color: var(--muted); font-size: 9px; line-height: 1.5; }
+.solo-lookup-limits > div:first-child b { color: var(--accent); }
+.solo-lookup-limits > div:last-child b { color: #d7953f; }
+.solo-result-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.solo-finds-list b { text-transform: capitalize; }
 .rustykaspa-pool-foot { display: flex; align-items: center; justify-content: space-between; gap: 20px; margin-top: 14px; }
 .rustykaspa-pool-foot p { display: flex; align-items: flex-start; gap: 7px; max-width: 700px; margin: 0; color: var(--muted); font-size: 10px; line-height: 1.55; }
 .rustykaspa-pool-foot p svg { flex: 0 0 auto; margin-top: 1px; color: var(--accent); }
@@ -1126,4 +1136,5 @@ footer { width: min(1320px, calc(100% - 40px)); margin: 0 auto; padding: 22px 0 
   .miner-result-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .miner-payments > div { grid-template-columns: 1fr auto; }
   .miner-payments code { grid-column: 1 / -1; }
+  .solo-lookup-limits { grid-template-columns: 1fr; }
 }

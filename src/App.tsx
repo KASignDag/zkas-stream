@@ -2046,6 +2046,21 @@ type RustyKaspaMinerData = {
   }>;
 };
 
+type RustyKaspaSoloData = {
+  found: true;
+  fetchedAt: number;
+  findCount: number;
+  findsLast24h: number | null;
+  findsLast7d: number | null;
+  returned: number;
+  hasMore: boolean;
+  finds: Array<{
+    blockHash: string;
+    acceptedAt: number | null;
+    role: string;
+  }>;
+};
+
 const KASPA_HASHRATE_HISTORY_URL = 'https://api.kaspa.org/info/hashrate/history';
 const ZKAS_LAUNCH_TIME = Date.parse('2026-07-26T00:00:00Z');
 const HASHRATE_HISTORY_START = Date.parse('2026-07-20T00:00:00Z');
@@ -2151,6 +2166,10 @@ function RustyKaspaPoolMonitor() {
   const [minerResult, setMinerResult] = useState<RustyKaspaMinerData | null>(null);
   const [minerLoading, setMinerLoading] = useState(false);
   const [minerError, setMinerError] = useState('');
+  const [soloAddress, setSoloAddress] = useState('');
+  const [soloResult, setSoloResult] = useState<RustyKaspaSoloData | null>(null);
+  const [soloLoading, setSoloLoading] = useState(false);
+  const [soloError, setSoloError] = useState('');
 
   useEffect(() => {
     let active = true;
@@ -2223,6 +2242,31 @@ function RustyKaspaPoolMonitor() {
     }).finally(() => setMinerLoading(false));
   };
 
+  const lookupSoloMiner = (event: FormEvent) => {
+    event.preventDefault();
+    const address = soloAddress.trim();
+    if (!address) return;
+    setSoloLoading(true);
+    setSoloError('');
+    setSoloResult(null);
+    fetch('/api/rustykaspa-solo', {
+      method: 'POST',
+      headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
+      cache: 'no-store',
+      body: JSON.stringify({ address }),
+    }).then(async (response) => {
+      const data = await response.json() as RustyKaspaSoloData | { error?: string };
+      if (!response.ok) {
+        const code = 'error' in data ? data.error : '';
+        if (code === 'invalid_zkas_address') throw new Error('Enter a valid mainnet zkas: payout address.');
+        throw new Error('Solo-mining lookup is temporarily unavailable.');
+      }
+      setSoloResult(data as RustyKaspaSoloData);
+    }).catch((error) => {
+      setSoloError(error instanceof Error ? error.message : 'Solo-mining lookup is temporarily unavailable.');
+    }).finally(() => setSoloLoading(false));
+  };
+
   return (
     <section className="panel rustykaspa-pool-panel">
       <div className="panel-head rustykaspa-pool-head">
@@ -2253,7 +2297,7 @@ function RustyKaspaPoolMonitor() {
 
         <div className="miner-lookup-card">
           <div className="miner-lookup-head">
-            <div><span className="panel-icon"><Search size={19} /></span><div><h3>Look up my miner</h3><p>Enter the Kaspa payout address used on the RustyKaspa PPLNS pool.</p></div></div>
+            <div><span className="panel-icon"><Search size={19} /></span><div><h3>Look up my PPLNS miner</h3><p>Enter the Kaspa payout address used on the RustyKaspa PPLNS pool.</p></div></div>
             <span className="privacy-chip"><ShieldCheck size={14} /> PRIVATE LOOKUP</span>
           </div>
           <form className="miner-lookup-form" onSubmit={lookupMiner}>
@@ -2292,6 +2336,54 @@ function RustyKaspaPoolMonitor() {
                 <b>{displayNumber(payment.amountKas)} KAS</b>
                 <code>{payment.txId ? short(payment.txId, 7) : payment.status || 'sent'}</code>
               </div>) : <p>No recent payment records were returned for this miner.</p>}
+            </div>
+          </div>}
+        </div>
+
+        <div className="miner-lookup-card solo-lookup-card">
+          <div className="miner-lookup-head">
+            <div><span className="panel-icon"><GitMerge size={19} /></span><div><h3>Verify my solo ZKAS finds</h3><p>Enter the ZKAS payout address used as the password on the KAS + ZKAS solo Stratum.</p></div></div>
+            <span className="privacy-chip"><ShieldCheck size={14} /> PRIVATE LOOKUP</span>
+          </div>
+          <form className="miner-lookup-form" onSubmit={lookupSoloMiner}>
+            <input
+              type="password"
+              value={soloAddress}
+              onChange={(event) => setSoloAddress(event.target.value)}
+              placeholder="zkas:your-payout-address"
+              aria-label="ZKAS solo payout address"
+              autoComplete="off"
+              autoCapitalize="none"
+              spellCheck={false}
+            />
+            <button type="submit" disabled={soloLoading || !soloAddress.trim()}>{soloLoading ? 'Verifying…' : 'Verify solo finds'}</button>
+          </form>
+          <p className="miner-lookup-privacy"><LockKeyhole size={14} /> The address is sent by POST, is not placed in the URL, and is not saved, cached, or returned by ZKAS.stream.</p>
+
+          <div className="solo-lookup-limits">
+            <div><b>Can be shown</b><span>Accepted ZKAS block finds, find totals, recent activity, acceptance times, and ZKAS block hashes.</span></div>
+            <div><b>Not included in the solo result</b><span>Hashrate, Kaspa wallet, worker name, and reward amounts cannot be derived from this ZKAS lookup. PPLNS balances and payments use the separate pool lookup.</span></div>
+          </div>
+
+          {soloError && <p className="miner-lookup-error">{soloError}</p>}
+          {soloResult && <div className="miner-result solo-result">
+            <div className="miner-result-head">
+              <div><b>{soloResult.findCount ? 'Solo finds verified' : 'No solo finds recorded'}</b><span>Checked {age(soloResult.fetchedAt)}</span></div>
+              <div className="miner-result-badges"><span className="merge-on">KAS + ZKAS SOLO</span></div>
+            </div>
+            <div className="miner-result-grid solo-result-grid">
+              <div><span>All recorded finds</span><b>{displayNumber(soloResult.findCount)}</b></div>
+              <div><span>Last 24 hours</span><b>{displayNumber(soloResult.findsLast24h)}</b></div>
+              <div><span>Last 7 days</span><b>{displayNumber(soloResult.findsLast7d)}</b></div>
+              <div><span>Newest shown</span><b>{displayNumber(soloResult.returned)}</b></div>
+            </div>
+            <div className="miner-payments solo-finds-list">
+              <h4>Accepted ZKAS blocks</h4>
+              {soloResult.finds.length ? soloResult.finds.map((find) => <div key={find.blockHash}>
+                <span>{find.acceptedAt ? new Date(find.acceptedAt).toLocaleString() : 'Time unavailable'}</span>
+                <b>{find.role || 'miner'}</b>
+                <code title={find.blockHash}>{short(find.blockHash, 10)}</code>
+              </div>) : <p>No ZKAS blocks were returned for this solo payout address.</p>}
             </div>
           </div>}
         </div>
