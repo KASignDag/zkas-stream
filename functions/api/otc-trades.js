@@ -72,31 +72,12 @@ function json(body, status = 200, cacheControl = 'private, no-store, max-age=0')
   });
 }
 
-// Reviewed Discord screenshots: desk 1,130, less 11 permanent test/outlier exclusions = 1,119 public trades.
-const reviewedTradesSep13Evening = [
-  { timestamp: '2026-09-13T20:39:00Z', side: 'sell', zkasAmount: 300, totalKas: 19.2 },
-  { timestamp: '2026-09-13T20:33:00Z', side: 'sell', zkasAmount: 500, totalKas: 32 },
-  { timestamp: '2026-09-13T17:40:00Z', side: 'sell', zkasAmount: 100000, totalKas: 6500 },
-  { timestamp: '2026-09-13T17:35:00Z', side: 'sell', zkasAmount: 273000, totalKas: 15288 },
-  { timestamp: '2026-09-13T17:30:00Z', side: 'sell', zkasAmount: 100000, totalKas: 5500 },
-  { timestamp: '2026-09-13T15:43:00Z', side: 'sell', zkasAmount: 10445, totalKas: 750.0000915 },
-  { timestamp: '2026-09-13T14:43:00Z', side: 'buy', zkasAmount: 7003, totalKas: 329.53645941 },
-];
-
 async function handleGet({ request, env, waitUntil }) {
   const updatedAt = Date.now();
   const endpoint = env.ZKAS_OTC_API_URL;
   if (!endpoint) {
     if (env.OTC_TRADES) {
-      let stored = await env.OTC_TRADES.get('trades:v1', 'json');
-      if (Array.isArray(stored?.trades) && stored.trades.length === 1112) {
-        const trades = [...stored.trades, ...reviewedTradesSep13Evening]
-          .map(normalizeTrade)
-          .filter(Boolean)
-          .sort((a, b) => a.timestamp - b.timestamp);
-        stored = { ...stored, updatedAt, trades };
-        await env.OTC_TRADES.put('trades:v1', JSON.stringify(stored));
-      }
+      const stored = await env.OTC_TRADES.get('trades:v1', 'json');
       const trades = Array.isArray(stored?.trades) ? stored.trades.map(normalizeTrade).filter(Boolean).slice(-5000) : [];
       if (trades.length) {
         return json({ schemaVersion: 1, status: 'live', source: 'screenshot-import', updatedAt: stored.updatedAt || updatedAt, trades }, 200, 'public, max-age=10, s-maxage=30, stale-while-revalidate=120');
