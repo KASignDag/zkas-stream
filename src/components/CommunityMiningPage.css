@@ -1,0 +1,239 @@
+.community-mining {
+  display: grid;
+  gap: 18px;
+}
+
+.community-mining__intro,
+.community-mining__panel,
+.community-mining__howto,
+.community-mining__card {
+  border: 1px solid var(--line, rgba(148, 163, 184, 0.22));
+  background: var(--panel, rgba(15, 23, 42, 0.58));
+  border-radius: 18px;
+}
+
+.community-mining__intro {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 24px;
+  padding: 22px;
+}
+
+.community-mining__intro h2 {
+  margin: 6px 0 8px;
+  font-size: clamp(1.5rem, 3vw, 2.2rem);
+}
+
+.community-mining__intro p {
+  margin: 0;
+  max-width: 850px;
+  color: var(--muted, #94a3b8);
+  line-height: 1.6;
+}
+
+.community-mining__eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.09em;
+  color: #22d3ee;
+}
+
+.community-mining__refresh {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  border-radius: 12px;
+  border: 1px solid var(--line, rgba(148, 163, 184, 0.22));
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+
+.community-mining__statusline {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  color: var(--muted, #94a3b8);
+  font-size: 0.9rem;
+}
+
+.community-mining__dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: #64748b;
+}
+
+.community-mining__dot.is-online {
+  background: #22c55e;
+  box-shadow: 0 0 14px rgba(34, 197, 94, 0.8);
+}
+
+.community-mining__cards {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.community-mining__card {
+  padding: 18px;
+  display: grid;
+  gap: 8px;
+}
+
+.community-mining__card span {
+  color: var(--muted, #94a3b8);
+  font-size: 0.85rem;
+}
+
+.community-mining__card strong {
+  font-size: 1.35rem;
+}
+
+.community-mining__panel {
+  overflow: hidden;
+}
+
+.community-mining__panel-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: center;
+  padding: 16px 18px;
+  border-bottom: 1px solid var(--line, rgba(148, 163, 184, 0.22));
+}
+
+.community-mining__panel-head > div {
+  display: inline-flex;
+  gap: 8px;
+  align-items: center;
+  font-weight: 700;
+}
+
+.community-mining__panel-head > span {
+  color: var(--muted, #94a3b8);
+  font-size: 0.82rem;
+}
+
+.community-mining__empty {
+  padding: 28px 18px;
+  color: var(--muted, #94a3b8);
+}
+
+.community-mining__table-wrap {
+  overflow-x: auto;
+}
+
+.community-mining__table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 1050px;
+}
+
+.community-mining__table th,
+.community-mining__table td {
+  padding: 13px 14px;
+  text-align: left;
+  border-bottom: 1px solid var(--line, rgba(148, 163, 184, 0.16));
+  white-space: nowrap;
+  font-size: 0.88rem;
+}
+
+.community-mining__table th {
+  color: var(--muted, #94a3b8);
+  font-size: 0.76rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.community-mining__table td:nth-child(4) {
+  display: table-cell;
+}
+
+.community-mining__table td:nth-child(4) svg {
+  vertical-align: -2px;
+  margin-right: 4px;
+}
+
+.community-mining__alias {
+  font-weight: 800;
+}
+
+.community-mining__badge {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  padding: 4px 8px;
+  background: rgba(100, 116, 139, 0.14);
+  color: #94a3b8;
+  text-transform: capitalize;
+}
+
+.community-mining__badge.is-online {
+  background: rgba(34, 197, 94, 0.14);
+  color: #4ade80;
+}
+
+.community-mining__howto {
+  padding: 20px;
+}
+
+.community-mining__howto h3 {
+  margin: 0 0 14px;
+}
+
+.community-mining__howto > div {
+  display: grid;
+  grid-template-columns: 130px minmax(0, 1fr);
+  gap: 12px;
+  align-items: center;
+  margin: 9px 0;
+}
+
+.community-mining__howto span {
+  color: var(--muted, #94a3b8);
+  font-size: 0.85rem;
+}
+
+.community-mining__howto code {
+  display: block;
+  overflow-wrap: anywhere;
+  padding: 9px 11px;
+  border-radius: 10px;
+  background: rgba(2, 6, 23, 0.44);
+}
+
+.community-mining__howto p {
+  margin: 14px 0 0;
+  color: var(--muted, #94a3b8);
+  font-size: 0.86rem;
+}
+
+@media (max-width: 900px) {
+  .community-mining__cards {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .community-mining__intro,
+  .community-mining__panel-head {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}
+
+@media (max-width: 560px) {
+  .community-mining__cards {
+    grid-template-columns: 1fr;
+  }
+
+  .community-mining__howto > div {
+    grid-template-columns: 1fr;
+    gap: 5px;
+  }
+}
