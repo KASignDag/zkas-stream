@@ -1189,7 +1189,6 @@ const SOLO_HASH_SCALES: Record<SoloHashUnit, number> = {
   'PH/s': 1e15,
 };
 
-const KASPA_MINING_API = 'https://api.kaspa.org';
 const KASPA_BLOCKS_PER_SECOND = 10;
 
 type KaspaMiningSnapshot = {
@@ -1313,25 +1312,27 @@ function SoloMiningIntelligence({ data }: { data: DashboardData }) {
   useEffect(() => {
     const controller = new AbortController();
 
-    const readKaspaValue = async (path: string, key: string) => {
-      const response = await fetch(`${KASPA_MINING_API}${path}`, { signal: controller.signal });
-      if (!response.ok) throw new Error(`Kaspa API returned ${response.status}`);
-      const payload = await response.json() as Record<string, unknown>;
-      const value = Number(payload[key]);
-      return Number.isFinite(value) && value >= 0 ? value : null;
+    const readJson = async (path: string) => {
+      const response = await fetch(path, { signal: controller.signal });
+      if (!response.ok) throw new Error(`${path} returned ${response.status}`);
+      return await response.json() as Record<string, unknown>;
     };
 
     Promise.all([
-      readKaspaValue('/info/hashrate', 'hashrate'),
-      readKaspaValue('/info/blockreward', 'blockreward'),
-      readKaspaValue('/info/price', 'price'),
+      readJson('/api/kas-mining'),
+      readJson('/api/kas-price').catch(() => null),
     ])
-      .then(([hashrateThs, blockRewardKas, priceUsd]) => {
+      .then(([mining, quote]) => {
+        const hashrateHps = Number(mining.hashrateHps);
+        const blockRewardKas = Number(mining.blockRewardKas);
+        const priceUsd = Number(quote?.priceUsd);
+        const hasMiningInputs = Number.isFinite(hashrateHps) && hashrateHps > 0
+          && Number.isFinite(blockRewardKas) && blockRewardKas > 0;
         setKaspa({
-          hashrateHps: hashrateThs === null ? null : hashrateThs * 1e12,
-          blockRewardKas,
-          priceUsd,
-          status: hashrateThs !== null && blockRewardKas !== null ? 'live' : 'unavailable',
+          hashrateHps: hasMiningInputs ? hashrateHps : null,
+          blockRewardKas: hasMiningInputs ? blockRewardKas : null,
+          priceUsd: Number.isFinite(priceUsd) && priceUsd > 0 ? priceUsd : null,
+          status: hasMiningInputs ? 'live' : 'unavailable',
         });
       })
       .catch((error: unknown) => {
