@@ -3,6 +3,8 @@ param(
   [string]$Endpoint = 'https://zkas.stream/api/community-mining',
   [string]$Secret = $env:MINING_INGEST_SECRET,
   [int]$IntervalSeconds = 15,
+  [int]$HashrateWindowSeconds = 600,
+  [int]$HashrateMinSampleSeconds = 60,
   [switch]$Once,
   [switch]$NoPost
 )
@@ -10,6 +12,7 @@ param(
 $ErrorActionPreference = 'Stop'
 $Two32 = [math]::Pow(2, 32)
 $previous = @{}
+$history = @{}
 $lastShareAt = @{}
 
 function Parse-Labels([string]$raw) {
@@ -75,6 +78,29 @@ function Min-WorkerStart($series, [string]$worker, [double]$currentDifficulty) {
   return $min
 }
 
+function Get-RollingHashrate([string]$worker, [double]$nowSec, [double]$diffTotal) {
+  if (-not $history.ContainsKey($worker)) {
+    $history[$worker] = [System.Collections.ArrayList]::new()
+  }
+
+  $samples = $history[$worker]
+  [void]$samples.Add([pscustomobject]@{ Time = $nowSec; Diff = $diffTotal })
+
+  $cutoff = $nowSec - [math]::Max(60, $HashrateWindowSeconds)
+  while ($samples.Count -gt 1 -and [double]$samples[0].Time -lt $cutoff) {
+    $samples.RemoveAt(0)
+  }
+
+  if ($samples.Count -lt 2) { return $null }
+  $first = $samples[0]
+  $last = $samples[$samples.Count - 1]
+  $dt = [double]$last.Time - [double]$first.Time
+  $deltaDiff = [double]$last.Diff - [double]$first.Diff
+  if ($dt -lt [math]::Max(15, $HashrateMinSampleSeconds) -or $deltaDiff -lt 0) { return $null }
+
+  return ($deltaDiff * $Two32) / $dt
+}
+
 function Build-Snapshot([string]$text) {
   $now = [DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds()
   $nowSec = $now / 1000.0
@@ -118,18 +144,15 @@ function Build-Snapshot([string]$text) {
 
     $payoutSet = (Max-WorkerValue $kasPayoutSet $worker) -ge 1
 
-    $hashrate = $null
     if ($previous.ContainsKey($worker)) {
       $prior = $previous[$worker]
-      $dt = $nowSec - [double]$prior.Time
-      $deltaDiff = $diffTotal - [double]$prior.Diff
-      if ($dt -gt 0 -and $deltaDiff -ge 0) { $hashrate = ($deltaDiff * $Two32) / $dt }
       if ($acceptedShares -gt [double]$prior.Shares) { $lastShareAt[$worker] = $now }
     } elseif ($acceptedShares -gt 0) {
       $lastShareAt[$worker] = $now
     }
+    $previous[$worker] = @{ Shares = $acceptedShares }
 
-    $previous[$worker] = @{ Time = $nowSec; Diff = $diffTotal; Shares = $acceptedShares }
+    $hashrate = Get-RollingHashrate $worker $nowSec $diffTotal
 
     $startSec = Min-WorkerStart $start $worker $difficultyNow
     $uptime = if ($null -ne $startSec) { [math]::Max(0, $nowSec - [double]$startSec) } else { $null }
@@ -174,6 +197,7 @@ function Push-Snapshot($snapshot) {
 Write-Host "Community mining collector"
 Write-Host "Metrics:  $MetricsUrl"
 Write-Host "Endpoint: $Endpoint"
+Write-Host ("Hashrate: rolling {0}s window, minimum {1}s sample" -f $HashrateWindowSeconds, $HashrateMinSampleSeconds)
 Write-Host 'Privacy: wallet and IP labels are parsed locally and never included in the posted JSON.'
 
 while ($true) {
