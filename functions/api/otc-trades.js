@@ -72,35 +72,12 @@ function json(body, status = 200, cacheControl = 'private, no-store, max-age=0')
   });
 }
 
-// Reviewed Discord screenshots: desk 1,141, less 11 permanent test/outlier exclusions = 1,130 public trades.
-const reviewedTradesSep14 = [
-  { timestamp: '2026-09-14T03:33:00Z', side: 'sell', zkasAmount: 100000, totalKas: 6500 },
-  { timestamp: '2026-09-14T02:33:00Z', side: 'buy', zkasAmount: 28605, totalKas: 1308.20190465 },
-  { timestamp: '2026-09-14T02:30:00Z', side: 'sell', zkasAmount: 30000, totalKas: 2200.0002 },
-  { timestamp: '2026-09-14T01:33:00Z', side: 'sell', zkasAmount: 10, totalKas: 0.6 },
-  { timestamp: '2026-09-14T00:35:00Z', side: 'sell', zkasAmount: 16000, totalKas: 959 },
-  { timestamp: '2026-09-14T00:30:00Z', side: 'buy', zkasAmount: 8000, totalKas: 460 },
-  { timestamp: '2026-09-13T23:33:00Z', side: 'sell', zkasAmount: 10775, totalKas: 747.0667385 },
-  { timestamp: '2026-09-13T21:33:00Z', side: 'sell', zkasAmount: 100000, totalKas: 6500 },
-  { timestamp: '2026-09-13T21:25:00Z', side: 'sell', zkasAmount: 1111, totalKas: 71.104 },
-  { timestamp: '2026-09-13T21:20:00Z', side: 'sell', zkasAmount: 1111, totalKas: 71.104 },
-  { timestamp: '2026-09-13T21:15:00Z', side: 'sell', zkasAmount: 220000, totalKas: 14080 },
-];
-
 async function handleGet({ request, env, waitUntil }) {
   const updatedAt = Date.now();
   const endpoint = env.ZKAS_OTC_API_URL;
   if (!endpoint) {
     if (env.OTC_TRADES) {
-      let stored = await env.OTC_TRADES.get('trades:v1', 'json');
-      if (Array.isArray(stored?.trades) && stored.trades.length === 1119) {
-        const trades = [...stored.trades, ...reviewedTradesSep14]
-          .map(normalizeTrade)
-          .filter(Boolean)
-          .sort((a, b) => a.timestamp - b.timestamp);
-        stored = { ...stored, updatedAt, trades };
-        await env.OTC_TRADES.put('trades:v1', JSON.stringify(stored));
-      }
+      const stored = await env.OTC_TRADES.get('trades:v1', 'json');
       const trades = Array.isArray(stored?.trades) ? stored.trades.map(normalizeTrade).filter(Boolean).slice(-5000) : [];
       if (trades.length) {
         return json({ schemaVersion: 1, status: 'live', source: 'screenshot-import', updatedAt: stored.updatedAt || updatedAt, trades }, 200, 'public, max-age=10, s-maxage=30, stale-while-revalidate=120');
