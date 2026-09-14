@@ -130,16 +130,13 @@ export function NetworkMap({ data, onOpenNodes }: NetworkMapProps) {
         </div>
       </header>
 
-      <div className="network-map-stage">
-        <svg viewBox="0 0 1000 500" role="img" aria-label={`Map showing ${mapNodes.length} approximately located ZKAS nodes`}>
+      <div className="network-map-stage" onClick={() => setActiveKey(null)}>
+        <div className="network-map-canvas">
+          <svg viewBox="0 0 1000 500" role="img" aria-label={`Map showing ${mapNodes.length} approximately located ZKAS nodes`}>
           <defs>
             <linearGradient id="network-map-ocean" x1="0" y1="0" x2="1" y2="1">
               <stop offset="0%" stopColor="#061b17" />
               <stop offset="100%" stopColor="#03110e" />
-            </linearGradient>
-            <linearGradient id="network-map-land" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor="#1b5548" />
-              <stop offset="100%" stopColor="#10372f" />
             </linearGradient>
             <filter id="network-map-glow" x="-200%" y="-200%" width="500%" height="500%">
               <feGaussianBlur stdDeviation="5" result="blur" />
@@ -153,28 +150,15 @@ export function NetworkMap({ data, onOpenNodes }: NetworkMapProps) {
             <path d="M125 0V500M250 0V500M375 0V500M500 0V500M625 0V500M750 0V500M875 0V500" />
           </g>
 
-          <g className="network-map-land" fill="url(#network-map-land)">
-            <path d="M43 105L75 67 139 47 211 63 247 93 282 107 300 139 280 169 250 174 224 203 198 214 183 252 149 260 125 228 91 216 72 181 47 159 31 129Z" />
-            <path d="M182 266L218 250 261 267 287 301 281 342 303 373 285 416 257 467 231 445 225 395 204 358 198 315Z" />
-            <path d="M329 37L376 18 424 32 438 65 408 89 362 86 335 67Z" />
-            <path d="M439 125L469 105 505 111 527 133 559 139 569 163 541 176 516 170 498 184 466 176 445 154Z" />
-            <path d="M466 190L505 176 552 195 580 233 570 283 548 318 526 377 491 371 477 333 452 304 449 258 433 224Z" />
-            <path d="M536 111L588 75 663 62 726 77 789 72 858 96 930 126 952 162 918 188 873 181 835 211 798 207 770 235 733 224 699 194 657 200 622 175 579 169 552 146Z" />
-            <path d="M612 211L642 202 665 222 650 248 627 243Z" />
-            <path d="M741 240L762 222 787 247 783 278 762 290 746 270Z" />
-            <path d="M793 350L835 329 900 342 930 376 910 421 854 439 808 416 779 381Z" />
-            <path d="M947 420L967 410 982 431 963 451 945 439Z" />
-            <path d="M589 388L607 402 600 435 581 421Z" />
-          </g>
-
-          <g className="network-map-coastline">
-            <path d="M43 105L75 67 139 47 211 63 247 93 282 107 300 139 280 169 250 174 224 203 198 214 183 252 149 260 125 228 91 216 72 181 47 159 31 129Z" />
-            <path d="M182 266L218 250 261 267 287 301 281 342 303 373 285 416 257 467 231 445 225 395 204 358 198 315Z" />
-            <path d="M439 125L469 105 505 111 527 133 559 139 569 163 541 176 516 170 498 184 466 176 445 154Z" />
-            <path d="M466 190L505 176 552 195 580 233 570 283 548 318 526 377 491 371 477 333 452 304 449 258 433 224Z" />
-            <path d="M536 111L588 75 663 62 726 77 789 72 858 96 930 126 952 162 918 188 873 181 835 211 798 207 770 235 733 224 699 194 657 200 622 175 579 169 552 146Z" />
-            <path d="M793 350L835 329 900 342 930 376 910 421 854 439 808 416 779 381Z" />
-          </g>
+          <image
+            className="network-map-geography"
+            href="/world-map-50m.svg"
+            x="0"
+            y="0"
+            width="1000"
+            height="500"
+            preserveAspectRatio="none"
+          />
 
           <g className="network-map-markers">
             {mapNodes.map((node) => (
@@ -226,7 +210,9 @@ export function NetworkMap({ data, onOpenNodes }: NetworkMapProps) {
             </dl>
           </div>
         )}
+        </div>
       </div>
+      <div className="network-map-swipe-hint" aria-hidden="true">← Swipe the map left or right →</div>
 
       <footer className="network-map-foot">
         <span><ShieldCheck size={14} /> Country-level positioning—not exact coordinates</span>
