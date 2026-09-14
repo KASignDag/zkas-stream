@@ -12,6 +12,7 @@ param(
 $ErrorActionPreference = 'Stop'
 $Two32 = [math]::Pow(2, 32)
 $previous = @{}
+$workTotals = @{}
 $history = @{}
 $lastShareAt = @{}
 
@@ -78,27 +79,88 @@ function Min-WorkerStart($series, [string]$worker, [double]$currentDifficulty) {
   return $min
 }
 
-function Get-RollingHashrate([string]$worker, [double]$nowSec, [double]$diffTotal) {
-  if (-not $history.ContainsKey($worker)) {
-    $history[$worker] = [System.Collections.ArrayList]::new()
+function Reset-WorkerHashrate([string]$worker) {
+  $workTotals[$worker] = 0.0
+  $history[$worker] = [System.Collections.ArrayList]::new()
+}
+
+function Add-WorkerWorkSample(
+  [string]$worker,
+  [double]$nowSec,
+  [double]$acceptedShares,
+  [double]$difficultyNow,
+  [int64]$nowMs
+) {
+  if (-not $workTotals.ContainsKey($worker) -or -not $history.ContainsKey($worker)) {
+    Reset-WorkerHashrate $worker
+  }
+
+  if ($previous.ContainsKey($worker)) {
+    $prior = $previous[$worker]
+    $deltaShares = $acceptedShares - [double]$prior.Shares
+
+    # Bridge restarts can reset cumulative counters. Start a fresh window rather
+    # than turning the reset into negative work or a false hashrate spike.
+    if ($deltaShares -lt 0) {
+      Reset-WorkerHashrate $worker
+      $deltaShares = 0
+    }
+
+    if ($deltaShares -gt 0) {
+      $priorDifficulty = [double]$prior.Difficulty
+      $intervalDifficulty = 0.0
+
+      # Vardiff may change between scrapes. With 15-second sampling we usually
+      # see the transition quickly; using the midpoint of the two assigned
+      # difficulties is a better estimate than pretending the whole interval
+      # used either endpoint. If only one endpoint is usable, use that one.
+      if ($priorDifficulty -gt 0 -and $difficultyNow -gt 0) {
+        $intervalDifficulty = ($priorDifficulty + $difficultyNow) / 2.0
+      } elseif ($difficultyNow -gt 0) {
+        $intervalDifficulty = $difficultyNow
+      } elseif ($priorDifficulty -gt 0) {
+        $intervalDifficulty = $priorDifficulty
+      }
+
+      if ($intervalDifficulty -gt 0) {
+        $workTotals[$worker] = [double]$workTotals[$worker] + ($deltaShares * $intervalDifficulty)
+      }
+      $lastShareAt[$worker] = $nowMs
+    }
+  } elseif ($acceptedShares -gt 0) {
+    # We know the miner was already working before the collector started, but we
+    # cannot time those older shares accurately. Mark it active and begin the
+    # hashrate window from this sample instead of inventing historical work.
+    $lastShareAt[$worker] = $nowMs
+  }
+
+  $previous[$worker] = @{
+    Shares = $acceptedShares
+    Difficulty = $difficultyNow
+    Time = $nowSec
   }
 
   $samples = $history[$worker]
-  [void]$samples.Add([pscustomobject]@{ Time = $nowSec; Diff = $diffTotal })
+  [void]$samples.Add([pscustomobject]@{ Time = $nowSec; Work = [double]$workTotals[$worker] })
 
   $cutoff = $nowSec - [math]::Max(60, $HashrateWindowSeconds)
   while ($samples.Count -gt 1 -and [double]$samples[0].Time -lt $cutoff) {
     $samples.RemoveAt(0)
   }
+}
 
+function Get-RollingHashrate([string]$worker) {
+  if (-not $history.ContainsKey($worker)) { return $null }
+  $samples = $history[$worker]
   if ($samples.Count -lt 2) { return $null }
+
   $first = $samples[0]
   $last = $samples[$samples.Count - 1]
   $dt = [double]$last.Time - [double]$first.Time
-  $deltaDiff = [double]$last.Diff - [double]$first.Diff
-  if ($dt -lt [math]::Max(15, $HashrateMinSampleSeconds) -or $deltaDiff -lt 0) { return $null }
+  $deltaWork = [double]$last.Work - [double]$first.Work
 
-  return ($deltaDiff * $Two32) / $dt
+  if ($dt -lt [math]::Max(15, $HashrateMinSampleSeconds) -or $deltaWork -lt 0) { return $null }
+  return ($deltaWork * $Two32) / $dt
 }
 
 function Build-Snapshot([string]$text) {
@@ -106,7 +168,6 @@ function Build-Snapshot([string]$text) {
   $nowSec = $now / 1000.0
 
   $valid = Get-Series $text 'ks_valid_share_counter'
-  $diff = Get-Series $text 'ks_valid_share_diff_counter'
   $invalid = Get-Series $text 'ks_invalid_share_counter'
   $currentDiff = Get-Series $text 'ks_worker_current_difficulty'
   $start = Get-Series $text 'ks_worker_start_time'
@@ -115,12 +176,11 @@ function Build-Snapshot([string]$text) {
   $kasAcceptedLegacy = Get-Series $text 'ks_merged_kas_blocks_accepted_total'
   $kasPayoutSet = Get-Series $text 'ks_worker_kas_payout_set'
 
-  $workers = Get-WorkersFromSeries @($valid, $diff, $currentDiff, $start, $zkasBlocks, $kasSubmit, $kasAcceptedLegacy, $kasPayoutSet)
+  $workers = Get-WorkersFromSeries @($valid, $currentDiff, $start, $zkasBlocks, $kasSubmit, $kasAcceptedLegacy, $kasPayoutSet)
   $miners = @()
 
   foreach ($worker in ($workers | Sort-Object)) {
     $acceptedShares = Sum-SessionMax $valid $worker
-    $diffTotal = Sum-SessionMax $diff $worker
     $difficultyNow = Max-WorkerValue $currentDiff $worker
 
     $invalidShares = 0.0
@@ -144,15 +204,8 @@ function Build-Snapshot([string]$text) {
 
     $payoutSet = (Max-WorkerValue $kasPayoutSet $worker) -ge 1
 
-    if ($previous.ContainsKey($worker)) {
-      $prior = $previous[$worker]
-      if ($acceptedShares -gt [double]$prior.Shares) { $lastShareAt[$worker] = $now }
-    } elseif ($acceptedShares -gt 0) {
-      $lastShareAt[$worker] = $now
-    }
-    $previous[$worker] = @{ Shares = $acceptedShares }
-
-    $hashrate = Get-RollingHashrate $worker $nowSec $diffTotal
+    Add-WorkerWorkSample $worker $nowSec $acceptedShares $difficultyNow $now
+    $hashrate = Get-RollingHashrate $worker
 
     $startSec = Min-WorkerStart $start $worker $difficultyNow
     $uptime = if ($null -ne $startSec) { [math]::Max(0, $nowSec - [double]$startSec) } else { $null }
@@ -197,7 +250,7 @@ function Push-Snapshot($snapshot) {
 Write-Host "Community mining collector"
 Write-Host "Metrics:  $MetricsUrl"
 Write-Host "Endpoint: $Endpoint"
-Write-Host ("Hashrate: rolling {0}s window, minimum {1}s sample" -f $HashrateWindowSeconds, $HashrateMinSampleSeconds)
+Write-Host ("Hashrate: vardiff-aware share work, rolling {0}s window, minimum {1}s sample" -f $HashrateWindowSeconds, $HashrateMinSampleSeconds)
 Write-Host 'Privacy: wallet and IP labels are parsed locally and never included in the posted JSON.'
 
 while ($true) {
