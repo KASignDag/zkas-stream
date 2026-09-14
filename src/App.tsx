@@ -1450,7 +1450,7 @@ function NetworkHealthPage({ data, diffValues, txValues, pulseTimes, onOpenNodes
         <MetricCard icon={<Activity size={19} />} label="BPS" value={displayNumber(data.bps)} sub="15m block flow" accent />
         <MetricCard icon={<Gauge size={19} />} label="Hashrate" value={displayHashrate(data.hashrate)} sub="Consensus work estimate" />
         <MetricCard icon={<Gauge size={19} />} label="Difficulty" value={displayNumber(data.difficulty, true)} sub="Current difficulty" />
-        <MetricCard icon={<Server size={19} />} label="Active peers" value={displayNumber(data.relay.activePeers ?? data.nodes)} sub="Public node metric" />
+        <MetricCard icon={<Server size={19} />} label="Explorer-connected peers" value={displayNumber(data.relay.activePeers ?? data.nodes)} sub="Connected to the explorer node" />
         <MetricCard icon={<Boxes size={19} />} label="Tip hashes" value={displayNumber(data.relay.tipHashes)} sub="Consensus tips" />
         <MetricCard icon={<Database size={19} />} label="Mempool" value={displayNumber(data.mempool)} sub="Transactions waiting" />
         <MetricCard icon={<Globe2 size={19} />} label="Countries" value={displayNumber(data.publicNodes.totals.countries)} sub="Visible geography" />
