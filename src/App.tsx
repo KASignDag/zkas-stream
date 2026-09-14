@@ -156,7 +156,7 @@ function displayMiningPercent(value: number | null) {
 function displayUsd(value: number | null) {
   if (value === null || !Number.isFinite(value)) return '—';
   const digits = Math.abs(value) < 1 ? 6 : 2;
-  return `${value.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: digits })}`;
+  return '$' + value.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: digits });
 }
 
 function objectEntries(data: unknown): Array<[string, string]> {
@@ -1196,6 +1196,7 @@ type KaspaMiningSnapshot = {
   blockRewardKas: number | null;
   priceUsd: number | null;
   status: 'loading' | 'live' | 'unavailable';
+  source: string | null;
 };
 
 function NativeMergedVisibility({ matched }: { matched: number | null }) {
@@ -1307,6 +1308,7 @@ function SoloMiningIntelligence({ data }: { data: DashboardData }) {
     blockRewardKas: null,
     priceUsd: null,
     status: 'loading',
+    source: null,
   });
 
   useEffect(() => {
@@ -1333,6 +1335,7 @@ function SoloMiningIntelligence({ data }: { data: DashboardData }) {
           blockRewardKas: hasMiningInputs ? blockRewardKas : null,
           priceUsd: Number.isFinite(priceUsd) && priceUsd > 0 ? priceUsd : null,
           status: hasMiningInputs ? 'live' : 'unavailable',
+          source: typeof mining.source === 'string' ? mining.source : null,
         });
       })
       .catch((error: unknown) => {
@@ -1427,7 +1430,7 @@ function SoloMiningIntelligence({ data }: { data: DashboardData }) {
           <div className="solo-live-condition"><span>ZKAS block flow</span><b>{liveBps === null ? '—' : `${fmt.format(liveBps)} BPS`}</b><small>observed public rate</small></div>
           <div className="solo-live-condition"><span>ZKAS difficulty</span><b>{displayNumber(data.difficulty, true)}</b><small>current consensus target difficulty</small></div>
           <div className="solo-live-condition"><span>ZKAS miner payout</span><b>{payout === null ? '—' : `${fmt.format(payout)} ZKAS`}</b><small>95% of gross block emission</small></div>
-          <div className="solo-live-condition"><span>Kaspa network hashrate</span><b>{displayHashrate(kaspa.hashrateHps)}</b><small>{kaspa.status === 'unavailable' ? 'live Kaspa input unavailable' : 'official public Kaspa estimate'}</small></div>
+          <div className="solo-live-condition"><span>Kaspa network hashrate</span><b>{displayHashrate(kaspa.hashrateHps)}</b><small>{kaspa.status === 'unavailable' ? 'live Kaspa input unavailable' : (kaspa.source ?? 'public Kaspa network estimate')}</small></div>
           <div className="solo-live-condition"><span>Kaspa block reward</span><b>{kaspa.blockRewardKas === null ? '—' : `${displayMiningEstimate(kaspa.blockRewardKas)} KAS`}</b><small>current public reward per block</small></div>
           <div className="solo-live-condition"><span>Kaspa price</span><b>{displayUsd(kaspa.priceUsd)}</b><small>current public USD price</small></div>
         </div>
