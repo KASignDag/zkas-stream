@@ -32,7 +32,32 @@ function Root() {
       </div>
     );
   }
-  return <App />;
+
+  return (
+    <>
+      <App />
+      <a
+        href="#community-mining"
+        style={{
+          position: 'fixed',
+          right: 18,
+          bottom: 18,
+          zIndex: 40,
+          padding: '11px 15px',
+          borderRadius: 999,
+          border: '1px solid rgba(34,211,238,.35)',
+          background: 'rgba(8,17,31,.94)',
+          color: '#e6fbff',
+          fontWeight: 800,
+          fontSize: 13,
+          textDecoration: 'none',
+          boxShadow: '0 10px 30px rgba(0,0,0,.24)',
+        }}
+      >
+        Community Mining · Live
+      </a>
+    </>
+  );
 }
 
 ReactDOM.createRoot(document.getElementById('root')!).render(<Root />);
