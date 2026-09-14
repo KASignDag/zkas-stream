@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Activity, BarChart3, ExternalLink, RefreshCw, TriangleAlert } from 'lucide-react';
+import { Activity, BarChart3, BookOpen, ExternalLink, RefreshCw, TriangleAlert } from 'lucide-react';
 
 type Interval = '5m' | '15m' | '1h' | '4h' | '1d';
 type ExchangeId = 'neoxex' | 'noirtrade';
@@ -112,6 +112,47 @@ function MarketMetric({ label, value, detail, tone }: { label: string; value: st
   return <div className={`exchange-metric ${tone ?? ''}`}><span>{label}</span><b>{value}</b><small>{detail}</small></div>;
 }
 
+function OrderBook({ feed }: { feed: MarketFeed | null }) {
+  const asks = [...(feed?.orderbook.asks ?? [])]
+    .filter((level) => level.price > 0 && level.quantity > 0)
+    .sort((a, b) => a.price - b.price)
+    .slice(0, 10)
+    .reverse();
+  const bids = [...(feed?.orderbook.bids ?? [])]
+    .filter((level) => level.price > 0 && level.quantity > 0)
+    .sort((a, b) => b.price - a.price)
+    .slice(0, 10);
+  const bestAsk = asks.at(-1)?.price ?? feed?.ticker?.bestAsk ?? 0;
+  const bestBid = bids[0]?.price ?? feed?.ticker?.bestBid ?? 0;
+  const spread = bestAsk > 0 && bestBid > 0 ? ((bestAsk - bestBid) / bestAsk) * 100 : null;
+  const renderRows = (levels: Level[], side: 'ask' | 'bid') => levels.length
+    ? levels.map((level, index) => (
+      <div className={`exchange-book-row ${side}`} key={`${side}-${level.price}-${index}`}>
+        <span>{level.price.toFixed(6)}</span>
+        <span>{amount(level.quantity)}</span>
+        <span>{usd(level.price * level.quantity, 2)}</span>
+      </div>
+    ))
+    : <div className="exchange-book-empty">No open {side === 'ask' ? 'sell' : 'buy'} orders</div>;
+
+  return (
+    <section className="panel exchange-orderbook-panel">
+      <div className="exchange-orderbook-head">
+        <div><span className="panel-icon"><BookOpen size={20} /></span><div><h2>Order book</h2><p>{feed?.exchange.name ?? 'Exchange'} · Open ZKAS/USDT orders</p></div></div>
+        <span className="range-chip">LIVE</span>
+      </div>
+      <div className="exchange-book-columns"><span>Price (USDT)</span><span>Amount (ZKAS)</span><span>Total (USDT)</span></div>
+      <div className="exchange-book-side asks">{renderRows(asks, 'ask')}</div>
+      <div className="exchange-book-mid">
+        <b>{usd(feed?.ticker?.lastPrice)}</b>
+        <span>{spread === null ? 'Spread unavailable' : `Spread ${spread.toFixed(2)}%`}</span>
+      </div>
+      <div className="exchange-book-side bids">{renderRows(bids, 'bid')}</div>
+      <p className="exchange-book-note">Open orders refresh every 10 seconds. Totals show price × amount.</p>
+    </section>
+  );
+}
+
 export function ExchangesPage() {
   const [feeds, setFeeds] = useState<Partial<Record<ExchangeId, MarketFeed>>>({});
   const [selected, setSelected] = useState<ExchangeId>('neoxex');
@@ -188,7 +229,10 @@ export function ExchangesPage() {
         <MarketMetric label="24h trades" value={amount(ticker?.trades24h)} detail={bidBelowAsk === null ? 'Spread unavailable' : `Bid ${bidBelowAsk.toFixed(2)}% below ask`} />
       </section>
 
-      <section className="panel exchange-chart-panel">
+      <div className="exchange-market-grid">
+        <OrderBook feed={feed} />
+
+        <section className="panel exchange-chart-panel">
         <div className="exchange-chart-head">
           <div><span className="panel-icon"><BarChart3 size={20} /></span><div><h2>Real-time ZKAS price chart</h2><p>{feed ? `${feed.exchange.name} · ${feed.chartSource}` : 'Loading live market history…'}</p></div></div>
           <div className="exchange-intervals" aria-label="Chart timeframe">{intervals.map((value) => <button key={value} className={interval === value ? 'active' : ''} onClick={() => setInterval(value)}>{value}</button>)}</div>
@@ -196,7 +240,8 @@ export function ExchangesPage() {
         <div className="exchange-chart-summary"><span>24h low <b>{usd(ticker?.low24h)}</b></span><span>24h high <b>{usd(ticker?.high24h)}</b></span><span>USDT volume <b>{ticker ? usd(ticker.quoteVolume24h, 2) : '—'}</b></span></div>
         <PriceChart candles={feed?.candles ?? []} lastPrice={ticker?.lastPrice ?? null} />
         <div className="exchange-chart-legend"><span><i className="up" /> Price up</span><span><i className="down" /> Price down</span><span><i className="volume" /> ZKAS volume</span></div>
-      </section>
+        </section>
+      </div>
 
       <section className="panel exchange-list-panel">
         <div className="panel-head"><div><span className="panel-icon"><Activity size={20} /></span><h2>Reporting exchanges</h2></div><span className="range-chip">{liveCount} LIVE</span></div>
