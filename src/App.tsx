@@ -153,6 +153,12 @@ function displayMiningPercent(value: number | null) {
   return `${fmt.format(value)}%`;
 }
 
+function displayUsd(value: number | null) {
+  if (value === null || !Number.isFinite(value)) return '—';
+  const digits = Math.abs(value) < 1 ? 6 : 2;
+  return `${value.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: digits })}`;
+}
+
 function objectEntries(data: unknown): Array<[string, string]> {
   if (!data || typeof data !== 'object') return [['Result', String(data ?? '—')]];
   return Object.entries(data as Record<string, unknown>).slice(0, 24).map(([key, value]) => {
@@ -1183,6 +1189,16 @@ const SOLO_HASH_SCALES: Record<SoloHashUnit, number> = {
   'PH/s': 1e15,
 };
 
+const KASPA_MINING_API = 'https://api.kaspa.org';
+const KASPA_BLOCKS_PER_SECOND = 10;
+
+type KaspaMiningSnapshot = {
+  hashrateHps: number | null;
+  blockRewardKas: number | null;
+  priceUsd: number | null;
+  status: 'loading' | 'live' | 'unavailable';
+};
+
 function NativeMergedVisibility({ matched }: { matched: number | null }) {
   return (
     <section className="panel mining-visibility-panel">
@@ -1287,6 +1303,44 @@ function MiningDistributionPanel({ data }: { data: DashboardData }) {
 function SoloMiningIntelligence({ data }: { data: DashboardData }) {
   const [minerHashrate, setMinerHashrate] = useState('1');
   const [hashUnit, setHashUnit] = useState<SoloHashUnit>('TH/s');
+  const [kaspa, setKaspa] = useState<KaspaMiningSnapshot>({
+    hashrateHps: null,
+    blockRewardKas: null,
+    priceUsd: null,
+    status: 'loading',
+  });
+
+  useEffect(() => {
+    const controller = new AbortController();
+
+    const readKaspaValue = async (path: string, key: string) => {
+      const response = await fetch(`${KASPA_MINING_API}${path}`, { signal: controller.signal });
+      if (!response.ok) throw new Error(`Kaspa API returned ${response.status}`);
+      const payload = await response.json() as Record<string, unknown>;
+      const value = Number(payload[key]);
+      return Number.isFinite(value) && value >= 0 ? value : null;
+    };
+
+    Promise.all([
+      readKaspaValue('/info/hashrate', 'hashrate'),
+      readKaspaValue('/info/blockreward', 'blockreward'),
+      readKaspaValue('/info/price', 'price'),
+    ])
+      .then(([hashrateThs, blockRewardKas, priceUsd]) => {
+        setKaspa({
+          hashrateHps: hashrateThs === null ? null : hashrateThs * 1e12,
+          blockRewardKas,
+          priceUsd,
+          status: hashrateThs !== null && blockRewardKas !== null ? 'live' : 'unavailable',
+        });
+      })
+      .catch((error: unknown) => {
+        if (error instanceof DOMException && error.name === 'AbortError') return;
+        setKaspa((current) => ({ ...current, status: 'unavailable' }));
+      });
+
+    return () => controller.abort();
+  }, []);
 
   const entered = Number(minerHashrate);
   const minerHps = Number.isFinite(entered) && entered > 0 ? entered * SOLO_HASH_SCALES[hashUnit] : null;
@@ -1303,6 +1357,19 @@ function SoloMiningIntelligence({ data }: { data: DashboardData }) {
   const chance24h = expectedBlocksDay === null ? null : (1 - Math.exp(-expectedBlocksDay)) * 100;
   const chance7d = expectedBlocksDay === null ? null : (1 - Math.exp(-expectedBlocksDay * 7)) * 100;
   const expectedPayoutDay = expectedBlocksDay !== null && payout !== null ? expectedBlocksDay * payout : null;
+  const expectedZkasUsdDay = expectedPayoutDay !== null && data.priceUsd !== null ? expectedPayoutDay * data.priceUsd : null;
+
+  const kaspaShareFraction = minerHps !== null && kaspa.hashrateHps !== null && kaspa.hashrateHps > 0
+    ? Math.min(1, minerHps / kaspa.hashrateHps)
+    : null;
+  const kaspaBlocksDay = kaspaShareFraction === null ? null : kaspaShareFraction * KASPA_BLOCKS_PER_SECOND * 86400;
+  const expectedKasDay = kaspaBlocksDay !== null && kaspa.blockRewardKas !== null
+    ? kaspaBlocksDay * kaspa.blockRewardKas
+    : null;
+  const expectedKasUsdDay = expectedKasDay !== null && kaspa.priceUsd !== null ? expectedKasDay * kaspa.priceUsd : null;
+  const combinedUsdDay = expectedZkasUsdDay !== null && expectedKasUsdDay !== null
+    ? expectedZkasUsdDay + expectedKasUsdDay
+    : null;
 
   return (
     <section className="solo-mining-section">
@@ -1311,41 +1378,67 @@ function SoloMiningIntelligence({ data }: { data: DashboardData }) {
           <div><span className="panel-icon"><Gauge size={20} /></span><h2>Solo mining intelligence</h2></div>
           <span className="range-chip">LOCAL CALCULATOR</span>
         </div>
-        <p className="solo-intro">Estimate solo-mining odds from the live public ZKas network conditions. Enter only hashrate; the calculator runs in this browser and does not connect to a wallet, worker or miner.</p>
+        <p className="solo-intro">Estimate ZKAS solo-mining odds and potential merge-mined KAS rewards from live public network conditions. The calculator runs in this browser and does not connect to a wallet, worker or miner.</p>
 
-        <div className="solo-controls">
-          <label>
-            <span>Your hashrate</span>
-            <div className="solo-input-wrap">
-              <input inputMode="decimal" type="number" min="0" step="any" value={minerHashrate} onChange={(e) => setMinerHashrate(e.target.value)} aria-label="Your mining hashrate" />
-              <select value={hashUnit} onChange={(e) => setHashUnit(e.target.value as SoloHashUnit)} aria-label="Hashrate unit">
-                <option>GH/s</option><option>TH/s</option><option>PH/s</option>
-              </select>
-            </div>
-          </label>
-          <div className="solo-live-condition"><span>Network hashrate</span><b>{displayHashrate(networkHps)}</b><small>public consensus work estimate</small></div>
-          <div className="solo-live-condition"><span>Block flow</span><b>{liveBps === null ? '—' : `${fmt.format(liveBps)} BPS`}</b><small>observed public rate</small></div>
-          <div className="solo-live-condition"><span>Difficulty</span><b>{displayNumber(data.difficulty, true)}</b><small>current consensus target difficulty</small></div>
-          <div className="solo-live-condition"><span>Current miner payout</span><b>{payout === null ? '—' : `${fmt.format(payout)} ZKAS`}</b><small>95% of gross block emission</small></div>
+        <label className="solo-hashrate-control">
+          <span>Your hashrate</span>
+          <div className="solo-input-wrap">
+            <input inputMode="decimal" type="number" min="0" step="any" value={minerHashrate} onChange={(e) => setMinerHashrate(e.target.value)} aria-label="Your mining hashrate" />
+            <select value={hashUnit} onChange={(e) => setHashUnit(e.target.value as SoloHashUnit)} aria-label="Hashrate unit">
+              <option>GH/s</option><option>TH/s</option><option>PH/s</option>
+            </select>
+          </div>
+        </label>
+
+        <div className="solo-section-label">Estimated daily rewards</div>
+        <div className="solo-earnings-grid">
+          <div className="solo-earnings-card zkas">
+            <span><i /> ZKAS · NATIVE</span>
+            <b>{displayMiningEstimate(expectedPayoutDay, ' ZKAS')}</b>
+            <strong>{displayUsd(expectedZkasUsdDay)} / day</strong>
+            <small>Probability-weighted solo estimate, not a guaranteed daily payout.</small>
+          </div>
+          <div className="solo-earnings-card kas">
+            <span><i /> KAS · MERGE-MINED</span>
+            <b>{kaspa.status === 'loading' ? 'Loading…' : displayMiningEstimate(expectedKasDay, ' KAS')}</b>
+            <strong>{kaspa.status === 'loading' ? 'Live Kaspa inputs' : `${displayUsd(expectedKasUsdDay)} / day`}</strong>
+            <small>Potential gross reward. Requires active KAS mining and a configured Kaspa payout address; pool fees may apply.</small>
+          </div>
+          <div className="solo-combined-value">
+            <span>Estimated combined value</span>
+            <b>{displayUsd(combinedUsdDay)} / day</b>
+            <small>ZKAS + KAS at currently reported USD prices</small>
+          </div>
         </div>
 
+        <div className="solo-section-label">ZKAS block odds</div>
         <div className="solo-result-grid">
-          <div><span>Estimated network share</span><b>{displayMiningPercent(sharePct)}</b><small>chosen hashrate ÷ network estimate</small></div>
           <div><span>Average time to a block</span><b>{expectedSeconds === null ? '—' : duration(expectedSeconds)}</b><small>statistical average, not a countdown</small></div>
-          <div><span>Expected blocks / day</span><b>{displayMiningEstimate(expectedBlocksDay)}</b><small>long-run expectation</small></div>
           <div><span>Chance ≥1 block in 24h</span><b>{displayMiningPercent(chance24h)}</b><small>Poisson estimate</small></div>
+          <div><span>Expected blocks / day</span><b>{displayMiningEstimate(expectedBlocksDay)}</b><small>long-run expectation</small></div>
+          <div><span>Estimated network share</span><b>{displayMiningPercent(sharePct)}</b><small>chosen hashrate ÷ ZKAS network estimate</small></div>
           <div><span>Chance ≥1 block in 7d</span><b>{displayMiningPercent(chance7d)}</b><small>Poisson estimate</small></div>
-          <div><span>Expected ZKAS / day</span><b>{displayMiningEstimate(expectedPayoutDay, ' ZKAS')}</b><small>probability-weighted, not guaranteed</small></div>
+        </div>
+
+        <div className="solo-section-label solo-supporting-label">Live calculation inputs</div>
+        <div className="solo-controls solo-live-inputs">
+          <div className="solo-live-condition"><span>ZKAS network hashrate</span><b>{displayHashrate(networkHps)}</b><small>public consensus work estimate</small></div>
+          <div className="solo-live-condition"><span>ZKAS block flow</span><b>{liveBps === null ? '—' : `${fmt.format(liveBps)} BPS`}</b><small>observed public rate</small></div>
+          <div className="solo-live-condition"><span>ZKAS difficulty</span><b>{displayNumber(data.difficulty, true)}</b><small>current consensus target difficulty</small></div>
+          <div className="solo-live-condition"><span>ZKAS miner payout</span><b>{payout === null ? '—' : `${fmt.format(payout)} ZKAS`}</b><small>95% of gross block emission</small></div>
+          <div className="solo-live-condition"><span>Kaspa network hashrate</span><b>{displayHashrate(kaspa.hashrateHps)}</b><small>{kaspa.status === 'unavailable' ? 'live Kaspa input unavailable' : 'official public Kaspa estimate'}</small></div>
+          <div className="solo-live-condition"><span>Kaspa block reward</span><b>{kaspa.blockRewardKas === null ? '—' : `${displayMiningEstimate(kaspa.blockRewardKas)} KAS`}</b><small>current public reward per block</small></div>
+          <div className="solo-live-condition"><span>Kaspa price</span><b>{displayUsd(kaspa.priceUsd)}</b><small>current public USD price</small></div>
         </div>
 
         <div className="solo-reward-strip">
-          <div><span>Gross block emission</span><b>{grossReward === null ? '—' : `${fmt.format(grossReward)} ZKAS`}</b></div>
+          <div><span>ZKAS gross block emission</span><b>{grossReward === null ? '—' : `${fmt.format(grossReward)} ZKAS`}</b></div>
           <div><span>Miner payout (95%)</span><b>{payout === null ? '—' : `${fmt.format(payout)} ZKAS`}</b></div>
           <div><span>Development allocation (5%)</span><b>{grossReward === null ? '—' : `${fmt.format(developmentAllocation(grossReward) ?? 0)} ZKAS`}</b></div>
           <div><span>Next miner payout</span><b>{nextPayout === null ? '—' : `${fmt.format(nextPayout)} ZKAS`}</b><small>{data.nextReductionSeconds === null ? 'schedule unavailable' : `in ${countdown(data.nextReductionSeconds)}`}</small></div>
         </div>
 
-        <p className="source-note"><ShieldCheck size={15} /> Solo estimates use the public network hashrate and observed BPS currently shown by ZKAS.stream. Mining luck is random: an average time of 3 days can still produce a block sooner, much later, or not at all during that period.</p>
+        <p className="source-note"><ShieldCheck size={15} /> Estimates use live public ZKAS and Kaspa network inputs. Solo and merge-mining rewards remain statistical estimates: luck, uptime, rejected shares, pool rules and fees can change actual payouts.</p>
       </section>
 
       <section className="two-col solo-info-row">
@@ -1374,7 +1467,6 @@ function SoloMiningIntelligence({ data }: { data: DashboardData }) {
     </section>
   );
 }
-
 function MergedIntelligencePage({ data }: { data: DashboardData }) {
   const groups = attributionGroups(data);
   const ratio = pct(data.merged.found, data.merged.checked);
