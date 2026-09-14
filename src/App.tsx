@@ -1303,6 +1303,7 @@ function MiningDistributionPanel({ data }: { data: DashboardData }) {
 function SoloMiningIntelligence({ data }: { data: DashboardData }) {
   const [minerHashrate, setMinerHashrate] = useState('1');
   const [hashUnit, setHashUnit] = useState<SoloHashUnit>('TH/s');
+  const [zkasFallbackPrice, setZkasFallbackPrice] = useState<number | null>(null);
   const [kaspa, setKaspa] = useState<KaspaMiningSnapshot>({
     hashrateHps: null,
     blockRewardKas: null,
@@ -1323,11 +1324,14 @@ function SoloMiningIntelligence({ data }: { data: DashboardData }) {
     Promise.all([
       readJson('/api/kas-mining'),
       readJson('/api/kas-price').catch(() => null),
+      readJson('/api/zkas-price').catch(() => null),
     ])
-      .then(([mining, quote]) => {
+      .then(([mining, quote, zkasQuote]) => {
         const hashrateHps = Number(mining.hashrateHps);
         const blockRewardKas = Number(mining.blockRewardKas);
         const priceUsd = Number(quote?.priceUsd);
+        const zkasPriceUsd = Number(zkasQuote?.priceUsd);
+        if (Number.isFinite(zkasPriceUsd) && zkasPriceUsd > 0) setZkasFallbackPrice(zkasPriceUsd);
         const hasMiningInputs = Number.isFinite(hashrateHps) && hashrateHps > 0
           && Number.isFinite(blockRewardKas) && blockRewardKas > 0;
         setKaspa({
@@ -1361,7 +1365,8 @@ function SoloMiningIntelligence({ data }: { data: DashboardData }) {
   const chance24h = expectedBlocksDay === null ? null : (1 - Math.exp(-expectedBlocksDay)) * 100;
   const chance7d = expectedBlocksDay === null ? null : (1 - Math.exp(-expectedBlocksDay * 7)) * 100;
   const expectedPayoutDay = expectedBlocksDay !== null && payout !== null ? expectedBlocksDay * payout : null;
-  const expectedZkasUsdDay = expectedPayoutDay !== null && data.priceUsd !== null ? expectedPayoutDay * data.priceUsd : null;
+  const zkasPriceUsd = data.priceUsd ?? zkasFallbackPrice;
+  const expectedZkasUsdDay = expectedPayoutDay !== null && zkasPriceUsd !== null ? expectedPayoutDay * zkasPriceUsd : null;
 
   const kaspaShareFraction = minerHps !== null && kaspa.hashrateHps !== null && kaspa.hashrateHps > 0
     ? Math.min(1, minerHps / kaspa.hashrateHps)
