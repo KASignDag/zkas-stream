@@ -1340,3 +1340,199 @@ footer { width: min(1320px, calc(100% - 40px)); margin: 0 auto; padding: 22px 0 
   .miner-payments code { grid-column: 1 / -1; }
   .solo-lookup-limits { grid-template-columns: 1fr; }
 }
+
+
+/* Live public-node globe */
+.network-globe-panel {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(310px, .85fr) minmax(460px, 1.15fr);
+  min-height: 540px;
+  overflow: hidden;
+  border-color: color-mix(in srgb, var(--accent) 34%, var(--border));
+  background:
+    radial-gradient(circle at 82% 42%, color-mix(in srgb, var(--accent) 13%, transparent), transparent 34%),
+    linear-gradient(145deg, color-mix(in srgb, #031713 96%, var(--surface)), #06110e);
+  color: #eefbf7;
+  box-shadow: 0 22px 54px rgba(3, 28, 22, .2);
+}
+.network-globe-panel::before {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  content: "";
+  background-image: linear-gradient(rgba(77, 222, 183, .035) 1px, transparent 1px), linear-gradient(90deg, rgba(77, 222, 183, .035) 1px, transparent 1px);
+  background-size: 42px 42px;
+  mask-image: linear-gradient(90deg, #000, transparent 78%);
+}
+.network-globe-copy {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 42px 10px 42px 42px;
+}
+.network-globe-eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  color: #55dfbc;
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 1.7px;
+}
+.network-globe-copy h2 {
+  max-width: 480px;
+  margin: 14px 0 10px;
+  color: #f4fffc;
+  font-size: clamp(28px, 3vw, 43px);
+  line-height: 1.03;
+  letter-spacing: -1.5px;
+}
+.network-globe-copy > p {
+  max-width: 500px;
+  margin: 0;
+  color: #9eb8af;
+  font-size: 14px;
+  line-height: 1.65;
+}
+.network-globe-stats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(92px, 1fr));
+  gap: 9px;
+  width: 100%;
+  max-width: 500px;
+  margin-top: 24px;
+}
+.network-globe-stats > div {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 2px 8px;
+  padding: 12px 13px;
+  border: 1px solid rgba(95, 229, 193, .17);
+  border-radius: 12px;
+  background: rgba(16, 50, 41, .44);
+}
+.network-globe-stats svg {
+  grid-row: 1 / 3;
+  align-self: center;
+  color: #4cdfb7;
+}
+.network-globe-stats span { color: #86a49a; font-size: 9px; font-weight: 800; text-transform: uppercase; }
+.network-globe-stats b { color: #f2fffb; font-size: 16px; }
+.network-country-list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 7px;
+  width: 100%;
+  max-width: 500px;
+  margin-top: 16px;
+}
+.network-country-list > div {
+  display: grid;
+  grid-template-columns: 26px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+  padding: 8px 10px;
+  border-radius: 9px;
+  background: rgba(255, 255, 255, .035);
+  color: #b9cec7;
+  font-size: 11px;
+}
+.network-country-list > div > span:nth-child(2) { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.network-country-list b { color: #55dfbc; font-size: 12px; }
+.network-country-list > p { grid-column: 1 / -1; color: #8ba59c; font-size: 12px; }
+.network-country-flag { font-size: 17px; line-height: 1; }
+.network-globe-button {
+  margin-top: 18px;
+  padding: 11px 17px;
+  border: 1px solid rgba(84, 224, 186, .42);
+  border-radius: 999px;
+  background: rgba(29, 145, 116, .15);
+  color: #62e6c2;
+  font-size: 12px;
+  font-weight: 900;
+  cursor: pointer;
+}
+.network-globe-button:hover { background: rgba(39, 183, 146, .22); transform: translateY(-1px); }
+.network-globe-stage {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  place-items: center;
+  min-width: 0;
+  padding: 20px 10px;
+  cursor: grab;
+  touch-action: pan-y;
+  user-select: none;
+}
+.network-globe-stage.dragging { cursor: grabbing; }
+.network-globe-stage svg { width: min(100%, 620px); height: auto; overflow: visible; }
+.network-globe-aura {
+  fill: rgba(52, 218, 174, .045);
+  stroke: rgba(72, 229, 188, .22);
+  stroke-width: 2;
+  filter: drop-shadow(0 0 28px rgba(44, 213, 169, .2));
+}
+.network-globe-sphere { stroke: rgba(93, 238, 198, .32); stroke-width: 1.5; }
+.network-globe-grid { fill: none; stroke: rgba(100, 229, 195, .13); stroke-width: 1; }
+.network-globe-marker-halo { fill: rgba(69, 226, 184, .22); }
+.network-globe-marker-dot { fill: #55e7bf; stroke: #d8fff4; stroke-width: 1.25; }
+.network-globe-marker { transition: opacity .12s linear; }
+.network-globe-floating-label {
+  position: absolute;
+  left: 50%;
+  bottom: 62px;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  transform: translateX(-50%);
+  padding: 8px 12px;
+  border: 1px solid rgba(76, 222, 184, .22);
+  border-radius: 999px;
+  background: rgba(3, 20, 16, .76);
+  color: #9cd6c6;
+  font-size: 10px;
+  font-weight: 800;
+  white-space: nowrap;
+  backdrop-filter: blur(9px);
+}
+.network-globe-floating-label svg { color: #4de0b9; }
+.network-globe-help {
+  position: absolute;
+  right: 28px;
+  bottom: 26px;
+  color: #6f9287;
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: .9px;
+  text-transform: uppercase;
+}
+
+@media (max-width: 980px) {
+  .network-globe-panel { grid-template-columns: 1fr; }
+  .network-globe-copy { order: 2; padding: 0 24px 30px; }
+  .network-globe-stage { order: 1; min-height: 400px; margin-bottom: -35px; padding-top: 8px; }
+  .network-globe-copy h2 { font-size: 31px; }
+}
+
+@media (max-width: 620px) {
+  .network-globe-panel { min-height: 0; border-radius: 18px; }
+  .network-globe-stage { min-height: 320px; margin-bottom: -26px; padding: 4px 0 0; }
+  .network-globe-stage svg { width: 112%; max-width: 500px; }
+  .network-globe-copy { padding: 0 17px 20px; }
+  .network-globe-copy h2 { margin-top: 10px; font-size: 27px; }
+  .network-globe-copy > p { font-size: 12px; }
+  .network-globe-stats { gap: 6px; margin-top: 16px; }
+  .network-globe-stats > div { padding: 9px 8px; }
+  .network-globe-stats svg { display: none; }
+  .network-globe-stats span { font-size: 8px; }
+  .network-globe-stats b { font-size: 14px; }
+  .network-country-list { gap: 5px; margin-top: 11px; }
+  .network-country-list > div { padding: 7px 8px; font-size: 10px; }
+  .network-globe-floating-label { bottom: 40px; }
+  .network-globe-help { right: 16px; bottom: 14px; }
+}
