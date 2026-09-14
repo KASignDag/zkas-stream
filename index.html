@@ -16,6 +16,20 @@
         event.preventDefault();
         window.location.href = '/community-mining.html';
       });
+
+      // Keep the Genesis Supporters page code intact, but hide its navigation
+      // entry for now so it does not take space in the main site UI.
+      function hideSupportersNav() {
+        document.querySelectorAll('.nav button').forEach(function (button) {
+          if (button.textContent && button.textContent.trim() === 'Supporters') {
+            button.style.display = 'none';
+          }
+        });
+      }
+      document.addEventListener('DOMContentLoaded', function () {
+        hideSupportersNav();
+        new MutationObserver(hideSupportersNav).observe(document.body, { childList: true, subtree: true });
+      });
     </script>
   </head>
   <body>
