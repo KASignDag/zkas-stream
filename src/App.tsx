@@ -52,8 +52,9 @@ import { OtcScreenshotImporter } from './components/OtcScreenshotImporter';
 import { SparkChart } from './components/SparkChart';
 import { GenesisSupportersPage } from './components/GenesisSupportersPage';
 import { MiningPayoutRanking } from './components/MiningPayoutRanking';
+import { ExchangesPage } from './components/ExchangesPage';
 
-type Tab = 'intelligence' | 'merged' | 'health' | 'nodes' | 'events' | 'explorer' | 'otc' | 'importer' | 'history' | 'supply' | 'reference' | 'supporters';
+type Tab = 'intelligence' | 'merged' | 'health' | 'nodes' | 'events' | 'explorer' | 'otc' | 'exchanges' | 'importer' | 'history' | 'supply' | 'reference' | 'supporters';
 
 const tabHashes: Record<Tab, string> = {
   intelligence: '',
@@ -63,6 +64,7 @@ const tabHashes: Record<Tab, string> = {
   events: 'events',
   explorer: 'explorer',
   otc: 'otc',
+  exchanges: 'exchanges',
   importer: 'otc-import',
   history: 'history',
   supply: 'supply-privacy',
@@ -575,6 +577,7 @@ const heroTitles: Record<Tab, string> = {
   events: 'Live event intelligence',
   explorer: 'Privacy-aware chain explorer',
   otc: 'ZKAS OTC market price',
+  exchanges: 'ZKAS exchange markets',
   importer: 'OTC screenshot importer',
   history: 'Historical intelligence',
   supply: 'Supply & privacy intelligence',
@@ -590,6 +593,7 @@ const heroDescriptions: Record<Tab, string> = {
   events: 'Recent public block and network activity, organized into stable signals instead of a reconstructed animated DAG.',
   explorer: 'Inspect recent BlockDAG activity, blocks and transactions without exposing shielded addresses, balances or transferred amounts.',
   otc: 'Completed ZKAS OTC trades, actual traded prices and volume—prepared to update automatically from the private trade-log connection.',
+  exchanges: 'Live ZKAS exchange prices, bid and ask liquidity, actual trading volume and real-time market charts.',
   importer: 'Privately read trade-log screenshots, review the detected facts and publish completed trades to the OTC chart.',
   history: 'Chain-derived work history and observer history, kept separate so unavailable historical data is never invented.',
   supply: 'Consensus supply, emission and aggregate shielded-activity intelligence without exposing individual holders.',
@@ -745,6 +749,7 @@ function App() {
     ['events', 'Events'],
     ['explorer', 'Explorer'],
     ['otc', 'OTC Price'],
+    ['exchanges', 'Exchanges'],
     ['history', 'History'],
     ['supply', 'Supply & Privacy'],
     ['reference', 'Reference'],
@@ -804,14 +809,14 @@ function App() {
                 </div>
               </details>
             </div>
-            {tab !== 'otc' && tab !== 'importer' && tab !== 'supporters' && <div className="sync-box">
+            {tab !== 'otc' && tab !== 'exchanges' && tab !== 'importer' && tab !== 'supporters' && <div className="sync-box">
               <span>Network</span><b>{data.network}</b>
               <span>Updated</span><b>{new Date(data.updatedAt).toLocaleTimeString()}</b>
             </div>}
           </div>
         </section>
 
-        {tab !== 'otc' && tab !== 'importer' && tab !== 'supporters' && <>
+        {tab !== 'otc' && tab !== 'exchanges' && tab !== 'importer' && tab !== 'supporters' && <>
           <form className="searchbar" onSubmit={onSearch}>
             <Search size={21} />
             <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search public block hash or transaction ID" aria-label="Search public block hash or transaction ID" />
@@ -819,8 +824,8 @@ function App() {
           </form>
           {searchError && <div className="inline-error">{searchError}</div>}
         </>}
-        {tab !== 'otc' && tab !== 'importer' && tab !== 'supporters' && status === 'stale' && <div className="demo-banner"><b>Live refresh delayed.</b> Showing the last good public mainnet snapshot while the API retries. {error && <span>{error}</span>}</div>}
-        {tab !== 'otc' && tab !== 'importer' && tab !== 'supporters' && status === 'connecting' && <div className="demo-banner"><b>Connecting to ZKas mainnet.</b> Waiting for the first public API snapshot. {error && <span>{error}</span>}</div>}
+        {tab !== 'otc' && tab !== 'exchanges' && tab !== 'importer' && tab !== 'supporters' && status === 'stale' && <div className="demo-banner"><b>Live refresh delayed.</b> Showing the last good public mainnet snapshot while the API retries. {error && <span>{error}</span>}</div>}
+        {tab !== 'otc' && tab !== 'exchanges' && tab !== 'importer' && tab !== 'supporters' && status === 'connecting' && <div className="demo-banner"><b>Connecting to ZKas mainnet.</b> Waiting for the first public API snapshot. {error && <span>{error}</span>}</div>}
 
         {tab === 'intelligence' && (
           <IntelligenceHome data={data} txValues={txValues} pulseTimes={pulseTimes} onReference={() => navigateToTab('reference')} />
@@ -832,6 +837,7 @@ function App() {
         {tab === 'events' && <EventsPage data={data} history={history} />}
         {tab === 'explorer' && <ExplorerPage data={data} txs={txs} onSelect={(value) => void doSearch(value)} />}
         {tab === 'otc' && <OtcMarketPage circulatingSupply={data.supply} />}
+        {tab === 'exchanges' && <ExchangesPage />}
         {tab === 'importer' && <OtcScreenshotImporter />}
         {tab === 'history' && <HistoryPage data={data} history={history} range={historyRange} onRange={setHistoryRange} />}
         {tab === 'supply' && <SupplyPrivacyPage data={data} history={history} range={historyRange} onRange={setHistoryRange} />}
