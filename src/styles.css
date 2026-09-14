@@ -1416,13 +1416,30 @@ footer { width: min(1320px, calc(100% - 40px)); margin: 0 auto; padding: 22px 0 
 .network-map-stats b { color: #f1fffb; font-size: 14px; }
 .network-map-stage {
   position: relative;
+  overflow-x: auto;
+  overflow-y: hidden;
   margin: 0 20px;
   border: 1px solid rgba(83, 222, 185, .2);
   border-radius: 16px;
   background: #04130f;
   box-shadow: inset 0 0 50px rgba(36, 180, 142, .06);
+  overscroll-behavior-x: contain;
+  scrollbar-color: rgba(84, 218, 182, .5) rgba(3, 24, 19, .8);
+  scrollbar-width: thin;
+  -webkit-overflow-scrolling: touch;
 }
-.network-map-stage > svg {
+.network-map-stage::-webkit-scrollbar { height: 7px; }
+.network-map-stage::-webkit-scrollbar-track { background: rgba(3, 24, 19, .8); }
+.network-map-stage::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  background: rgba(84, 218, 182, .5);
+}
+.network-map-canvas {
+  position: relative;
+  width: 100%;
+  min-width: 0;
+}
+.network-map-canvas > svg {
   display: block;
   width: 100%;
   height: auto;
@@ -1434,13 +1451,7 @@ footer { width: min(1320px, calc(100% - 40px)); margin: 0 auto; padding: 22px 0 
   stroke: rgba(108, 228, 197, .075);
   stroke-width: 1;
 }
-.network-map-land { opacity: .82; }
-.network-map-coastline {
-  fill: none;
-  stroke: rgba(113, 230, 199, .26);
-  stroke-width: 1.25;
-  vector-effect: non-scaling-stroke;
-}
+.network-map-geography { pointer-events: none; }
 .network-map-marker {
   cursor: pointer;
   outline: none;
@@ -1508,6 +1519,16 @@ footer { width: min(1320px, calc(100% - 40px)); margin: 0 auto; padding: 22px 0 
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+.network-map-swipe-hint {
+  display: none;
+  margin: 7px 12px 0;
+  color: #6f978b;
+  font-size: 8px;
+  font-weight: 800;
+  letter-spacing: .45px;
+  text-align: center;
+  text-transform: uppercase;
+}
 .network-map-foot {
   display: flex;
   align-items: center;
@@ -1545,12 +1566,14 @@ footer { width: min(1320px, calc(100% - 40px)); margin: 0 auto; padding: 22px 0 
   .network-map-head h2 { margin: 6px 0 4px; font-size: 23px; }
   .network-map-head p { font-size: 10px; line-height: 1.45; }
   .network-map-stats { gap: 5px; }
-  .network-map-stats > div { display: block; padding: 7px 7px; }
+  .network-map-stats > div { display: block; padding: 7px; }
   .network-map-stats svg { display: none; }
   .network-map-stats span { display: block; margin-bottom: 2px; font-size: 6px; }
   .network-map-stats b { display: block; font-size: 13px; }
   .network-map-stage { margin: 0 8px; border-radius: 11px; }
-  .network-map-stage > svg { min-height: 180px; border-radius: 11px; }
+  .network-map-canvas { width: 760px; min-width: 760px; }
+  .network-map-canvas > svg { min-height: 380px; border-radius: 11px; }
+  .network-map-swipe-hint { display: block; }
   .network-map-popup { width: 185px; padding: 9px; }
   .network-map-popup > div b { font-size: 10px; }
   .network-map-popup > small { margin: 6px 0; font-size: 7px; }
