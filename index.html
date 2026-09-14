@@ -6,6 +6,17 @@
     <meta name="theme-color" content="#07130f" />
     <meta name="description" content="ZKAS Stream — public merged-mining attribution, mining-share intelligence and network health for ZKas." />
     <title>ZKAS Stream</title>
+    <script>
+      if (window.location.hash === '#community-mining' || window.location.hash === '#/community-mining') {
+        window.location.replace('/community-mining.html');
+      }
+      document.addEventListener('click', function (event) {
+        const target = event.target instanceof Element ? event.target.closest('a[href="#community-mining"], a[href="#/community-mining"]') : null;
+        if (!target) return;
+        event.preventDefault();
+        window.location.href = '/community-mining.html';
+      });
+    </script>
   </head>
   <body>
     <div id="root"></div>
