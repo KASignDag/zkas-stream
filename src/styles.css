@@ -1345,6 +1345,7 @@ footer { width: min(1320px, calc(100% - 40px)); margin: 0 auto; padding: 22px 0 
 /* Live public-node globe */
 .network-globe-panel {
   position: relative;
+  padding: 0;
   display: grid;
   grid-template-columns: minmax(310px, .85fr) minmax(460px, 1.15fr);
   min-height: 540px;
