@@ -36,24 +36,53 @@ function Root() {
   return (
     <>
       <App />
-      <a
-        href="#community-mining"
-        style={{
-          position: 'fixed',
-          right: 18,
-          bottom: 18,
-          zIndex: 40,
-          padding: '11px 15px',
-          borderRadius: 999,
-          border: '1px solid rgba(34,211,238,.35)',
-          background: 'rgba(8,17,31,.94)',
-          color: '#e6fbff',
-          fontWeight: 800,
-          fontSize: 13,
-          textDecoration: 'none',
-          boxShadow: '0 10px 30px rgba(0,0,0,.24)',
-        }}
-      >
+      <style>{`
+        .community-mining-fab {
+          position: fixed;
+          right: 18px;
+          bottom: 18px;
+          z-index: 40;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          gap: 8px;
+          padding: 11px 15px;
+          border: 1px solid rgba(34,211,238,.35);
+          border-radius: 999px;
+          background: rgba(8,17,31,.94);
+          color: #e6fbff;
+          font-size: 13px;
+          font-weight: 800;
+          text-decoration: none;
+          box-shadow: 0 10px 30px rgba(0,0,0,.24);
+          backdrop-filter: blur(12px);
+          -webkit-backdrop-filter: blur(12px);
+        }
+        .community-mining-fab:hover { transform: translateY(-1px); }
+        .community-mining-fab-dot {
+          width: 7px;
+          height: 7px;
+          border-radius: 50%;
+          background: #31d7aa;
+          box-shadow: 0 0 0 4px rgba(49,215,170,.14);
+        }
+        @media (max-width: 900px) {
+          body:has(.nav.open) .community-mining-fab { display: none; }
+          .community-mining-fab {
+            left: 12px;
+            right: 12px;
+            bottom: max(12px, env(safe-area-inset-bottom));
+            min-height: 50px;
+            padding: 12px 18px;
+            border-color: rgba(21,154,126,.38);
+            background: rgba(8,27,22,.96);
+            font-size: 14px;
+            box-shadow: 0 10px 30px rgba(0,0,0,.2);
+          }
+        }
+      `}</style>
+      <a className="community-mining-fab" href="/community-mining.html" aria-label="Open Community Mining live dashboard">
+        <span className="community-mining-fab-dot" aria-hidden="true" />
         Community Mining · Live
       </a>
     </>
