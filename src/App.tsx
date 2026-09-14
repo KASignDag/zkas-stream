@@ -1408,15 +1408,15 @@ function SoloMiningIntelligence({ data }: { data: DashboardData }) {
             <small>Probability-weighted solo estimate, not a guaranteed daily payout.</small>
           </div>
           <div className="solo-earnings-card kas">
-            <span><i /> KAS · MERGE-MINED</span>
+            <span><i /> KAS · THEORETICAL MERGE-MINED</span>
             <b>{kaspa.status === 'loading' ? 'Loading…' : displayMiningEstimate(expectedKasDay, ' KAS')}</b>
             <strong>{kaspa.status === 'loading' ? 'Live Kaspa inputs' : `${displayUsd(expectedKasUsdDay)} / day`}</strong>
-            <small>Potential gross reward. Requires active KAS mining and a configured Kaspa payout address; pool fees may apply.</small>
+            <small>Theoretical potential gross reward. Requires active KAS mining and a configured Kaspa payout address; pool fees may apply.</small>
           </div>
           <div className="solo-combined-value">
             <span>Estimated combined value</span>
             <b>{displayUsd(combinedUsdDay)} / day</b>
-            <small>ZKAS + KAS at currently reported USD prices</small>
+            <small>Statistical ZKAS + theoretical KAS value at currently reported USD prices—not guaranteed income.</small>
           </div>
         </div>
 
