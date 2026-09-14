@@ -53,7 +53,7 @@ import { SparkChart } from './components/SparkChart';
 import { GenesisSupportersPage } from './components/GenesisSupportersPage';
 import { MiningPayoutRanking } from './components/MiningPayoutRanking';
 import { ExchangesPage } from './components/ExchangesPage';
-import { NetworkGlobe } from './components/NetworkGlobe';
+import { NetworkMap } from './components/NetworkMap';
 
 type Tab = 'intelligence' | 'merged' | 'health' | 'nodes' | 'events' | 'explorer' | 'otc' | 'exchanges' | 'importer' | 'history' | 'supply' | 'reference' | 'supporters';
 
@@ -1445,7 +1445,7 @@ function NetworkHealthPage({ data, diffValues, txValues, pulseTimes, onOpenNodes
   return (
     <section className="page-stack">
       <div className="privacy-callout"><Activity size={21} /><div><b>Observed health signals, not an authoritative global score</b><span>These metrics come from the public explorer vantage point and consensus data. They are intended to show changes and anomalies without claiming to see every node on the network.</span></div></div>
-      <NetworkGlobe data={data.publicNodes} onOpenNodes={onOpenNodes} />
+      <NetworkMap data={data.publicNodes} onOpenNodes={onOpenNodes} />
       <div className="metric-grid nodes-metrics">
         <MetricCard icon={<Activity size={19} />} label="BPS" value={displayNumber(data.bps)} sub="15m block flow" accent />
         <MetricCard icon={<Gauge size={19} />} label="Hashrate" value={displayHashrate(data.hashrate)} sub="Consensus work estimate" />
