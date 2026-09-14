@@ -1471,7 +1471,7 @@ footer { width: min(1320px, calc(100% - 40px)); margin: 0 auto; padding: 22px 0 
   user-select: none;
 }
 .network-globe-stage.dragging { cursor: grabbing; }
-.network-globe-stage svg { width: min(100%, 620px); height: auto; overflow: visible; }
+.network-globe-stage > svg { width: min(100%, 620px); height: auto; overflow: visible; }
 .network-globe-aura {
   fill: rgba(52, 218, 174, .045);
   stroke: rgba(72, 229, 188, .22);
@@ -1521,19 +1521,41 @@ footer { width: min(1320px, calc(100% - 40px)); margin: 0 auto; padding: 22px 0 
 }
 
 @media (max-width: 620px) {
-  .network-globe-panel { min-height: 0; border-radius: 18px; }
-  .network-globe-stage { min-height: 320px; margin-bottom: -26px; padding: 4px 0 0; }
-  .network-globe-stage svg { width: 112%; max-width: 500px; }
-  .network-globe-copy { padding: 0 17px 20px; }
-  .network-globe-copy h2 { margin-top: 10px; font-size: 27px; }
-  .network-globe-copy > p { font-size: 12px; }
-  .network-globe-stats { gap: 6px; margin-top: 16px; }
-  .network-globe-stats > div { padding: 9px 8px; }
+  .network-globe-panel { width: 100%; min-height: 0; border-radius: 16px; }
+  .network-globe-stage {
+    min-height: 258px;
+    max-height: 258px;
+    margin: 0;
+    padding: 0;
+    overflow: hidden;
+  }
+  .network-globe-stage > svg { width: 100%; max-width: 340px; }
+  .network-globe-copy { padding: 0 14px 16px; }
+  .network-globe-eyebrow { gap: 7px; font-size: 9px; letter-spacing: 1.35px; }
+  .network-globe-copy h2 {
+    max-width: 300px;
+    margin: 8px 0 7px;
+    font-size: 23px;
+    line-height: 1.06;
+    letter-spacing: -.8px;
+  }
+  .network-globe-copy > p {
+    display: -webkit-box;
+    overflow: hidden;
+    margin: 0;
+    font-size: 11px;
+    line-height: 1.5;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 3;
+  }
+  .network-globe-stats { gap: 5px; margin-top: 12px; }
+  .network-globe-stats > div { display: block; padding: 8px 7px; border-radius: 9px; }
   .network-globe-stats svg { display: none; }
-  .network-globe-stats span { font-size: 8px; }
-  .network-globe-stats b { font-size: 14px; }
-  .network-country-list { gap: 5px; margin-top: 11px; }
-  .network-country-list > div { padding: 7px 8px; font-size: 10px; }
-  .network-globe-floating-label { bottom: 40px; }
-  .network-globe-help { right: 16px; bottom: 14px; }
+  .network-globe-stats span { display: block; margin-bottom: 2px; font-size: 7px; letter-spacing: .4px; }
+  .network-globe-stats b { display: block; font-size: 14px; }
+  .network-country-list { display: none; }
+  .network-globe-button { width: 100%; margin-top: 11px; padding: 10px 14px; }
+  .network-globe-floating-label { bottom: 28px; padding: 6px 9px; font-size: 8px; }
+  .network-globe-floating-label svg { width: 13px; height: 13px; }
+  .network-globe-help { right: 10px; bottom: 8px; font-size: 7px; }
 }
