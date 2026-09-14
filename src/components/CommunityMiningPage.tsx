@@ -30,8 +30,10 @@ const EMPTY: MiningSnapshot = {
   miners: [],
 };
 
+const STALE_AFTER_MS = 3 * 60 * 1000;
+
 function fmtHashrate(value: number | null) {
-  if (value === null || !Number.isFinite(value)) return '—';
+  if (value === null || !Number.isFinite(value) || value <= 0) return 'Collecting';
   const units = ['H/s', 'KH/s', 'MH/s', 'GH/s', 'TH/s', 'PH/s', 'EH/s'];
   let n = value;
   let unit = 0;
@@ -75,6 +77,7 @@ export function CommunityMiningPage() {
       const response = await fetch('/api/community-mining', {
         signal: signal ?? controller!.signal,
         headers: { Accept: 'application/json' },
+        cache: 'no-store',
       });
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
       const body = await response.json() as MiningSnapshot;
@@ -99,10 +102,19 @@ export function CommunityMiningPage() {
   const totals = useMemo(() => {
     const online = snapshot.miners.filter((miner) => miner.status === 'online').length;
     const hashrate = snapshot.miners.reduce((sum, miner) => sum + (miner.hashrateHps ?? 0), 0);
+    const acceptedShares = snapshot.miners.reduce((sum, miner) => sum + (miner.acceptedShares ?? 0), 0);
     const zkasBlocks = snapshot.miners.reduce((sum, miner) => sum + (miner.zkasBlocks ?? 0), 0);
     const kasBlocks = snapshot.miners.reduce((sum, miner) => sum + (miner.kasBlocks ?? 0), 0);
-    return { online, hashrate, zkasBlocks, kasBlocks };
+    return { online, hashrate, acceptedShares, zkasBlocks, kasBlocks };
   }, [snapshot.miners]);
+
+  const miners = useMemo(() => [...snapshot.miners].sort((a, b) => {
+    if (a.status !== b.status) return a.status === 'online' ? -1 : 1;
+    return a.alias.localeCompare(b.alias);
+  }), [snapshot.miners]);
+
+  const snapshotFresh = snapshot.updatedAt !== null && Date.now() - snapshot.updatedAt < STALE_AFTER_MS;
+  const gatewayOnline = snapshot.gatewayOnline && snapshotFresh;
 
   return (
     <section className="community-mining">
@@ -111,8 +123,8 @@ export function CommunityMiningPage() {
           <div className="community-mining__eyebrow"><Zap size={16} /> ZKAS + KAS SOLO MERGE MINING</div>
           <h2>Community Merge Mining</h2>
           <p>
-            One Stratum connection lets compatible ASICs solo merge-mine ZKAS and KAS with the same hashrate.
-            Each miner supplies a ZKAS payout address in the worker name and a Kaspa payout address in the password field.
+            Live, privacy-safe mining telemetry from the ZKAS.stream community gateway. Compatible ASICs can solo merge-mine
+            ZKAS and KAS with the same hashrate while each miner keeps control of their own ZKAS and Kaspa payout addresses.
           </p>
         </div>
         <button className="community-mining__refresh" type="button" onClick={() => void refresh()}>
@@ -121,15 +133,17 @@ export function CommunityMiningPage() {
       </div>
 
       <div className="community-mining__statusline">
-        <span className={`community-mining__dot ${snapshot.gatewayOnline ? 'is-online' : ''}`} />
-        Gateway {snapshot.gatewayOnline ? 'online' : 'offline'}
+        <span className={`community-mining__dot ${gatewayOnline ? 'is-online' : ''}`} />
+        Gateway {gatewayOnline ? 'online' : snapshot.updatedAt ? 'stale / offline' : 'waiting'}
         <span>•</span>
         <span>{snapshot.updatedAt ? `Updated ${fmtAge(snapshot.updatedAt)}` : state === 'loading' ? 'Waiting for first snapshot' : 'No snapshot yet'}</span>
+        <span>•</span>
+        <span>Auto-refreshes every 15 seconds</span>
       </div>
 
       <div className="community-mining__cards">
         <div className="community-mining__card"><Server size={20} /><span>Online miners</span><strong>{totals.online}</strong></div>
-        <div className="community-mining__card"><Cpu size={20} /><span>Combined hashrate</span><strong>{fmtHashrate(totals.hashrate)}</strong></div>
+        <div className="community-mining__card"><Activity size={20} /><span>Accepted shares</span><strong>{fmtNumber(totals.acceptedShares)}</strong></div>
         <div className="community-mining__card"><ShieldCheck size={20} /><span>ZKAS blocks</span><strong>{fmtNumber(totals.zkasBlocks)}</strong></div>
         <div className="community-mining__card"><CheckCircle2 size={20} /><span>KAS blocks</span><strong>{fmtNumber(totals.kasBlocks)}</strong></div>
       </div>
@@ -137,15 +151,15 @@ export function CommunityMiningPage() {
       <div className="community-mining__panel">
         <div className="community-mining__panel-head">
           <div><Activity size={18} /> Live miners</div>
-          <span>Wallet addresses and IP addresses are not displayed.</span>
+          <span>Wallet addresses and IP addresses are never displayed.</span>
         </div>
 
         {state === 'error' && <div className="community-mining__empty">Mining snapshot is temporarily unavailable.</div>}
-        {state !== 'error' && snapshot.miners.length === 0 && (
+        {state !== 'error' && miners.length === 0 && (
           <div className="community-mining__empty">No public miners have been published yet.</div>
         )}
 
-        {snapshot.miners.length > 0 && (
+        {miners.length > 0 && (
           <div className="community-mining__table-wrap">
             <table className="community-mining__table">
               <thead>
@@ -163,7 +177,7 @@ export function CommunityMiningPage() {
                 </tr>
               </thead>
               <tbody>
-                {snapshot.miners.map((miner) => (
+                {miners.map((miner) => (
                   <tr key={miner.alias}>
                     <td className="community-mining__alias">{miner.alias}</td>
                     <td><span className={`community-mining__badge ${miner.status === 'online' ? 'is-online' : ''}`}>{miner.status}</span></td>
@@ -174,7 +188,7 @@ export function CommunityMiningPage() {
                     <td>{fmtAge(miner.lastShareAt)}</td>
                     <td>{fmtNumber(miner.zkasBlocks)}</td>
                     <td>{fmtNumber(miner.kasBlocks)}</td>
-                    <td>{miner.kasPayoutSet ? 'Set' : 'Pool fallback'}</td>
+                    <td><span className={`community-mining__payout ${miner.kasPayoutSet ? 'is-set' : ''}`}>{miner.kasPayoutSet ? 'Miner wallet' : 'Pool fallback'}</span></td>
                   </tr>
                 ))}
               </tbody>
@@ -188,8 +202,12 @@ export function CommunityMiningPage() {
         <div><span>URL</span><code>stratum+tcp://mine.zkas.stream:&lt;port&gt;</code></div>
         <div><span>User / worker</span><code>zkas:&lt;YOUR_ZKAS_ADDRESS&gt;.&lt;WORKER&gt;</code></div>
         <div><span>Password</span><code>kaspa:&lt;YOUR_KAS_ADDRESS&gt;</code></div>
-        <p>The public hostname and production port will be published after the external gateway test is complete.</p>
+        <p>The public hostname and production port will be published after the external gateway test is complete. Until then, this page is showing the live private-gateway test feed.</p>
       </div>
+
+      {totals.hashrate > 0 && (
+        <div className="community-mining__footnote"><Cpu size={15} /> Combined reported hashrate: {fmtHashrate(totals.hashrate)}</div>
+      )}
     </section>
   );
 }
