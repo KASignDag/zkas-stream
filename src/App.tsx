@@ -2382,7 +2382,7 @@ function RustyKaspaPoolMonitor() {
               <div><b>{soloResult.findCount ? 'Solo finds verified' : 'No solo finds recorded'}</b><span>Checked {age(soloResult.fetchedAt)}</span></div>
               <div className="miner-result-badges"><span className="merge-on">KAS + ZKAS SOLO</span></div>
             </div>
-            <div className="miner-result-grid solo-result-grid">
+            <div className="miner-result-grid solo-finds-grid">
               <div><span>All recorded finds</span><b>{displayNumber(soloResult.findCount)}</b></div>
               <div><span>Last 24 hours</span><b>{displayNumber(soloResult.findsLast24h)}</b></div>
               <div><span>Last 7 days</span><b>{displayNumber(soloResult.findsLast7d)}</b></div>
