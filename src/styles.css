@@ -979,6 +979,12 @@ footer { width: min(1320px, calc(100% - 40px)); margin: 0 auto; padding: 22px 0 
 @media (max-width: 720px) {
   .solo-controls { grid-template-columns: 1fr; }
   .solo-result-grid { grid-template-columns: 1fr 1fr; }
+  .solo-result-grid b {
+    overflow: visible;
+    white-space: normal;
+    text-overflow: clip;
+    overflow-wrap: anywhere;
+  }
   .solo-reward-strip { grid-template-columns: 1fr 1fr; gap: 14px 0; }
   .solo-reward-strip > div:nth-child(2) { border-right: 0; }
   .solo-reward-strip > div:nth-child(3) { padding-left: 0; }
@@ -1313,7 +1319,7 @@ footer { width: min(1320px, calc(100% - 40px)); margin: 0 auto; padding: 22px 0 
 .solo-lookup-limits span { margin-top: 4px; color: var(--muted); font-size: 9px; line-height: 1.5; }
 .solo-lookup-limits > div:first-child b { color: var(--accent); }
 .solo-lookup-limits > div:last-child b { color: #d7953f; }
-.solo-result-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.solo-finds-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 .solo-finds-list b { text-transform: capitalize; }
 .rustykaspa-pool-foot { display: flex; align-items: center; justify-content: space-between; gap: 20px; margin-top: 14px; }
 .rustykaspa-pool-foot p { display: flex; align-items: flex-start; gap: 7px; max-width: 700px; margin: 0; color: var(--muted); font-size: 10px; line-height: 1.55; }
