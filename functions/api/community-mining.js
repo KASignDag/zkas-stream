@@ -44,8 +44,7 @@ function cleanMiner(value) {
   if (!alias) return null;
 
   const status = value.status === 'online' ? 'online' : 'offline';
-  const lastShareAt = finiteNonNegative(value.lastShareAt);
-  const miner = {
+  return {
     alias,
     status,
     hashrateHps: finiteNonNegative(value.hashrateHps),
@@ -53,20 +52,22 @@ function cleanMiner(value) {
     acceptedShares: finiteNonNegative(value.acceptedShares),
     invalidShares: finiteNonNegative(value.invalidShares),
     staleShares: finiteNonNegative(value.staleShares),
-    lastShareAt,
+    lastShareAt: finiteNonNegative(value.lastShareAt),
     zkasBlocks: finiteNonNegative(value.zkasBlocks),
     kasBlocks: finiteNonNegative(value.kasBlocks),
     kasPayoutSet: value.kasPayoutSet === true,
   };
-
-  return miner;
 }
 
 export async function onRequest(context) {
-  if (!context.env.COMMUNITY_MINING) return json({ error: 'storage_not_configured' }, 503);
+  // Prefer a dedicated KV binding when present. Until then, safely reuse the
+  // existing OTC_TRADES namespace under a distinct key so no extra KV namespace
+  // is required to bring the community-mining feed online.
+  const store = context.env.COMMUNITY_MINING || context.env.OTC_TRADES;
+  if (!store) return json({ error: 'storage_not_configured' }, 503);
 
   if (context.request.method === 'GET') {
-    const snapshot = await context.env.COMMUNITY_MINING.get(STORAGE_KEY, 'json');
+    const snapshot = await store.get(STORAGE_KEY, 'json');
     if (!snapshot) {
       return json({
         schemaVersion: 1,
@@ -102,6 +103,6 @@ export async function onRequest(context) {
     miners,
   };
 
-  await context.env.COMMUNITY_MINING.put(STORAGE_KEY, JSON.stringify(snapshot));
+  await store.put(STORAGE_KEY, JSON.stringify(snapshot));
   return json({ ok: true, miners: miners.length, updatedAt: snapshot.updatedAt });
 }
