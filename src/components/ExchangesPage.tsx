@@ -2,11 +2,12 @@ import { useEffect, useMemo, useState } from 'react';
 import { Activity, BarChart3, ExternalLink, RefreshCw, TriangleAlert } from 'lucide-react';
 
 type Interval = '5m' | '15m' | '1h' | '4h' | '1d';
+type ExchangeId = 'neoxex' | 'noirtrade';
 type Candle = { time: number; open: number; high: number; low: number; close: number; volume: number };
 type Level = { price: number; quantity: number; orders: number };
 type Trade = { trade_id: string; side: 'buy' | 'sell'; quantity: number; price: number; total: number; executed_at: string };
 type MarketFeed = {
-  exchange: { id: string; name: string; website: string; tradeUrl: string };
+  exchange: { id: ExchangeId; name: string; website: string; tradeUrl: string };
   pair: string;
   interval: Interval;
   ticker: {
@@ -23,9 +24,12 @@ type MarketFeed = {
   orderbook: { bids: Level[]; asks: Level[] };
   candles: Candle[];
   trades: Trade[];
+  chartSource: string;
   updatedAt: number;
 };
 
+const exchangeIds: ExchangeId[] = ['neoxex', 'noirtrade'];
+const exchangeNames: Record<ExchangeId, string> = { neoxex: 'NeoxEX', noirtrade: 'NoirTrade' };
 const intervals: Interval[] = ['5m', '15m', '1h', '4h', '1d'];
 const number = new Intl.NumberFormat('en-US', { maximumFractionDigits: 2 });
 
@@ -66,10 +70,10 @@ function PriceChart({ candles, lastPrice }: { candles: Candle[]; lastPrice: numb
     const x = (index: number) => left + step * index + step / 2;
     const y = (price: number) => top + (1 - (price - min) / span) * (priceBottom - top);
     const volumeY = (volume: number) => volumeBottom - (volume / maxVolume) * (volumeBottom - volumeTop);
-    return { rows, width, height, left, right, top, priceBottom, volumeTop, volumeBottom, min, max, x, y, volumeY, candleWidth };
+    return { rows, width, height, left, right, volumeTop, volumeBottom, min, max, x, y, volumeY, candleWidth };
   }, [candles]);
 
-  if (!chart) return <div className="exchange-chart-empty">Waiting for the first exchange candles…</div>;
+  if (!chart) return <div className="exchange-chart-empty">Waiting for completed exchange trades…</div>;
   const labelIndexes = Array.from(new Set([0, Math.floor((chart.rows.length - 1) / 2), chart.rows.length - 1]));
   const priceTicks = [0, .25, .5, .75, 1].map((ratio) => chart.max - (chart.max - chart.min) * ratio);
   const currentY = lastPrice !== null && lastPrice >= chart.min && lastPrice <= chart.max ? chart.y(lastPrice) : null;
@@ -109,10 +113,11 @@ function MarketMetric({ label, value, detail, tone }: { label: string; value: st
 }
 
 export function ExchangesPage() {
-  const [feed, setFeed] = useState<MarketFeed | null>(null);
+  const [feeds, setFeeds] = useState<Partial<Record<ExchangeId, MarketFeed>>>({});
+  const [selected, setSelected] = useState<ExchangeId>('neoxex');
   const [interval, setInterval] = useState<Interval>('15m');
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [errors, setErrors] = useState<Partial<Record<ExchangeId, string>>>({});
 
   useEffect(() => {
     let stopped = false;
@@ -120,16 +125,24 @@ export function ExchangesPage() {
     async function refresh() {
       controller?.abort();
       controller = new AbortController();
-      try {
-        const response = await fetch(`/api/exchange-market?exchange=neoxex&pair=ZKAS_USDT&interval=${interval}`, { signal: controller.signal, cache: 'no-store' });
-        if (!response.ok) throw new Error('Live exchange feed is temporarily unavailable.');
-        const next = await response.json() as MarketFeed;
-        if (!stopped) { setFeed(next); setError(null); }
-      } catch (reason) {
-        if (!stopped && !controller.signal.aborted) setError(reason instanceof Error ? reason.message : 'Unable to load exchange data.');
-      } finally {
-        if (!stopped) setLoading(false);
-      }
+      const results = await Promise.allSettled(exchangeIds.map(async (exchangeId) => {
+        const response = await fetch(`/api/exchange-market?exchange=${exchangeId}&pair=ZKAS_USDT&interval=${interval}`, { signal: controller?.signal, cache: 'no-store' });
+        if (!response.ok) throw new Error(`${exchangeNames[exchangeId]} feed is temporarily unavailable.`);
+        return await response.json() as MarketFeed;
+      }));
+      if (stopped || controller.signal.aborted) return;
+      const nextErrors: Partial<Record<ExchangeId, string>> = {};
+      setFeeds((previous) => {
+        const next = { ...previous };
+        results.forEach((result, index) => {
+          const exchangeId = exchangeIds[index];
+          if (result.status === 'fulfilled') next[exchangeId] = result.value;
+          else nextErrors[exchangeId] = result.reason instanceof Error ? result.reason.message : `${exchangeNames[exchangeId]} unavailable`;
+        });
+        return next;
+      });
+      setErrors(nextErrors);
+      setLoading(false);
     }
     setLoading(true);
     void refresh();
@@ -137,24 +150,33 @@ export function ExchangesPage() {
     return () => { stopped = true; controller?.abort(); window.clearInterval(timer); };
   }, [interval]);
 
+  const feed = feeds[selected] ?? null;
   const ticker = feed?.ticker ?? null;
-  const bidBelowAsk = ticker?.bestAsk && ticker.bestBid !== null
+  const bidBelowAsk = ticker?.bestAsk && ticker.bestBid > 0
     ? ((ticker.bestAsk - ticker.bestBid) / ticker.bestAsk) * 100
     : null;
   const lowLiquidity = bidBelowAsk !== null && bidBelowAsk >= 10;
+  const liveCount = exchangeIds.filter((exchangeId) => feeds[exchangeId]).length;
 
   return (
     <div className="page-stack exchanges-page">
-      <div className={`exchange-status ${error ? 'error' : 'live'}`}>
+      <div className={`exchange-status ${liveCount === 0 ? 'error' : 'live'}`}>
         <span className="exchange-status-dot" />
-        <div><b>{error ? 'Exchange feed retrying' : 'NeoxEX market connected'}</b><span>{error || 'Live public market data refreshes every 10 seconds.'}</span></div>
+        <div><b>{liveCount ? `${liveCount} live exchange ${liveCount === 1 ? 'market' : 'markets'} connected` : 'Exchange feeds retrying'}</b><span>{liveCount ? 'NeoxEX and NoirTrade public market data refresh every 10 seconds.' : Object.values(errors)[0] || 'Unable to load exchange data.'}</span></div>
         <span className="exchange-refresh"><RefreshCw size={13} className={loading ? 'spinning' : ''} /> 10 sec refresh</span>
+      </div>
+
+      <div className="exchange-selector" aria-label="Select chart exchange">
+        {exchangeIds.map((exchangeId) => {
+          const item = feeds[exchangeId];
+          return <button key={exchangeId} className={selected === exchangeId ? 'active' : ''} onClick={() => setSelected(exchangeId)}><span>{exchangeNames[exchangeId]} <i className={item ? 'online' : ''} /></span><b>{usd(item?.ticker?.lastPrice)}</b><small>{errors[exchangeId] || 'ZKAS / USDT'}</small></button>;
+        })}
       </div>
 
       {lowLiquidity && <div className="exchange-warning"><TriangleAlert size={19} /><div><b>Low-liquidity market</b><span>The last trade can differ substantially from the price available to buyers or sellers. Check the live bid and ask before using the last price as a market value.</span></div></div>}
 
       <section className="exchange-price-dock" aria-live="polite">
-        <div><span>NeoxEX · ZKAS / USDT</span><small>Live exchange market</small></div>
+        <div><span>{feed?.exchange.name || exchangeNames[selected]} · ZKAS / USDT</span><small>Live exchange market</small></div>
         <div><small>LAST TRADE</small><strong>{usd(ticker?.lastPrice)}</strong><em className={(ticker?.changePercent ?? 0) >= 0 ? 'positive' : 'negative'}>{ticker ? `${ticker.changePercent >= 0 ? '+' : ''}${ticker.changePercent.toFixed(2)}% 24h` : '—'}</em></div>
       </section>
 
@@ -168,7 +190,7 @@ export function ExchangesPage() {
 
       <section className="panel exchange-chart-panel">
         <div className="exchange-chart-head">
-          <div><span className="panel-icon"><BarChart3 size={20} /></span><div><h2>Real-time ZKAS price chart</h2><p>Live OHLCV candles from NeoxEX</p></div></div>
+          <div><span className="panel-icon"><BarChart3 size={20} /></span><div><h2>Real-time ZKAS price chart</h2><p>{feed ? `${feed.exchange.name} · ${feed.chartSource}` : 'Loading live market history…'}</p></div></div>
           <div className="exchange-intervals" aria-label="Chart timeframe">{intervals.map((value) => <button key={value} className={interval === value ? 'active' : ''} onClick={() => setInterval(value)}>{value}</button>)}</div>
         </div>
         <div className="exchange-chart-summary"><span>24h low <b>{usd(ticker?.low24h)}</b></span><span>24h high <b>{usd(ticker?.high24h)}</b></span><span>USDT volume <b>{ticker ? usd(ticker.quoteVolume24h, 2) : '—'}</b></span></div>
@@ -177,9 +199,12 @@ export function ExchangesPage() {
       </section>
 
       <section className="panel exchange-list-panel">
-        <div className="panel-head"><div><span className="panel-icon"><Activity size={20} /></span><h2>Reporting exchanges</h2></div><span className="range-chip">1 LIVE</span></div>
-        <div className="exchange-table-scroll"><table><thead><tr><th>Exchange</th><th>Pair</th><th>Last price</th><th>Best bid</th><th>Best ask</th><th>24h USDT volume</th><th>Status</th><th /></tr></thead><tbody><tr><td><b>NeoxEX</b></td><td>ZKAS/USDT</td><td>{usd(ticker?.lastPrice)}</td><td className="bid-text">{usd(ticker?.bestBid)}</td><td className="ask-text">{usd(ticker?.bestAsk)}</td><td>{ticker ? usd(ticker.quoteVolume24h, 2) : '—'}</td><td><span className="exchange-live-chip"><i /> Live</span></td><td><a href={feed?.exchange.tradeUrl || 'https://neoxa.exchange'} target="_blank" rel="noreferrer">Trade <ExternalLink size={13} /></a></td></tr></tbody></table></div>
-        <p className="source-note"><TriangleAlert size={15} /> Exchange prices are reported separately from completed OTC trades. Additional exchanges can be added here as soon as ZKAS markets and public data feeds become available.</p>
+        <div className="panel-head"><div><span className="panel-icon"><Activity size={20} /></span><h2>Reporting exchanges</h2></div><span className="range-chip">{liveCount} LIVE</span></div>
+        <div className="exchange-table-scroll"><table><thead><tr><th>Exchange</th><th>Pair</th><th>Last price</th><th>Best bid</th><th>Best ask</th><th>24h USDT volume</th><th>Status</th><th /></tr></thead><tbody>{exchangeIds.map((exchangeId) => {
+          const item = feeds[exchangeId];
+          return <tr key={exchangeId}><td><b>{exchangeNames[exchangeId]}</b></td><td>ZKAS/USDT</td><td>{usd(item?.ticker?.lastPrice)}</td><td className="bid-text">{usd(item?.ticker?.bestBid)}</td><td className="ask-text">{usd(item?.ticker?.bestAsk)}</td><td>{item?.ticker ? usd(item.ticker.quoteVolume24h, 2) : '—'}</td><td>{item ? <span className="exchange-live-chip"><i /> Live</span> : <span className="exchange-retry-chip">Retrying</span>}</td><td><a href={item?.exchange.tradeUrl || (exchangeId === 'noirtrade' ? 'https://noirtrade.com/trade?pair=ZKAS_USDT' : 'https://neoxa.exchange')} target="_blank" rel="noreferrer">Trade <ExternalLink size={13} /></a></td></tr>;
+        })}</tbody></table></div>
+        <p className="source-note"><TriangleAlert size={15} /> Exchange prices are reported separately from completed OTC trades. Select an exchange above to inspect its live market and chart.</p>
       </section>
     </div>
   );
