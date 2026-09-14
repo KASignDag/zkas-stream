@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#07130f" />
+  <title>Community Mining · ZKAS Stream</title>
+  <style>
+    :root{color-scheme:light dark;--bg:#f5faf7;--panel:#fff;--text:#14231d;--muted:#6f7e77;--line:#dbe7e1;--accent:#009f7a;--dark:#0c1d17}
+    @media(prefers-color-scheme:dark){:root{--bg:#07130f;--panel:#0c1d17;--text:#ecf7f2;--muted:#9fb1a8;--line:#203a31;--dark:#020806}}
+    *{box-sizing:border-box}body{margin:0;font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:var(--bg);color:var(--text)}
+    header{position:sticky;top:0;z-index:10;background:color-mix(in srgb,var(--panel) 94%,transparent);border-bottom:1px solid var(--line);padding:14px 5vw;display:flex;align-items:center;justify-content:space-between;gap:16px;backdrop-filter:blur(14px)}
+    .brand{font-size:22px;font-weight:900;letter-spacing:-.04em}.brand span{color:var(--accent);font-weight:500}.back{border:1px solid var(--line);padding:10px 14px;border-radius:12px;text-decoration:none;color:inherit;font-weight:800;background:var(--panel)}
+    main{width:min(1380px,92vw);margin:34px auto 60px}.eyebrow{color:var(--accent);font-size:12px;font-weight:900;letter-spacing:.12em}.hero{display:flex;justify-content:space-between;gap:22px;align-items:flex-start;margin-bottom:18px}.hero h1{font-size:clamp(34px,5vw,64px);line-height:.96;letter-spacing:-.05em;margin:9px 0 12px}.hero p{max-width:860px;color:var(--muted);line-height:1.55;margin:0}.refresh{border:1px solid var(--line);background:var(--panel);color:inherit;border-radius:12px;padding:10px 14px;font-weight:800;cursor:pointer}
+    .status{display:flex;gap:9px;align-items:center;color:var(--muted);margin:15px 0 20px;font-size:14px}.dot{width:9px;height:9px;border-radius:50%;background:#718079}.dot.on{background:#10b981;box-shadow:0 0 0 5px rgba(16,185,129,.12)}
+    .cards{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:13px;margin-bottom:18px}.card,.panel,.howto{background:var(--panel);border:1px solid var(--line);border-radius:18px}.card{padding:18px}.card span{display:block;color:var(--muted);font-size:13px;margin-bottom:8px}.card b{font-size:28px}.panel{overflow:hidden}.head{display:flex;justify-content:space-between;gap:16px;padding:16px 18px;border-bottom:1px solid var(--line);font-weight:900}.head small{color:var(--muted);font-weight:600}.table-wrap{overflow:auto}table{width:100%;border-collapse:collapse;min-width:1050px}th,td{text-align:left;padding:13px 14px;border-bottom:1px solid var(--line);white-space:nowrap;font-size:14px}th{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}.badge{display:inline-flex;padding:4px 8px;border-radius:999px;background:#eef2f0;color:#65756e;text-transform:capitalize}.badge.on{background:rgba(16,185,129,.13);color:#10a274}.empty{padding:28px;color:var(--muted)}
+    .howto{margin-top:18px;padding:20px}.howto h2{margin-top:0}.howrow{display:grid;grid-template-columns:140px 1fr;gap:12px;margin:10px 0;align-items:center}.howrow span{color:var(--muted);font-size:13px}.howrow code{padding:10px 12px;background:var(--dark);color:#dff9ef;border-radius:10px;overflow-wrap:anywhere}.note{color:var(--muted);font-size:13px;line-height:1.5;margin-top:14px}
+    @media(max-width:850px){.cards{grid-template-columns:repeat(2,1fr)}.hero{flex-direction:column}.head{flex-direction:column}.howrow{grid-template-columns:1fr}}
+    @media(max-width:520px){.cards{grid-template-columns:1fr}}
+  </style>
+</head>
+<body>
+<header><div class="brand">ZKAS<span>.stream</span></div><a class="back" href="/">← Intelligence</a></header>
+<main>
+  <section class="hero">
+    <div><div class="eyebrow">ZKAS + KAS SOLO MERGE MINING</div><h1>Community Mining</h1><p>Live, privacy-safe telemetry from the ZKAS.stream community gateway. Wallet addresses and miner IP addresses are not displayed.</p></div>
+    <button class="refresh" id="refresh">Refresh</button>
+  </section>
+  <div class="status"><i class="dot" id="dot"></i><b id="gateway">Gateway loading</b><span>•</span><span id="updated">Waiting for snapshot</span><span>•</span><span>Auto-refresh every 15s</span></div>
+  <section class="cards">
+    <div class="card"><span>Online miners</span><b id="online">—</b></div>
+    <div class="card"><span>Accepted shares</span><b id="shares">—</b></div>
+    <div class="card"><span>ZKAS blocks</span><b id="zkas">—</b></div>
+    <div class="card"><span>KAS blocks</span><b id="kas">—</b></div>
+  </section>
+  <section class="panel">
+    <div class="head"><span>Live miners</span><small>Wallets and IP addresses remain private</small></div>
+    <div class="table-wrap"><table><thead><tr><th>Miner</th><th>Status</th><th>Hashrate</th><th>Uptime</th><th>Accepted</th><th>Invalid / stale</th><th>Last share</th><th>ZKAS blocks</th><th>KAS blocks</th><th>KAS payout</th></tr></thead><tbody id="miners"><tr><td colspan="10" class="empty">Loading public mining snapshot…</td></tr></tbody></table></div>
+  </section>
+  <section class="howto"><h2>Miner format</h2><div class="howrow"><span>URL</span><code>stratum+tcp://mine.zkas.stream:&lt;port&gt;</code></div><div class="howrow"><span>User / worker</span><code>zkas:&lt;YOUR_ZKAS_ADDRESS&gt;.&lt;WORKER&gt;</code></div><div class="howrow"><span>Password</span><code>kaspa:&lt;YOUR_KAS_ADDRESS&gt;</code></div><p class="note">The production hostname and port will be published after the external gateway test is complete. This page currently shows the live gateway test feed.</p></section>
+</main>
+<script>
+const fmt=n=>Number.isFinite(n)?new Intl.NumberFormat('en-US',{maximumFractionDigits:0}).format(n):'—';
+const duration=s=>{if(!Number.isFinite(s))return'—';if(s<60)return Math.floor(s)+'s';if(s<3600)return Math.floor(s/60)+'m';if(s<86400)return Math.floor(s/3600)+'h '+Math.floor((s%3600)/60)+'m';return Math.floor(s/86400)+'d '+Math.floor((s%86400)/3600)+'h'};
+const age=t=>{if(!t)return'—';const s=Math.max(0,Math.floor((Date.now()-t)/1000));if(s<60)return s+'s ago';if(s<3600)return Math.floor(s/60)+'m ago';if(s<86400)return Math.floor(s/3600)+'h ago';return Math.floor(s/86400)+'d ago'};
+const hash=v=>!Number.isFinite(v)||v<=0?'Collecting':(()=>{const u=['H/s','KH/s','MH/s','GH/s','TH/s','PH/s','EH/s'];let n=v,i=0;while(Math.abs(n)>=1000&&i<u.length-1){n/=1000;i++}return new Intl.NumberFormat('en-US',{maximumFractionDigits:2}).format(n)+' '+u[i]})();
+async function load(){try{const r=await fetch('/api/community-mining',{cache:'no-store'});if(!r.ok)throw new Error();const d=await r.json();const miners=Array.isArray(d.miners)?d.miners:[];const fresh=d.updatedAt&&Date.now()-d.updatedAt<180000;const on=!!d.gatewayOnline&&fresh;document.getElementById('dot').className='dot'+(on?' on':'');document.getElementById('gateway').textContent='Gateway '+(on?'online':'stale / offline');document.getElementById('updated').textContent=d.updatedAt?'Updated '+age(d.updatedAt):'No snapshot yet';document.getElementById('online').textContent=miners.filter(m=>m.status==='online').length;document.getElementById('shares').textContent=fmt(miners.reduce((a,m)=>a+(m.acceptedShares||0),0));document.getElementById('zkas').textContent=fmt(miners.reduce((a,m)=>a+(m.zkasBlocks||0),0));document.getElementById('kas').textContent=fmt(miners.reduce((a,m)=>a+(m.kasBlocks||0),0));miners.sort((a,b)=>(a.status===b.status?a.alias.localeCompare(b.alias):a.status==='online'?-1:1));document.getElementById('miners').innerHTML=miners.length?miners.map(m=>`<tr><td><b>${esc(m.alias)}</b></td><td><span class="badge ${m.status==='online'?'on':''}">${esc(m.status)}</span></td><td>${hash(m.hashrateHps)}</td><td>${duration(m.uptimeSeconds)}</td><td>${fmt(m.acceptedShares)}</td><td>${fmt((m.invalidShares||0)+(m.staleShares||0))}</td><td>${age(m.lastShareAt)}</td><td>${fmt(m.zkasBlocks)}</td><td>${fmt(m.kasBlocks)}</td><td>${m.kasPayoutSet?'Miner wallet':'Pool fallback'}</td></tr>`).join(''):'<tr><td colspan="10" class="empty">No public miners have been published yet.</td></tr>'}catch(e){document.getElementById('gateway').textContent='Gateway unavailable';document.getElementById('miners').innerHTML='<tr><td colspan="10" class="empty">Mining snapshot is temporarily unavailable.</td></tr>'}}
+function esc(v){return String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+document.getElementById('refresh').addEventListener('click',load);load();setInterval(load,15000);
+</script>
+</body>
+</html>
