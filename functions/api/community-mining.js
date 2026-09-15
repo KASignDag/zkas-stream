@@ -15,16 +15,16 @@ const COUNTER_KEYS = {
 const RESTORE_VERSION = 'pre-reboot-2026-09-14-2043';
 const RESTORE_BASELINES = {
   community: {
-    'asic-15-gll': { zkas: 34, kas: 34 },
-    'asic-16-gll': { zkas: 26, kas: 26 },
-    'KS7-pnw': { zkas: 5, kas: 5 },
-    'ks0ultra1-rn2': { zkas: 0, kas: 0 },
-    'ks0ultra2-rn2': { zkas: 0, kas: 0 },
-    'ks0ultra3-rn2': { zkas: 0, kas: 0 },
+    'asic-15-gll': { zkas: 34, kas: 34, kasPayoutSet: true },
+    'asic-16-gll': { zkas: 26, kas: 26, kasPayoutSet: true },
+    'KS7-pnw': { zkas: 5, kas: 5, kasPayoutSet: true },
+    'ks0ultra1-rn2': { zkas: 0, kas: 0, kasPayoutSet: true },
+    'ks0ultra2-rn2': { zkas: 0, kas: 0, kasPayoutSet: true },
+    'ks0ultra3-rn2': { zkas: 0, kas: 0, kasPayoutSet: true },
   },
   'community-107': {
-    'KSOULTRA-pnw': { zkas: 0, kas: 1 },
-    'KSOPRO-pnw': { zkas: 0, kas: 0 },
+    'KSOULTRA-pnw': { zkas: 0, kas: 1, kasPayoutSet: false },
+    'KSOPRO-pnw': { zkas: 0, kas: 0, kasPayoutSet: false },
   },
 };
 
@@ -114,6 +114,7 @@ function restoreVerifiedPreRebootTotals(state, gateway) {
       ...previous,
       zkas: addBaseline(previous.zkas, blocks.zkas),
       kas: addBaseline(previous.kas, blocks.kas),
+      kasPayoutSet: blocks.kasPayoutSet === true,
       updatedAt: Date.now(),
     };
   }
@@ -127,6 +128,22 @@ function lifetimeTotals(state) {
     totals.kas += counterValue(miner?.kas?.total);
     return totals;
   }, { zkas: 0, kas: 0 });
+}
+
+function historicalMinerRow(alias, saved) {
+  return {
+    alias,
+    status: 'offline',
+    hashrateHps: null,
+    uptimeSeconds: null,
+    acceptedShares: null,
+    invalidShares: null,
+    staleShares: null,
+    lastShareAt: null,
+    zkasBlocks: counterValue(saved?.zkas?.total),
+    kasBlocks: counterValue(saved?.kas?.total),
+    kasPayoutSet: saved?.kasPayoutSet === true,
+  };
 }
 
 async function applyLifetimeBlockCounters(store, gateway, miners) {
@@ -145,6 +162,7 @@ async function applyLifetimeBlockCounters(store, gateway, miners) {
       ...previous,
       zkas,
       kas,
+      kasPayoutSet: miner.kasPayoutSet,
       updatedAt: Date.now(),
     };
 
@@ -154,6 +172,15 @@ async function applyLifetimeBlockCounters(store, gateway, miners) {
       kasBlocks: kas.total,
     };
   });
+
+  // Keep miners that are no longer connected visible as offline historical
+  // rows so their earned blocks remain part of the dashboard totals.
+  const currentAliases = new Set(published.map((miner) => miner.alias));
+  for (const [alias, saved] of Object.entries(state.miners)) {
+    if (!currentAliases.has(alias) && (counterValue(saved?.zkas?.total) > 0 || counterValue(saved?.kas?.total) > 0)) {
+      published.push(historicalMinerRow(alias, saved));
+    }
+  }
 
   state.schemaVersion = 1;
   state.gateway = gateway;
