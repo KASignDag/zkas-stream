@@ -122,10 +122,21 @@ function lifetimeTotals(state) {
   }, { zkas: 0, kas: 0 });
 }
 
+function preserveGatewayTotals(state) {
+  const derived = lifetimeTotals(state);
+  const saved = state.gatewayTotals && typeof state.gatewayTotals === 'object' ? state.gatewayTotals : {};
+  state.gatewayTotals = {
+    zkas: Math.max(counterValue(saved.zkas), derived.zkas),
+    kas: Math.max(counterValue(saved.kas), derived.kas),
+  };
+  return state.gatewayTotals;
+}
+
 function historicalMinerRow(alias, saved) {
   return {
     alias,
     status: 'offline',
+    historical: true,
     hashrateHps: null,
     uptimeSeconds: null,
     acceptedShares: null,
@@ -171,15 +182,15 @@ function applyLifetimeBlockCounters(state, gateway, miners) {
     }
   }
 
-  state.schemaVersion = 1;
+  state.schemaVersion = 2;
   state.gateway = gateway;
   state.updatedAt = Date.now();
-  const totals = lifetimeTotals(state);
+  const totals = preserveGatewayTotals(state);
   return { state, miners: published, lifetimeZkasBlocks: totals.zkas, lifetimeKasBlocks: totals.kas };
 }
 
 function publicSnapshot(snapshot, gateway) {
-  if (!snapshot) return { schemaVersion: 1, gateway, updatedAt: null, gatewayOnline: false, miners: [] };
+  if (!snapshot) return { schemaVersion: 1, gateway, updatedAt: null, gatewayOnline: false, miners: [], lifetimeZkasBlocks: 0, lifetimeKasBlocks: 0 };
   const { _counterState, ...safe } = snapshot;
   return { ...safe, gateway };
 }
@@ -215,7 +226,7 @@ export async function onRequest(context) {
     const counterState = await loadCounterState(store, gateway, previousSnapshot);
     const counted = applyLifetimeBlockCounters(counterState, gateway, cleanMiners);
     const snapshot = {
-      schemaVersion: 2,
+      schemaVersion: 3,
       gateway,
       updatedAt: Date.now(),
       gatewayOnline: body.gatewayOnline !== false,
@@ -225,8 +236,9 @@ export async function onRequest(context) {
       _counterState: counted.state,
     };
 
-    // One KV write per telemetry update. Counter state is stored privately
-    // inside the snapshot and stripped from all public GET responses.
+    // One KV write per telemetry update. Counter state and permanent gateway
+    // lifetime totals are stored privately inside the snapshot and stripped
+    // from all public GET responses except the published lifetime totals.
     await store.put(storageKey, JSON.stringify(snapshot));
     return json({ ok: true, gateway, miners: counted.miners.length, updatedAt: snapshot.updatedAt });
   } catch (error) {
