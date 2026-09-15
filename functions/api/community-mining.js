@@ -10,8 +10,6 @@ const COUNTER_KEYS = {
 
 // Verified from the Community Mining dashboard screenshot captured
 // 2026-09-14 20:43, before the Windows Update reboot at 22:00.
-// KSOULTRA/KSOPRO subsequently moved to the 1.0.7 bridge, so their
-// pre-reboot lifetime totals follow the miner to its current bridge.
 const RESTORE_VERSION = 'pre-reboot-2026-09-14-2043';
 const RESTORE_BASELINES = {
   community: {
@@ -86,11 +84,7 @@ function accumulateCounter(previous, raw) {
   const lastRaw = counterValue(previous?.lastRaw);
   const total = counterValue(previous?.total);
   const currentRaw = counterValue(raw);
-
   if (!previous) return { lastRaw: currentRaw, total: currentRaw };
-
-  // Normal session: add only newly reported blocks. After a bridge reset,
-  // the raw counter drops; the new raw value is then entirely post-reset.
   const delta = currentRaw >= lastRaw ? currentRaw - lastRaw : currentRaw;
   return { lastRaw: currentRaw, total: total + delta };
 }
@@ -106,7 +100,6 @@ function addBaseline(counter, amount) {
 function restoreVerifiedPreRebootTotals(state, gateway) {
   state.restores = state.restores && typeof state.restores === 'object' ? state.restores : {};
   if (state.restores[RESTORE_VERSION]) return;
-
   const baseline = RESTORE_BASELINES[gateway] || {};
   for (const [alias, blocks] of Object.entries(baseline)) {
     const previous = state.miners[alias] || {};
@@ -118,7 +111,6 @@ function restoreVerifiedPreRebootTotals(state, gateway) {
       updatedAt: Date.now(),
     };
   }
-
   state.restores[RESTORE_VERSION] = Date.now();
 }
 
@@ -146,18 +138,22 @@ function historicalMinerRow(alias, saved) {
   };
 }
 
-async function applyLifetimeBlockCounters(store, gateway, miners) {
-  const counterKey = COUNTER_KEYS[gateway];
-  const state = (await store.get(counterKey, 'json')) || { schemaVersion: 1, miners: {} };
-  if (!state.miners || typeof state.miners !== 'object' || Array.isArray(state.miners)) state.miners = {};
+async function loadCounterState(store, gateway, snapshot) {
+  if (snapshot?._counterState && typeof snapshot._counterState === 'object') {
+    return snapshot._counterState;
+  }
+  // One-time migration path from the previous two-write design.
+  return (await store.get(COUNTER_KEYS[gateway], 'json')) || { schemaVersion: 1, miners: {} };
+}
 
+function applyLifetimeBlockCounters(state, gateway, miners) {
+  if (!state.miners || typeof state.miners !== 'object' || Array.isArray(state.miners)) state.miners = {};
   restoreVerifiedPreRebootTotals(state, gateway);
 
   const published = miners.map((miner) => {
     const previous = state.miners[miner.alias] || null;
     const zkas = accumulateCounter(previous?.zkas, miner.zkasBlocks);
     const kas = accumulateCounter(previous?.kas, miner.kasBlocks);
-
     state.miners[miner.alias] = {
       ...previous,
       zkas,
@@ -165,16 +161,9 @@ async function applyLifetimeBlockCounters(store, gateway, miners) {
       kasPayoutSet: miner.kasPayoutSet,
       updatedAt: Date.now(),
     };
-
-    return {
-      ...miner,
-      zkasBlocks: zkas.total,
-      kasBlocks: kas.total,
-    };
+    return { ...miner, zkasBlocks: zkas.total, kasBlocks: kas.total };
   });
 
-  // Keep miners that are no longer connected visible as offline historical
-  // rows so their earned blocks remain part of the dashboard totals.
   const currentAliases = new Set(published.map((miner) => miner.alias));
   for (const [alias, saved] of Object.entries(state.miners)) {
     if (!currentAliases.has(alias) && (counterValue(saved?.zkas?.total) > 0 || counterValue(saved?.kas?.total) > 0)) {
@@ -186,8 +175,13 @@ async function applyLifetimeBlockCounters(store, gateway, miners) {
   state.gateway = gateway;
   state.updatedAt = Date.now();
   const totals = lifetimeTotals(state);
-  await store.put(counterKey, JSON.stringify(state));
-  return { miners: published, lifetimeZkasBlocks: totals.zkas, lifetimeKasBlocks: totals.kas };
+  return { state, miners: published, lifetimeZkasBlocks: totals.zkas, lifetimeKasBlocks: totals.kas };
+}
+
+function publicSnapshot(snapshot, gateway) {
+  if (!snapshot) return { schemaVersion: 1, gateway, updatedAt: null, gatewayOnline: false, miners: [] };
+  const { _counterState, ...safe } = snapshot;
+  return { ...safe, gateway };
 }
 
 export async function onRequest(context) {
@@ -201,8 +195,7 @@ export async function onRequest(context) {
 
   if (context.request.method === 'GET') {
     const snapshot = await store.get(storageKey, 'json');
-    if (!snapshot) return json({ schemaVersion: 1, gateway, updatedAt: null, gatewayOnline: false, miners: [] }, 200, 'public, max-age=5');
-    return json({ ...snapshot, gateway }, 200, 'public, max-age=5');
+    return json(publicSnapshot(snapshot, gateway), 200, 'public, max-age=5');
   }
 
   if (context.request.method !== 'POST') return json({ error: 'method_not_allowed' }, 405);
@@ -218,16 +211,22 @@ export async function onRequest(context) {
   if (cleanMiners.length !== body.miners.length) return json({ error: 'invalid_miner_row' }, 400);
 
   try {
-    const counted = await applyLifetimeBlockCounters(store, gateway, cleanMiners);
+    const previousSnapshot = await store.get(storageKey, 'json');
+    const counterState = await loadCounterState(store, gateway, previousSnapshot);
+    const counted = applyLifetimeBlockCounters(counterState, gateway, cleanMiners);
     const snapshot = {
-      schemaVersion: 1,
+      schemaVersion: 2,
       gateway,
       updatedAt: Date.now(),
       gatewayOnline: body.gatewayOnline !== false,
       miners: counted.miners,
       lifetimeZkasBlocks: counted.lifetimeZkasBlocks,
       lifetimeKasBlocks: counted.lifetimeKasBlocks,
+      _counterState: counted.state,
     };
+
+    // One KV write per telemetry update. Counter state is stored privately
+    // inside the snapshot and stripped from all public GET responses.
     await store.put(storageKey, JSON.stringify(snapshot));
     return json({ ok: true, gateway, miners: counted.miners.length, updatedAt: snapshot.updatedAt });
   } catch (error) {
