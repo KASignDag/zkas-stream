@@ -8,6 +8,26 @@ const COUNTER_KEYS = {
   'community-107': 'community-mining:counters:v1:community-107',
 };
 
+// Verified from the Community Mining dashboard screenshot captured
+// 2026-09-14 20:43, before the Windows Update reboot at 22:00.
+// KSOULTRA/KSOPRO subsequently moved to the 1.0.7 bridge, so their
+// pre-reboot lifetime totals follow the miner to its current bridge.
+const RESTORE_VERSION = 'pre-reboot-2026-09-14-2043';
+const RESTORE_BASELINES = {
+  community: {
+    'asic-15-gll': { zkas: 34, kas: 34 },
+    'asic-16-gll': { zkas: 26, kas: 26 },
+    'KS7-pnw': { zkas: 5, kas: 5 },
+    'ks0ultra1-rn2': { zkas: 0, kas: 0 },
+    'ks0ultra2-rn2': { zkas: 0, kas: 0 },
+    'ks0ultra3-rn2': { zkas: 0, kas: 0 },
+  },
+  'community-107': {
+    'KSOULTRA-pnw': { zkas: 0, kas: 1 },
+    'KSOPRO-pnw': { zkas: 0, kas: 0 },
+  },
+};
+
 function json(body, status = 200, cache = 'no-store') {
   return Response.json(body, { status, headers: { 'Cache-Control': cache, 'Referrer-Policy': 'no-referrer', 'X-Content-Type-Options': 'nosniff' } });
 }
@@ -69,11 +89,36 @@ function accumulateCounter(previous, raw) {
 
   if (!previous) return { lastRaw: currentRaw, total: currentRaw };
 
-  // Normal session: add only the newly reported blocks.
-  // Restart/reset: the raw bridge counter drops, so everything in the new
-  // raw counter was earned after the reset and is added to the lifetime total.
+  // Normal session: add only newly reported blocks. After a bridge reset,
+  // the raw counter drops; the new raw value is then entirely post-reset.
   const delta = currentRaw >= lastRaw ? currentRaw - lastRaw : currentRaw;
   return { lastRaw: currentRaw, total: total + delta };
+}
+
+function addBaseline(counter, amount) {
+  const existing = counter || { lastRaw: 0, total: 0 };
+  return {
+    lastRaw: counterValue(existing.lastRaw),
+    total: counterValue(existing.total) + counterValue(amount),
+  };
+}
+
+function restoreVerifiedPreRebootTotals(state, gateway) {
+  state.restores = state.restores && typeof state.restores === 'object' ? state.restores : {};
+  if (state.restores[RESTORE_VERSION]) return;
+
+  const baseline = RESTORE_BASELINES[gateway] || {};
+  for (const [alias, blocks] of Object.entries(baseline)) {
+    const previous = state.miners[alias] || {};
+    state.miners[alias] = {
+      ...previous,
+      zkas: addBaseline(previous.zkas, blocks.zkas),
+      kas: addBaseline(previous.kas, blocks.kas),
+      updatedAt: Date.now(),
+    };
+  }
+
+  state.restores[RESTORE_VERSION] = Date.now();
 }
 
 async function applyLifetimeBlockCounters(store, gateway, miners) {
@@ -81,12 +126,15 @@ async function applyLifetimeBlockCounters(store, gateway, miners) {
   const state = (await store.get(counterKey, 'json')) || { schemaVersion: 1, miners: {} };
   if (!state.miners || typeof state.miners !== 'object' || Array.isArray(state.miners)) state.miners = {};
 
+  restoreVerifiedPreRebootTotals(state, gateway);
+
   const published = miners.map((miner) => {
     const previous = state.miners[miner.alias] || null;
     const zkas = accumulateCounter(previous?.zkas, miner.zkasBlocks);
     const kas = accumulateCounter(previous?.kas, miner.kasBlocks);
 
     state.miners[miner.alias] = {
+      ...previous,
       zkas,
       kas,
       updatedAt: Date.now(),
