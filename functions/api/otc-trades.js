@@ -72,37 +72,12 @@ function json(body, status = 200, cacheControl = 'private, no-store, max-age=0')
   });
 }
 
-// Reviewed Discord screenshots: desk 1,169, less 11 permanent test/outlier exclusions = 1,158 public trades.
-const reviewedTradesSep15 = [
-  { timestamp: '2026-09-15T00:01:00Z', side: 'sell', zkasAmount: 450, totalKas: 28.0263195 },
-  { timestamp: '2026-09-14T23:30:00Z', side: 'sell', zkasAmount: 40000, totalKas: 2535.7144 },
-  { timestamp: '2026-09-14T22:30:00Z', side: 'sell', zkasAmount: 60364, totalKas: 3826.64660104 },
-  { timestamp: '2026-09-14T21:30:00Z', side: 'sell', zkasAmount: 1000, totalKas: 63.39286 },
-  { timestamp: '2026-09-14T21:28:00Z', side: 'sell', zkasAmount: 72000, totalKas: 4521.6 },
-  { timestamp: '2026-09-14T20:30:00Z', side: 'buy', zkasAmount: 10000, totalKas: 490 },
-  { timestamp: '2026-09-14T20:28:00Z', side: 'sell', zkasAmount: 36000, totalKas: 2260.8 },
-  { timestamp: '2026-09-14T16:30:00Z', side: 'sell', zkasAmount: 75000, totalKas: 4710 },
-  { timestamp: '2026-09-14T16:28:00Z', side: 'sell', zkasAmount: 79, totalKas: 4.9612 },
-  { timestamp: '2026-09-14T16:26:00Z', side: 'sell', zkasAmount: 66800, totalKas: 4195.04 },
-  { timestamp: '2026-09-14T15:30:00Z', side: 'sell', zkasAmount: 8000, totalKas: 512 },
-  { timestamp: '2026-09-14T15:28:00Z', side: 'sell', zkasAmount: 25000, totalKas: 1550 },
-  { timestamp: '2026-09-14T15:26:00Z', side: 'sell', zkasAmount: 75000, totalKas: 4650 },
-];
-
 async function handleGet({ request, env, waitUntil }) {
   const updatedAt = Date.now();
   const endpoint = env.ZKAS_OTC_API_URL;
   if (!endpoint) {
     if (env.OTC_TRADES) {
-      let stored = await env.OTC_TRADES.get('trades:v1', 'json');
-      if (Array.isArray(stored?.trades) && stored.trades.length === 1145) {
-        const trades = [...stored.trades, ...reviewedTradesSep15]
-          .map(normalizeTrade)
-          .filter(Boolean)
-          .sort((a, b) => a.timestamp - b.timestamp);
-        stored = { ...stored, updatedAt, trades };
-        await env.OTC_TRADES.put('trades:v1', JSON.stringify(stored));
-      }
+      const stored = await env.OTC_TRADES.get('trades:v1', 'json');
       const trades = Array.isArray(stored?.trades) ? stored.trades.map(normalizeTrade).filter(Boolean).slice(-5000) : [];
       if (trades.length) {
         return json({ schemaVersion: 1, status: 'live', source: 'screenshot-import', updatedAt: stored.updatedAt || updatedAt, trades }, 200, 'public, max-age=10, s-maxage=30, stale-while-revalidate=120');
