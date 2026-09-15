@@ -217,16 +217,21 @@ export async function onRequest(context) {
   const cleanMiners = body.miners.map(cleanMiner).filter(Boolean);
   if (cleanMiners.length !== body.miners.length) return json({ error: 'invalid_miner_row' }, 400);
 
-  const counted = await applyLifetimeBlockCounters(store, gateway, cleanMiners);
-  const snapshot = {
-    schemaVersion: 1,
-    gateway,
-    updatedAt: Date.now(),
-    gatewayOnline: body.gatewayOnline !== false,
-    miners: counted.miners,
-    lifetimeZkasBlocks: counted.lifetimeZkasBlocks,
-    lifetimeKasBlocks: counted.lifetimeKasBlocks,
-  };
-  await store.put(storageKey, JSON.stringify(snapshot));
-  return json({ ok: true, gateway, miners: counted.miners.length, updatedAt: snapshot.updatedAt });
+  try {
+    const counted = await applyLifetimeBlockCounters(store, gateway, cleanMiners);
+    const snapshot = {
+      schemaVersion: 1,
+      gateway,
+      updatedAt: Date.now(),
+      gatewayOnline: body.gatewayOnline !== false,
+      miners: counted.miners,
+      lifetimeZkasBlocks: counted.lifetimeZkasBlocks,
+      lifetimeKasBlocks: counted.lifetimeKasBlocks,
+    };
+    await store.put(storageKey, JSON.stringify(snapshot));
+    return json({ ok: true, gateway, miners: counted.miners.length, updatedAt: snapshot.updatedAt });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    return json({ error: 'ingest_failed', message }, 500);
+  }
 }
