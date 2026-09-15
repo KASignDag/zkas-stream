@@ -121,6 +121,14 @@ function restoreVerifiedPreRebootTotals(state, gateway) {
   state.restores[RESTORE_VERSION] = Date.now();
 }
 
+function lifetimeTotals(state) {
+  return Object.values(state.miners || {}).reduce((totals, miner) => {
+    totals.zkas += counterValue(miner?.zkas?.total);
+    totals.kas += counterValue(miner?.kas?.total);
+    return totals;
+  }, { zkas: 0, kas: 0 });
+}
+
 async function applyLifetimeBlockCounters(store, gateway, miners) {
   const counterKey = COUNTER_KEYS[gateway];
   const state = (await store.get(counterKey, 'json')) || { schemaVersion: 1, miners: {} };
@@ -150,8 +158,9 @@ async function applyLifetimeBlockCounters(store, gateway, miners) {
   state.schemaVersion = 1;
   state.gateway = gateway;
   state.updatedAt = Date.now();
+  const totals = lifetimeTotals(state);
   await store.put(counterKey, JSON.stringify(state));
-  return published;
+  return { miners: published, lifetimeZkasBlocks: totals.zkas, lifetimeKasBlocks: totals.kas };
 }
 
 export async function onRequest(context) {
@@ -181,8 +190,16 @@ export async function onRequest(context) {
   const cleanMiners = body.miners.map(cleanMiner).filter(Boolean);
   if (cleanMiners.length !== body.miners.length) return json({ error: 'invalid_miner_row' }, 400);
 
-  const miners = await applyLifetimeBlockCounters(store, gateway, cleanMiners);
-  const snapshot = { schemaVersion: 1, gateway, updatedAt: Date.now(), gatewayOnline: body.gatewayOnline !== false, miners };
+  const counted = await applyLifetimeBlockCounters(store, gateway, cleanMiners);
+  const snapshot = {
+    schemaVersion: 1,
+    gateway,
+    updatedAt: Date.now(),
+    gatewayOnline: body.gatewayOnline !== false,
+    miners: counted.miners,
+    lifetimeZkasBlocks: counted.lifetimeZkasBlocks,
+    lifetimeKasBlocks: counted.lifetimeKasBlocks,
+  };
   await store.put(storageKey, JSON.stringify(snapshot));
-  return json({ ok: true, gateway, miners: miners.length, updatedAt: snapshot.updatedAt });
+  return json({ ok: true, gateway, miners: counted.miners.length, updatedAt: snapshot.updatedAt });
 }
