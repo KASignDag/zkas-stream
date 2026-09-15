@@ -72,23 +72,21 @@ function json(body, status = 200, cacheControl = 'private, no-store, max-age=0')
   });
 }
 
-// Reviewed Discord screenshots: desk 1,156, less 11 permanent test/outlier exclusions = 1,145 public trades.
-const reviewedTradesSep14Evening = [
-  { timestamp: '2026-09-14T13:42:00Z', side: 'sell', zkasAmount: 1500, totalKas: 92.64618 },
-  { timestamp: '2026-09-14T11:42:00Z', side: 'sell', zkasAmount: 26800, totalKas: 1715.2 },
-  { timestamp: '2026-09-14T11:40:00Z', side: 'sell', zkasAmount: 700, totalKas: 43.234884 },
-  { timestamp: '2026-09-14T11:38:00Z', side: 'sell', zkasAmount: 8445, totalKas: 520.77502815 },
-  { timestamp: '2026-09-14T11:36:00Z', side: 'sell', zkasAmount: 555, totalKas: 34.22500185 },
-  { timestamp: '2026-09-14T11:34:00Z', side: 'sell', zkasAmount: 79000, totalKas: 4879.36548 },
-  { timestamp: '2026-09-14T11:32:00Z', side: 'sell', zkasAmount: 32000, totalKas: 1976.45184 },
-  { timestamp: '2026-09-14T10:42:00Z', side: 'sell', zkasAmount: 40000, totalKas: 2470.5648 },
-  { timestamp: '2026-09-14T09:42:00Z', side: 'sell', zkasAmount: 40000, totalKas: 3000 },
-  { timestamp: '2026-09-14T08:42:00Z', side: 'buy', zkasAmount: 73000, totalKas: 3351.36357 },
-  { timestamp: '2026-09-14T07:42:00Z', side: 'buy', zkasAmount: 2960, totalKas: 135.8909064 },
-  { timestamp: '2026-09-14T06:42:00Z', side: 'sell', zkasAmount: 7800, totalKas: 499.2 },
-  { timestamp: '2026-09-14T05:42:00Z', side: 'buy', zkasAmount: 80605.66, totalKas: 3680.99126929 },
-  { timestamp: '2026-09-14T05:40:00Z', side: 'buy', zkasAmount: 119395, totalKas: 5460.33093535 },
-  { timestamp: '2026-09-14T05:38:00Z', side: 'buy', zkasAmount: 2000, totalKas: 91.46666 },
+// Reviewed Discord screenshots: desk 1,169, less 11 permanent test/outlier exclusions = 1,158 public trades.
+const reviewedTradesSep15 = [
+  { timestamp: '2026-09-15T00:01:00Z', side: 'sell', zkasAmount: 450, totalKas: 28.0263195 },
+  { timestamp: '2026-09-14T23:30:00Z', side: 'sell', zkasAmount: 40000, totalKas: 2535.7144 },
+  { timestamp: '2026-09-14T22:30:00Z', side: 'sell', zkasAmount: 60364, totalKas: 3826.64660104 },
+  { timestamp: '2026-09-14T21:30:00Z', side: 'sell', zkasAmount: 1000, totalKas: 63.39286 },
+  { timestamp: '2026-09-14T21:28:00Z', side: 'sell', zkasAmount: 72000, totalKas: 4521.6 },
+  { timestamp: '2026-09-14T20:30:00Z', side: 'buy', zkasAmount: 10000, totalKas: 490 },
+  { timestamp: '2026-09-14T20:28:00Z', side: 'sell', zkasAmount: 36000, totalKas: 2260.8 },
+  { timestamp: '2026-09-14T16:30:00Z', side: 'sell', zkasAmount: 75000, totalKas: 4710 },
+  { timestamp: '2026-09-14T16:28:00Z', side: 'sell', zkasAmount: 79, totalKas: 4.9612 },
+  { timestamp: '2026-09-14T16:26:00Z', side: 'sell', zkasAmount: 66800, totalKas: 4195.04 },
+  { timestamp: '2026-09-14T15:30:00Z', side: 'sell', zkasAmount: 8000, totalKas: 512 },
+  { timestamp: '2026-09-14T15:28:00Z', side: 'sell', zkasAmount: 25000, totalKas: 1550 },
+  { timestamp: '2026-09-14T15:26:00Z', side: 'sell', zkasAmount: 75000, totalKas: 4650 },
 ];
 
 async function handleGet({ request, env, waitUntil }) {
@@ -97,8 +95,8 @@ async function handleGet({ request, env, waitUntil }) {
   if (!endpoint) {
     if (env.OTC_TRADES) {
       let stored = await env.OTC_TRADES.get('trades:v1', 'json');
-      if (Array.isArray(stored?.trades) && stored.trades.length === 1130) {
-        const trades = [...stored.trades, ...reviewedTradesSep14Evening]
+      if (Array.isArray(stored?.trades) && stored.trades.length === 1145) {
+        const trades = [...stored.trades, ...reviewedTradesSep15]
           .map(normalizeTrade)
           .filter(Boolean)
           .sort((a, b) => a.timestamp - b.timestamp);
