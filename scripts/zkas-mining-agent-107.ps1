@@ -8,7 +8,7 @@ $MetricsUrl = 'http://127.0.0.1:18114/metrics'
 $IngestUrl  = 'https://zkas.stream/api/community-mining?gateway=community-107'
 $StratumPort = 5556
 $PollSeconds = 60
-$DiffToHashes = 268435456.0 # 2^28; bridge share-difficulty scale
+$DiffToHashes = 1073741824.0 # 2^30; calibrated to the 1.0.7 bridge share-difficulty scale
 
 $secret = [Environment]::GetEnvironmentVariable('MINING_INGEST_SECRET','Machine')
 if ([string]::IsNullOrWhiteSpace($secret)) {
