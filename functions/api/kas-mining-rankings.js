@@ -135,7 +135,12 @@ function validateSnapshot(payload) {
 
   const coveragePercent = Number(payload.backfill?.coveragePercent);
   if (!Number.isFinite(coveragePercent) || coveragePercent <= 0 || coveragePercent > 100) throw new Error('invalid_coverage');
-  if (typeof payload.source?.acceptanceFiltered !== 'boolean' || payload.source.acceptanceFiltered !== true) throw new Error('acceptance_not_verified');
+  if (payload.source?.acceptanceFiltered !== true) throw new Error('acceptance_not_verified');
+
+  const networkAcceptedCoinbases = payload.totals?.acceptedCoinbases;
+  const networkPayoutOutputs = payload.totals?.payoutOutputs;
+  if (!safeNonNegativeInteger(networkAcceptedCoinbases) || networkAcceptedCoinbases < 1) throw new Error('invalid_network_coinbase_total');
+  if (!safeNonNegativeInteger(networkPayoutOutputs) || networkPayoutOutputs < networkAcceptedCoinbases) throw new Error('invalid_network_output_total');
 
   const addresses = new Set();
   let previous = null;
@@ -191,7 +196,7 @@ function emptyPayload(message = 'The Kaspa historical mining-payout index has no
     message,
     updatedAt: Date.now(),
     backfill: { processedAcceptedCoinbases: 0, coveragePercent: 0, coverageLabel: 'Awaiting historical dataset' },
-    totals: { addresses: 0, acceptedCoinbases: 0, payoutOutputs: 0, kasMined: '0.00000000' },
+    totals: { addresses: 0, acceptedCoinbases: null, payoutOutputs: 0, kasMined: '0.00000000' },
     page: 1,
     pageSize: DEFAULT_PAGE_SIZE,
     totalPages: 0,
@@ -254,7 +259,6 @@ export async function onRequestGet(context) {
   rows = rows.map((row, index) => ({ ...row, rank: index + 1 }));
 
   const totalSompi = rows.reduce((sum, row) => sum + BigInt(row.kasMinedSompi), 0n);
-  const totalAcceptedCoinbases = rows.reduce((sum, row) => sum + row.acceptedCoinbases, 0);
   const totalPayoutOutputs = rows.reduce((sum, row) => sum + row.payoutOutputs, 0);
   const filtered = query ? rows.filter((row) => row.address === query) : rows;
   const totalPages = Math.ceil(filtered.length / pageSize);
@@ -272,8 +276,10 @@ export async function onRequestGet(context) {
     source: source.source || {},
     totals: {
       addresses: rows.length,
-      acceptedCoinbases: source.totals?.acceptedCoinbases ?? totalAcceptedCoinbases,
-      payoutOutputs: source.totals?.payoutOutputs ?? totalPayoutOutputs,
+      // Do not derive this by summing per-address counts: one accepted coinbase
+      // can pay several addresses. The indexer must provide the network total.
+      acceptedCoinbases: safeNonNegativeInteger(source.totals?.acceptedCoinbases) ? source.totals.acceptedCoinbases : null,
+      payoutOutputs: safeNonNegativeInteger(source.totals?.payoutOutputs) ? source.totals.payoutOutputs : totalPayoutOutputs,
       kasMined: source.totals?.kasMined || formatSompi(totalSompi),
     },
     page: safePage,
