@@ -160,15 +160,105 @@ function validHash(value) {
   return typeof value === 'string' && /^[a-f0-9]{64}$/.test(value);
 }
 
+function normalizePublicSource(value) {
+  const source = value && typeof value === 'object' && !Array.isArray(value) ? value : {};
+  const genesisHash = String(source.genesisHash || '').toLowerCase();
+  const checkpointHash = String(source.checkpointHash || '').toLowerCase();
+  return {
+    genesisHash: validHash(genesisHash) ? genesisHash : null,
+    checkpointHash: validHash(checkpointHash) ? checkpointHash : null,
+    checkpointDaaScore: safeNonNegativeInteger(source.checkpointDaaScore) ? source.checkpointDaaScore : null,
+    historyFromDaaScore: safeNonNegativeInteger(source.historyFromDaaScore) ? source.historyFromDaaScore : null,
+    historyComplete: source.historyComplete === true,
+  };
+}
+
+function normalizeHistory(value, expectedBlocks, expectedAddresses) {
+  if (!value || typeof value !== 'object' || Array.isArray(value) || value.granularity !== 'utc_day') throw new Error('invalid_history');
+  if (!Array.isArray(value.daily) || value.daily.length < 1 || value.daily.length > 5_000) throw new Error('invalid_history_days');
+
+  let previousTime = 0;
+  let blocks = 0;
+  let cumulativeSompi = 0n;
+  let payoutAddresses = 0;
+  let shieldedTransactions = 0;
+  let shieldedActions = 0;
+  let noteCommitments = 0;
+  let nullifiers = 0;
+  const daily = value.daily.map((day) => {
+    if (!day || typeof day !== 'object' || Array.isArray(day)) throw new Error('invalid_history_day');
+    const integerFields = ['time', 'blocks', 'newPayoutAddresses', 'payoutAddresses', 'shieldedTransactions', 'shieldedActions', 'noteCommitments', 'nullifiers'];
+    for (const field of integerFields) {
+      if (!safeNonNegativeInteger(day[field])) throw new Error('invalid_history_day');
+    }
+    if (day.time <= previousTime || day.time % 86_400_000 !== 0) throw new Error('history_days_not_sorted');
+    previousTime = day.time;
+    if (typeof day.coinbaseSompi !== 'string' || !/^\d+$/.test(day.coinbaseSompi)) throw new Error('invalid_history_coinbase');
+    if (typeof day.cumulativeCoinbaseSompi !== 'string' || !/^\d+$/.test(day.cumulativeCoinbaseSompi)) throw new Error('invalid_history_coinbase');
+
+    const daySompi = BigInt(day.coinbaseSompi);
+    cumulativeSompi += daySompi;
+    payoutAddresses += day.newPayoutAddresses;
+    if (BigInt(day.cumulativeCoinbaseSompi) !== cumulativeSompi || day.payoutAddresses !== payoutAddresses) throw new Error('history_cumulative_mismatch');
+    if (day.nullifiers !== day.shieldedActions || day.noteCommitments < day.shieldedActions) throw new Error('history_shielded_mismatch');
+
+    blocks += day.blocks;
+    shieldedTransactions += day.shieldedTransactions;
+    shieldedActions += day.shieldedActions;
+    noteCommitments += day.noteCommitments;
+    nullifiers += day.nullifiers;
+    return {
+      time: day.time,
+      blocks: day.blocks,
+      coinbaseZkas: formatSompi(daySompi),
+      coinbaseSompi: daySompi.toString(),
+      cumulativeCoinbaseZkas: formatSompi(cumulativeSompi),
+      cumulativeCoinbaseSompi: cumulativeSompi.toString(),
+      newPayoutAddresses: day.newPayoutAddresses,
+      payoutAddresses: day.payoutAddresses,
+      shieldedTransactions: day.shieldedTransactions,
+      shieldedActions: day.shieldedActions,
+      noteCommitments: day.noteCommitments,
+      nullifiers: day.nullifiers,
+    };
+  });
+
+  if (blocks !== expectedBlocks || payoutAddresses !== expectedAddresses) throw new Error('history_totals_mismatch');
+  const totals = value.totals;
+  if (!totals || typeof totals !== 'object' || Array.isArray(totals)) throw new Error('invalid_history_totals');
+  if (totals.blocks !== blocks || totals.payoutAddresses !== payoutAddresses || totals.coinbaseSompi !== cumulativeSompi.toString()
+    || totals.shieldedTransactions !== shieldedTransactions || totals.shieldedActions !== shieldedActions
+    || totals.noteCommitments !== noteCommitments || totals.nullifiers !== nullifiers) throw new Error('history_totals_mismatch');
+
+  return {
+    granularity: 'utc_day',
+    totals: {
+      blocks,
+      coinbaseZkas: formatSompi(cumulativeSompi),
+      coinbaseSompi: cumulativeSompi.toString(),
+      payoutAddresses,
+      shieldedTransactions,
+      shieldedActions,
+      noteCommitments,
+      nullifiers,
+      firstTimestamp: timestampish(totals.firstTimestamp),
+      lastTimestamp: timestampish(totals.lastTimestamp),
+    },
+    daily,
+  };
+}
+
 function validateSnapshot(payload) {
   if (!payload || typeof payload !== 'object' || Array.isArray(payload)) throw new Error('invalid_snapshot');
-  if (payload.schemaVersion !== 1 || payload.status !== 'complete' || payload.complete !== true) throw new Error('snapshot_not_complete');
+  if (![1, 2].includes(payload.schemaVersion) || payload.status !== 'complete' || payload.complete !== true) throw new Error('snapshot_not_complete');
   if (payload.source?.historyComplete !== true || payload.source?.historyFromDaaScore !== 0) throw new Error('history_not_complete_from_genesis');
 
   const checkpointHash = String(payload.source?.checkpointHash || '').toLowerCase();
+  const genesisHash = String(payload.source?.genesisHash || '').toLowerCase();
   const indexedHash = String(payload.indexedThroughHash || '').toLowerCase();
   const checkpointDaa = payload.source?.checkpointDaaScore;
   const indexedDaa = payload.indexedThroughDaaScore;
+  if (!validHash(genesisHash)) throw new Error('invalid_genesis_hash');
   if (!validHash(checkpointHash) || checkpointHash !== indexedHash) throw new Error('checkpoint_hash_mismatch');
   if (!safeNonNegativeInteger(checkpointDaa) || checkpointDaa !== indexedDaa) throw new Error('checkpoint_daa_mismatch');
 
@@ -205,16 +295,24 @@ function validateSnapshot(payload) {
     return { ...value, rank, address, blocks, zkasMined: formatSompi(sompi), zkasMinedSompi: sompiText };
   });
 
+  const history = payload.schemaVersion === 2 ? normalizeHistory(payload.history, processedBlocks, rows.length) : null;
   return {
     snapshot: {
       ...payload,
-      schemaVersion: 1,
+      schemaVersion: payload.schemaVersion,
       status: 'complete',
       complete: true,
       updatedAt: Date.now(),
       indexedThroughHash: indexedHash,
       indexedThroughDaaScore: indexedDaa,
-      source: { ...payload.source, checkpointHash, checkpointDaaScore: checkpointDaa, historyFromDaaScore: 0, historyComplete: true },
+      source: {
+        genesisHash,
+        checkpointHash,
+        checkpointDaaScore: checkpointDaa,
+        historyFromDaaScore: 0,
+        historyComplete: true,
+      },
+      history,
       rows,
     },
     summary: { checkpointHash, checkpointDaaScore: checkpointDaa, processedBlocks, addresses: rows.length },
@@ -316,9 +414,11 @@ export async function onRequestGet(context) {
   const targetBlocks = numberish(source.backfill?.targetBlocks ?? source.targetBlocks);
   const coveragePercent = targetBlocks && targetBlocks > 0 ? Math.min(100, processedBlocks / targetBlocks * 100) : numberish(source.backfill?.coveragePercent) ?? null;
   const totalSompi = rankedRows.reduce((sum, row) => sum + BigInt(row.zkasMinedSompi), 0n);
+  const publicSource = normalizePublicSource(source.source);
+  const publicHistory = source.schemaVersion === 2 && source.history ? source.history : null;
 
   return json({
-    schemaVersion: 1,
+    schemaVersion: source.schemaVersion === 2 ? 2 : 1,
     status: complete ? 'complete' : 'backfilling',
     complete,
     message: complete
@@ -326,6 +426,9 @@ export async function onRequestGet(context) {
       : 'Historical blocks are still being indexed. Rankings remain provisional until coverage reaches 100%.',
     updatedAt: timestampish(source.updatedAt) ?? Date.now(),
     indexedThrough: timestampish(source.indexedThrough),
+    indexedThroughDaaScore: safeNonNegativeInteger(source.indexedThroughDaaScore) ? source.indexedThroughDaaScore : null,
+    source: publicSource,
+    history: publicHistory,
     backfill: { processedBlocks, targetBlocks, coveragePercent },
     totals: {
       addresses: rankedRows.length,

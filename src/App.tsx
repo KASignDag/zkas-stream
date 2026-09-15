@@ -54,6 +54,7 @@ import { GenesisSupportersPage } from './components/GenesisSupportersPage';
 import { MiningPayoutRanking } from './components/MiningPayoutRanking';
 import { ExchangesPage } from './components/ExchangesPage';
 import { NetworkMap } from './components/NetworkMap';
+import { useGenesisArchive } from './genesisHistory';
 
 type Tab = 'intelligence' | 'merged' | 'health' | 'nodes' | 'events' | 'explorer' | 'otc' | 'exchanges' | 'importer' | 'history' | 'supply' | 'reference' | 'supporters';
 
@@ -1477,6 +1478,7 @@ function SoloMiningIntelligence({ data }: { data: DashboardData }) {
   );
 }
 function MergedIntelligencePage({ data }: { data: DashboardData }) {
+  const genesis = useGenesisArchive();
   const groups = attributionGroups(data);
   const ratio = pct(data.merged.found, data.merged.checked);
   const weightedConfidence = weightedAttributionConfidence(groups);
@@ -1493,6 +1495,19 @@ function MergedIntelligencePage({ data }: { data: DashboardData }) {
         <MetricCard icon={<Zap size={19} />} label="Largest observed share" value={topShare === null ? '—' : `${fmt.format(topShare)}%`} sub="Of attributed blocks" />
       </div>
       <NativeMergedVisibility matched={matched} />
+      <section className="panel genesis-context-panel">
+        <div className="panel-head">
+          <div><span className="panel-icon"><Database size={20} /></span><h2>Network-wide payout history</h2></div>
+          <span className={`range-chip ${genesis?.source.historyComplete ? 'genesis-verified' : ''}`}>{genesis?.source.historyComplete ? 'GENESIS VERIFIED' : 'LOADING'}</span>
+        </div>
+        <div className="merge-stats node-stats">
+          <div><span>Selected-chain blocks</span><b>{displayNumber(genesis?.totals.blocks ?? null, true)}</b></div>
+          <div><span>Payout destinations</span><b>{displayNumber(genesis?.totals.addresses ?? null, true)}</b></div>
+          <div><span>Public mining payouts</span><b>{genesis ? `${displayNumber(genesis.totals.zkasMined, true)} ZKAS` : '—'}</b></div>
+          <div><span>Historical coverage</span><b>{genesis?.source.historyComplete && genesis.source.historyFromDaaScore === 0 ? '100%' : '—'}</b></div>
+        </div>
+        <p className="source-note"><ShieldCheck size={15} /> These are all-time public coinbase payout destinations, not unique people or current wallet balances. The archive cannot classify every historical block as native or AuxPoW, so it is kept separate from observed merged-mining attribution.</p>
+      </section>
       <MiningDistributionPanel data={data} />
       <SoloMiningIntelligence data={data} />
       <AttributionBreakdown data={data} />
@@ -1770,6 +1785,8 @@ function EventCard({ event }: { event: NetworkEvent }) {
 }
 
 function HistoryPage({ data, history, range, onRange }: { data: DashboardData; history: HistorySnapshot[]; range: HistoryRange; onRange: (range: HistoryRange) => void }) {
+  const genesis = useGenesisArchive();
+  const genesisDays = genesis?.history?.daily ?? [];
   const cutoff = Date.now() - rangeMs(range);
   const rows = history.filter((row) => row.t >= cutoff);
   const first = rows[0] ?? null;
@@ -1811,12 +1828,30 @@ function HistoryPage({ data, history, range, onRange }: { data: DashboardData; h
       <section className="two-col">
         <div className="privacy-callout">
           <TrendingUp size={21} />
-          <div><b>CHAIN BACKFILL · HASHRATE + DIFFICULTY</b><span>The public ZKas explorer reconstructs compact work-history bins from selected-parent chain data. The current public backend seeds up to the most recent 24 hours, so these two charts can fill immediately instead of starting from zero today.</span></div>
+          <div><b>CHAIN-WORK BACKFILL · HASHRATE + DIFFICULTY</b><span>The public explorer provides roughly 24 hours of selected-parent work data. The verified node archive separately covers public mining payouts and shielded activity from genesis; it does not contain historical difficulty or hashrate.</span></div>
         </div>
         <div className="privacy-callout">
           <Network size={21} />
           <div><b>OBSERVER HISTORY · TRACKING BEGAN {observerStarted.toUpperCase()}</b><span>Visible nodes, countries, mining attribution, confidence and Kaspa co-location are observations from an explorer vantage point. Their history begins when ZKAS.stream recorded them and is not retroactively fabricated.</span></div>
         </div>
+      </section>
+
+      <section className="panel genesis-archive-panel">
+        <div className="panel-head">
+          <div><span className="panel-icon"><Database size={20} /></span><h2>Verified genesis archive</h2></div>
+          <span className={`range-chip ${genesis?.source.historyComplete ? 'genesis-verified' : ''}`}>{genesis?.source.historyComplete ? '100% COVERAGE' : 'AWAITING DATA'}</span>
+        </div>
+        <div className="merge-stats node-stats">
+          <div><span>Selected-chain blocks</span><b>{displayNumber(genesis?.totals.blocks ?? null, true)}</b></div>
+          <div><span>Payout destinations</span><b>{displayNumber(genesis?.totals.addresses ?? null, true)}</b></div>
+          <div><span>Public mining payouts</span><b>{genesis ? `${displayNumber(genesis.totals.zkasMined, true)} ZKAS` : '—'}</b></div>
+          <div><span>Indexed through DAA</span><b>{displayNumber(genesis?.indexedThroughDaaScore ?? null, true)}</b></div>
+        </div>
+        {genesisDays.length > 0 ? <section className="two-col history-charts genesis-charts">
+          <HistoryChart title="Selected-chain blocks · daily" chip="GENESIS ARCHIVE" values={genesisDays.map((day) => day.blocks)} labels={genesisDays.map((day) => day.time)} />
+          <HistoryChart title="Public coinbase issuance · cumulative" chip="GENESIS ARCHIVE" values={genesisDays.map((day) => day.cumulativeCoinbaseZkas)} labels={genesisDays.map((day) => day.time)} />
+        </section> : <p className="genesis-awaiting">The current ranking remains available. Genesis charts will appear after the upgraded Windows indexer completes its next verified upload.</p>}
+        <p className="source-note"><ShieldCheck size={15} /> Reconstructed from the node’s verified selected-chain shielded scan archive from DAA 0 through a frozen checkpoint. Only aggregate public consensus data is uploaded; the node RPC remains private.</p>
       </section>
 
       <MiningPayoutRanking />
@@ -1862,10 +1897,12 @@ function HistoryPage({ data, history, range, onRange }: { data: DashboardData; h
           <div><span>Observer tracking since</span><b>{oldest ? dateStamp(oldest) : 'Just started'}</b></div>
           <div><span>Chain-work samples</span><b>{displayNumber((data.chainWorkHistory ?? []).length)}</b></div>
           <div><span>Chain backfill span</span><b>{chainSpan > 0 ? duration(chainSpan / 1000) : 'Loading'}</b></div>
+          <div><span>Genesis archive</span><b>{genesis?.source.historyComplete ? 'Verified' : 'Awaiting upload'}</b></div>
+          <div><span>Genesis archive blocks</span><b>{displayNumber(genesis?.totals.blocks ?? null, true)}</b></div>
           <div><span>Observer coverage</span><b>{rows.length ? `${fmt.format(coverage)}%` : '0%'}</b></div>
           <div><span>Local retention</span><b>30 days</b></div>
         </div>
-        <p className="source-note"><ShieldCheck size={15} /> Current public API limitation: chain-work backfill is available for roughly the last 24 hours, not mainnet day one. Extending trustworthy chain backfill to 7D/30D/launch requires a longer historical endpoint or archival backend. Observer-only metrics remain truthful from their recorded start date.</p>
+        <p className="source-note"><ShieldCheck size={15} /> Coverage differs by source: payout and aggregate shielded history can be verified from genesis; difficulty and hashrate backfill currently cover roughly 24 hours; observer-only peer, geography and attribution metrics begin when ZKAS.stream recorded them.</p>
       </section>
     </section>
   );
@@ -1891,6 +1928,9 @@ function HistoryChart({ title, chip, values, labels }: { title: string; chip: st
 }
 
 function SupplyPrivacyPage({ data, history, range, onRange }: { data: DashboardData; history: HistorySnapshot[]; range: HistoryRange; onRange: (range: HistoryRange) => void }) {
+  const genesis = useGenesisArchive();
+  const genesisDays = genesis?.history?.daily ?? [];
+  const genesisTotals = genesis?.history?.totals ?? null;
   const cutoff = Date.now() - rangeMs(range);
   const rows = history.filter((row) => row.t >= cutoff);
   const first = rows[0];
@@ -1921,6 +1961,26 @@ function SupplyPrivacyPage({ data, history, range, onRange }: { data: DashboardD
         <MetricCard icon={<Database size={19} />} label="Cumulative shielded issuance" value={displayNumber(data.shieldedValue ?? data.supply, true)} sub="Consensus-derived aggregate · not wallet balances" />
       </div>
 
+      <section className="panel genesis-archive-panel">
+        <div className="panel-head">
+          <div><span className="panel-icon"><Database size={20} /></span><h2>All-time aggregate shielded history</h2></div>
+          <span className={`range-chip ${genesis?.source.historyComplete ? 'genesis-verified' : ''}`}>{genesis?.source.historyComplete ? 'GENESIS VERIFIED' : 'AWAITING DATA'}</span>
+        </div>
+        <div className="merge-stats node-stats">
+          <div><span>Public coinbase issuance</span><b>{genesisTotals ? `${displayNumber(genesisTotals.coinbaseZkas, true)} ZKAS` : '—'}</b></div>
+          <div><span>Note commitments</span><b>{displayNumber(genesisTotals?.noteCommitments ?? null, true)}</b></div>
+          <div><span>Nullifiers</span><b>{displayNumber(genesisTotals?.nullifiers ?? null, true)}</b></div>
+          <div><span>Shielded transactions</span><b>{displayNumber(genesisTotals?.shieldedTransactions ?? null, true)}</b></div>
+        </div>
+        {genesisDays.length > 0 ? <section className="two-col history-charts genesis-charts">
+          <HistoryChart title="Public coinbase issuance · cumulative" chip="ALL TIME" values={genesisDays.map((day) => day.cumulativeCoinbaseZkas)} labels={genesisDays.map((day) => day.time)} />
+          <HistoryChart title="Shielded actions · daily" chip="ALL TIME" values={genesisDays.map((day) => day.shieldedActions)} labels={genesisDays.map((day) => day.time)} />
+          <HistoryChart title="Note commitments · daily" chip="ALL TIME" values={genesisDays.map((day) => day.noteCommitments)} labels={genesisDays.map((day) => day.time)} />
+          <HistoryChart title="Payout destinations · cumulative" chip="ALL TIME" values={genesisDays.map((day) => day.payoutAddresses)} labels={genesisDays.map((day) => day.time)} />
+        </section> : <p className="genesis-awaiting">All-time charts will appear after the upgraded Windows indexer completes its first schema-v2 upload.</p>}
+        <p className="source-note"><ShieldCheck size={15} /> These are network aggregates reconstructed from public compact history. They do not reveal senders, recipients, transfer amounts, wallet balances, or current holders.</p>
+      </section>
+
       <section className="two-col">
         <div className="panel">
           <div className="panel-head"><div><span className="panel-icon"><TrendingUp size={20} /></span><h2>Supply growth · observer history</h2></div><span className="range-chip">{range.toUpperCase()}</span></div>
@@ -1943,6 +2003,7 @@ function SupplyPrivacyPage({ data, history, range, onRange }: { data: DashboardD
           <div><span>Next miner payout</span><b>{minerPayout(data.nextReward) === null ? '—' : `${displayNumber(minerPayout(data.nextReward))} ZKAS`}</b></div>
           <div><span>Next reduction</span><b>{countdown(data.nextReductionSeconds)}</b></div>
           <div><span>DAA score</span><b>{displayNumber(data.daaScore, true)}</b></div>
+          <div><span>Archive coverage</span><b>{genesis?.source.historyComplete && genesis.source.historyFromDaaScore === 0 ? 'Genesis → checkpoint' : 'Awaiting verified upload'}</b></div>
         </div>
         <p className="source-note"><ShieldCheck size={15} /> No annualized inflation estimate is shown. Reward and reduction values come from the public ZKas consensus/explorer API.</p>
       </section>

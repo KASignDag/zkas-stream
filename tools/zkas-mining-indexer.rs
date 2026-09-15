@@ -17,7 +17,7 @@ use kaspa_grpc_client::GrpcClient;
 use kaspa_rpc_core::{api::rpc::RpcApi, notify::mode::NotificationMode, RpcHash};
 use serde::Serialize;
 use std::{
-    collections::{HashMap, HashSet},
+    collections::{BTreeMap, HashMap, HashSet},
     error::Error,
     path::{Path, PathBuf},
     time::{SystemTime, UNIX_EPOCH},
@@ -25,6 +25,8 @@ use std::{
 
 const PAGE_SIZE: u64 = 2_000;
 const ORCHARD_SCRIPT_LEN: usize = 43;
+const COMPACT_ACTION_RECORD_LEN: usize = 148;
+const DAY_MS: u64 = 86_400_000;
 const SOMPI_PER_ZKAS: u128 = 100_000_000;
 
 #[derive(Default)]
@@ -62,12 +64,61 @@ struct BackfillStatus {
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 struct SourceMetadata {
-    rpc: String,
     genesis_hash: String,
     checkpoint_hash: String,
     checkpoint_daa_score: u64,
     history_from_daa_score: u64,
     history_complete: bool,
+}
+
+#[derive(Default)]
+struct DailyAggregate {
+    blocks: u64,
+    coinbase_sompi: u128,
+    new_payout_addresses: u64,
+    shielded_transactions: u64,
+    shielded_actions: u64,
+    coinbase_notes: u64,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct DailyHistoryRow {
+    time: u64,
+    blocks: u64,
+    coinbase_zkas: String,
+    coinbase_sompi: String,
+    cumulative_coinbase_zkas: String,
+    cumulative_coinbase_sompi: String,
+    new_payout_addresses: u64,
+    payout_addresses: u64,
+    shielded_transactions: u64,
+    shielded_actions: u64,
+    note_commitments: u64,
+    nullifiers: u64,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct HistoryTotals {
+    blocks: u64,
+    coinbase_zkas: String,
+    coinbase_sompi: String,
+    payout_addresses: usize,
+    shielded_transactions: u64,
+    shielded_actions: u64,
+    note_commitments: u64,
+    nullifiers: u64,
+    first_timestamp: Option<u64>,
+    last_timestamp: Option<u64>,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct HistoryArchive {
+    granularity: &'static str,
+    totals: HistoryTotals,
+    daily: Vec<DailyHistoryRow>,
 }
 
 #[derive(Serialize)]
@@ -82,6 +133,7 @@ struct Snapshot {
     indexed_through_hash: String,
     backfill: BackfillStatus,
     source: SourceMetadata,
+    history: HistoryArchive,
     rows: Vec<RankingRow>,
 }
 
@@ -159,6 +211,10 @@ async fn main() -> Result<(), Box<dyn Error>> {
     let mut indexed_through_daa_score = None;
     let mut indexed_through_hash = genesis.to_string();
     let mut totals: HashMap<String, Aggregate> = HashMap::new();
+    let mut daily: BTreeMap<u64, DailyAggregate> = BTreeMap::new();
+    let mut seen_payout_addresses = HashSet::new();
+    let mut first_timestamp = None;
+    let mut last_timestamp = None;
 
     while !reached_checkpoint {
         let response = client.get_shielded_blocks(cursor, PAGE_SIZE).await?;
@@ -171,8 +227,33 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
         pages += 1;
         for block in response.blocks {
+            let day = block.timestamp / DAY_MS * DAY_MS;
+            let daily_row = daily.entry(day).or_default();
+            daily_row.blocks = daily_row.blocks.checked_add(1).ok_or("daily block count overflow")?;
+            update_min(&mut first_timestamp, block.timestamp);
+            update_max(&mut last_timestamp, block.timestamp);
+
+            daily_row.shielded_transactions = daily_row
+                .shielded_transactions
+                .checked_add(block.accepted_actions.len().try_into()?)
+                .ok_or("shielded transaction count overflow")?;
+            for compact_actions in &block.accepted_actions {
+                if compact_actions.len() % COMPACT_ACTION_RECORD_LEN != 0 {
+                    return Err(format!(
+                        "block {} contains malformed compact shielded actions ({} bytes)",
+                        block.hash,
+                        compact_actions.len()
+                    )
+                    .into());
+                }
+                daily_row.shielded_actions = daily_row
+                    .shielded_actions
+                    .checked_add((compact_actions.len() / COMPACT_ACTION_RECORD_LEN).try_into()?)
+                    .ok_or("shielded action count overflow")?;
+            }
+
             let mut touched_in_block = HashSet::new();
-            for output in block.coinbase_outputs {
+            for output in &block.coinbase_outputs {
                 if output.script_public_key.len() != ORCHARD_SCRIPT_LEN {
                     continue;
                 }
@@ -186,6 +267,17 @@ async fn main() -> Result<(), Box<dyn Error>> {
                     .sompi
                     .checked_add(u128::from(output.value))
                     .ok_or("coinbase total overflow")?;
+                daily_row.coinbase_sompi = daily_row
+                    .coinbase_sompi
+                    .checked_add(u128::from(output.value))
+                    .ok_or("daily coinbase total overflow")?;
+                daily_row.coinbase_notes = daily_row.coinbase_notes.checked_add(1).ok_or("coinbase note count overflow")?;
+                if seen_payout_addresses.insert(address.clone()) {
+                    daily_row.new_payout_addresses = daily_row
+                        .new_payout_addresses
+                        .checked_add(1)
+                        .ok_or("daily payout address count overflow")?;
+                }
                 if touched_in_block.insert(address) {
                     aggregate.blocks = aggregate.blocks.checked_add(1).ok_or("block count overflow")?;
                 }
@@ -237,8 +329,54 @@ async fn main() -> Result<(), Box<dyn Error>> {
         })
         .collect();
 
+    let mut cumulative_coinbase_sompi = 0u128;
+    let mut cumulative_payout_addresses = 0u64;
+    let mut total_shielded_transactions = 0u64;
+    let mut total_shielded_actions = 0u64;
+    let mut total_coinbase_notes = 0u64;
+    let daily_rows = daily
+        .into_iter()
+        .map(|(time, value)| -> Result<DailyHistoryRow, Box<dyn Error>> {
+            cumulative_coinbase_sompi = cumulative_coinbase_sompi
+                .checked_add(value.coinbase_sompi)
+                .ok_or("cumulative coinbase total overflow")?;
+            cumulative_payout_addresses = cumulative_payout_addresses
+                .checked_add(value.new_payout_addresses)
+                .ok_or("cumulative payout address count overflow")?;
+            total_shielded_transactions = total_shielded_transactions
+                .checked_add(value.shielded_transactions)
+                .ok_or("shielded transaction total overflow")?;
+            total_shielded_actions = total_shielded_actions
+                .checked_add(value.shielded_actions)
+                .ok_or("shielded action total overflow")?;
+            total_coinbase_notes = total_coinbase_notes
+                .checked_add(value.coinbase_notes)
+                .ok_or("coinbase note total overflow")?;
+            let note_commitments = value.coinbase_notes
+                .checked_add(value.shielded_actions)
+                .ok_or("daily note commitment count overflow")?;
+            Ok(DailyHistoryRow {
+                time,
+                blocks: value.blocks,
+                coinbase_zkas: format_zkas(value.coinbase_sompi),
+                coinbase_sompi: value.coinbase_sompi.to_string(),
+                cumulative_coinbase_zkas: format_zkas(cumulative_coinbase_sompi),
+                cumulative_coinbase_sompi: cumulative_coinbase_sompi.to_string(),
+                new_payout_addresses: value.new_payout_addresses,
+                payout_addresses: cumulative_payout_addresses,
+                shielded_transactions: value.shielded_transactions,
+                shielded_actions: value.shielded_actions,
+                note_commitments,
+                nullifiers: value.shielded_actions,
+            })
+        })
+        .collect::<Result<Vec<_>, _>>()?;
+    let total_note_commitments = total_coinbase_notes
+        .checked_add(total_shielded_actions)
+        .ok_or("note commitment total overflow")?;
+
     let snapshot = Snapshot {
-        schema_version: 1,
+        schema_version: 2,
         status: "complete",
         complete: true,
         updated_at: unix_time_ms()?,
@@ -251,12 +389,27 @@ async fn main() -> Result<(), Box<dyn Error>> {
             coverage_percent: 100.0,
         },
         source: SourceMetadata {
-            rpc,
             genesis_hash: genesis.to_string(),
             checkpoint_hash: checkpoint.to_string(),
             checkpoint_daa_score: state.daa_score,
             history_from_daa_score: state.history_from_daa_score,
             history_complete: state.history_complete,
+        },
+        history: HistoryArchive {
+            granularity: "utc_day",
+            totals: HistoryTotals {
+                blocks: processed_blocks,
+                coinbase_zkas: format_zkas(cumulative_coinbase_sompi),
+                coinbase_sompi: cumulative_coinbase_sompi.to_string(),
+                payout_addresses: seen_payout_addresses.len(),
+                shielded_transactions: total_shielded_transactions,
+                shielded_actions: total_shielded_actions,
+                note_commitments: total_note_commitments,
+                nullifiers: total_shielded_actions,
+                first_timestamp,
+                last_timestamp,
+            },
+            daily: daily_rows,
         },
         rows,
     };

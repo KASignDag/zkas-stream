@@ -71,7 +71,7 @@ try {
     if ($LASTEXITCODE -ne 0) { throw "Indexer exited with code $LASTEXITCODE" }
 
     $snapshot = Get-Content -LiteralPath $SnapshotPath -Raw -Encoding UTF8 | ConvertFrom-Json
-    if ($snapshot.schemaVersion -ne 1 -or $snapshot.status -ne "complete" -or $snapshot.complete -ne $true) {
+    if ($snapshot.schemaVersion -notin @(1, 2) -or $snapshot.status -ne "complete" -or $snapshot.complete -ne $true) {
         throw "Indexer did not produce a complete snapshot."
     }
     if ($snapshot.source.historyComplete -ne $true -or [uint64]$snapshot.source.historyFromDaaScore -ne 0) {
@@ -81,6 +81,14 @@ try {
         throw "Snapshot backfill is incomplete."
     }
     if ($snapshot.rows.Count -lt 1) { throw "Snapshot contains no payout addresses." }
+    if ($snapshot.schemaVersion -eq 2) {
+        if ($snapshot.history.granularity -ne "utc_day" -or $snapshot.history.daily.Count -lt 1) {
+            throw "Snapshot does not contain genesis history aggregates."
+        }
+        if ([uint64]$snapshot.history.totals.blocks -ne [uint64]$snapshot.backfill.processedBlocks) {
+            throw "Genesis history block total does not match the verified backfill."
+        }
+    }
 
     $encryptedToken = (Get-Content -LiteralPath $TokenPath -Raw -Encoding ASCII).Trim()
     $secureToken = ConvertTo-SecureString $encryptedToken

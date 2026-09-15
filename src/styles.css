@@ -836,6 +836,11 @@ footer { width: min(1320px, calc(100% - 40px)); margin: 0 auto; padding: 22px 0 
 .history-metric small { display: block; margin-top: 7px; color: var(--muted); font-size: 11px; line-height: 1.4; }
 .history-charts { align-items: stretch; }
 .history-storage { margin-top: 2px; }
+.genesis-verified { color: var(--accent); border-color: color-mix(in srgb, var(--accent) 35%, var(--border)); background: var(--accent-soft); }
+.genesis-archive-panel, .genesis-context-panel { overflow: hidden; }
+.genesis-charts { margin-top: 14px; }
+.genesis-charts > .panel { background: var(--surface-2); box-shadow: none; }
+.genesis-awaiting { margin: 14px 0 0; padding: 18px; border: 1px dashed var(--border); border-radius: 10px; color: var(--muted); font-size: 11px; text-align: center; }
 
 /* v0.9 — network-wide historical mining payout ranking */
 .payout-ranking-panel { overflow: hidden; }
