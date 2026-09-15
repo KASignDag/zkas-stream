@@ -1,14 +1,10 @@
-const STORAGE_KEY = 'community-mining:v1';
+const STORAGE_KEYS = {
+  community: 'community-mining:v1',
+  'community-107': 'community-mining:v1:community-107',
+};
 
 function json(body, status = 200, cache = 'no-store') {
-  return Response.json(body, {
-    status,
-    headers: {
-      'Cache-Control': cache,
-      'Referrer-Policy': 'no-referrer',
-      'X-Content-Type-Options': 'nosniff',
-    },
-  });
+  return Response.json(body, { status, headers: { 'Cache-Control': cache, 'Referrer-Policy': 'no-referrer', 'X-Content-Type-Options': 'nosniff' } });
 }
 
 async function authorized(request, expected) {
@@ -34,19 +30,16 @@ function finiteNonNegative(value) {
 function cleanAlias(value) {
   if (typeof value !== 'string') return null;
   const alias = value.trim();
-  if (!/^[A-Za-z0-9._-]{1,32}$/.test(alias)) return null;
-  return alias;
+  return /^[A-Za-z0-9._-]{1,32}$/.test(alias) ? alias : null;
 }
 
 function cleanMiner(value) {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
   const alias = cleanAlias(value.alias);
   if (!alias) return null;
-
-  const status = value.status === 'online' ? 'online' : 'offline';
   return {
     alias,
-    status,
+    status: value.status === 'online' ? 'online' : 'offline',
     hashrateHps: finiteNonNegative(value.hashrateHps),
     uptimeSeconds: finiteNonNegative(value.uptimeSeconds),
     acceptedShares: finiteNonNegative(value.acceptedShares),
@@ -60,23 +53,18 @@ function cleanMiner(value) {
 }
 
 export async function onRequest(context) {
-  // Prefer a dedicated KV binding when present. Until then, safely reuse the
-  // existing OTC_TRADES namespace under a distinct key so no extra KV namespace
-  // is required to bring the community-mining feed online.
   const store = context.env.COMMUNITY_MINING || context.env.OTC_TRADES;
   if (!store) return json({ error: 'storage_not_configured' }, 503);
 
+  const url = new URL(context.request.url);
+  const gateway = url.searchParams.get('gateway') || 'community';
+  const storageKey = STORAGE_KEYS[gateway];
+  if (!storageKey) return json({ error: 'invalid_gateway' }, 400);
+
   if (context.request.method === 'GET') {
-    const snapshot = await store.get(STORAGE_KEY, 'json');
-    if (!snapshot) {
-      return json({
-        schemaVersion: 1,
-        updatedAt: null,
-        gatewayOnline: false,
-        miners: [],
-      }, 200, 'public, max-age=5');
-    }
-    return json(snapshot, 200, 'public, max-age=5');
+    const snapshot = await store.get(storageKey, 'json');
+    if (!snapshot) return json({ schemaVersion: 1, gateway, updatedAt: null, gatewayOnline: false, miners: [] }, 200, 'public, max-age=5');
+    return json({ ...snapshot, gateway }, 200, 'public, max-age=5');
   }
 
   if (context.request.method !== 'POST') return json({ error: 'method_not_allowed' }, 405);
@@ -86,23 +74,12 @@ export async function onRequest(context) {
   if (contentLength > 100_000) return json({ error: 'payload_too_large' }, 413);
 
   let body;
-  try {
-    body = await context.request.json();
-  } catch {
-    return json({ error: 'invalid_json' }, 400);
-  }
-
+  try { body = await context.request.json(); } catch { return json({ error: 'invalid_json' }, 400); }
   if (!Array.isArray(body?.miners) || body.miners.length > 500) return json({ error: 'invalid_miners' }, 400);
   const miners = body.miners.map(cleanMiner).filter(Boolean);
   if (miners.length !== body.miners.length) return json({ error: 'invalid_miner_row' }, 400);
 
-  const snapshot = {
-    schemaVersion: 1,
-    updatedAt: Date.now(),
-    gatewayOnline: body.gatewayOnline !== false,
-    miners,
-  };
-
-  await store.put(STORAGE_KEY, JSON.stringify(snapshot));
-  return json({ ok: true, miners: miners.length, updatedAt: snapshot.updatedAt });
+  const snapshot = { schemaVersion: 1, gateway, updatedAt: Date.now(), gatewayOnline: body.gatewayOnline !== false, miners };
+  await store.put(storageKey, JSON.stringify(snapshot));
+  return json({ ok: true, gateway, miners: miners.length, updatedAt: snapshot.updatedAt });
 }
