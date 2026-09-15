@@ -3,6 +3,11 @@ const STORAGE_KEYS = {
   'community-107': 'community-mining:v1:community-107',
 };
 
+const COUNTER_KEYS = {
+  community: 'community-mining:counters:v1:community',
+  'community-107': 'community-mining:counters:v1:community-107',
+};
+
 function json(body, status = 200, cache = 'no-store') {
   return Response.json(body, { status, headers: { 'Cache-Control': cache, 'Referrer-Policy': 'no-referrer', 'X-Content-Type-Options': 'nosniff' } });
 }
@@ -25,6 +30,11 @@ async function authorized(request, expected) {
 
 function finiteNonNegative(value) {
   return typeof value === 'number' && Number.isFinite(value) && value >= 0 ? value : null;
+}
+
+function counterValue(value) {
+  const n = finiteNonNegative(value);
+  return n === null ? 0 : Math.floor(n);
 }
 
 function cleanAlias(value) {
@@ -52,6 +62,50 @@ function cleanMiner(value) {
   };
 }
 
+function accumulateCounter(previous, raw) {
+  const lastRaw = counterValue(previous?.lastRaw);
+  const total = counterValue(previous?.total);
+  const currentRaw = counterValue(raw);
+
+  if (!previous) return { lastRaw: currentRaw, total: currentRaw };
+
+  // Normal session: add only the newly reported blocks.
+  // Restart/reset: the raw bridge counter drops, so everything in the new
+  // raw counter was earned after the reset and is added to the lifetime total.
+  const delta = currentRaw >= lastRaw ? currentRaw - lastRaw : currentRaw;
+  return { lastRaw: currentRaw, total: total + delta };
+}
+
+async function applyLifetimeBlockCounters(store, gateway, miners) {
+  const counterKey = COUNTER_KEYS[gateway];
+  const state = (await store.get(counterKey, 'json')) || { schemaVersion: 1, miners: {} };
+  if (!state.miners || typeof state.miners !== 'object' || Array.isArray(state.miners)) state.miners = {};
+
+  const published = miners.map((miner) => {
+    const previous = state.miners[miner.alias] || null;
+    const zkas = accumulateCounter(previous?.zkas, miner.zkasBlocks);
+    const kas = accumulateCounter(previous?.kas, miner.kasBlocks);
+
+    state.miners[miner.alias] = {
+      zkas,
+      kas,
+      updatedAt: Date.now(),
+    };
+
+    return {
+      ...miner,
+      zkasBlocks: zkas.total,
+      kasBlocks: kas.total,
+    };
+  });
+
+  state.schemaVersion = 1;
+  state.gateway = gateway;
+  state.updatedAt = Date.now();
+  await store.put(counterKey, JSON.stringify(state));
+  return published;
+}
+
 export async function onRequest(context) {
   const store = context.env.COMMUNITY_MINING || context.env.OTC_TRADES;
   if (!store) return json({ error: 'storage_not_configured' }, 503);
@@ -76,9 +130,10 @@ export async function onRequest(context) {
   let body;
   try { body = await context.request.json(); } catch { return json({ error: 'invalid_json' }, 400); }
   if (!Array.isArray(body?.miners) || body.miners.length > 500) return json({ error: 'invalid_miners' }, 400);
-  const miners = body.miners.map(cleanMiner).filter(Boolean);
-  if (miners.length !== body.miners.length) return json({ error: 'invalid_miner_row' }, 400);
+  const cleanMiners = body.miners.map(cleanMiner).filter(Boolean);
+  if (cleanMiners.length !== body.miners.length) return json({ error: 'invalid_miner_row' }, 400);
 
+  const miners = await applyLifetimeBlockCounters(store, gateway, cleanMiners);
   const snapshot = { schemaVersion: 1, gateway, updatedAt: Date.now(), gatewayOnline: body.gatewayOnline !== false, miners };
   await store.put(storageKey, JSON.stringify(snapshot));
   return json({ ok: true, gateway, miners: miners.length, updatedAt: snapshot.updatedAt });
