@@ -37,6 +37,9 @@ function Root() {
     <>
       <App />
       <style>{`
+        .otc-page .otc-price-dock {
+          z-index: 30;
+        }
         .community-mining-fab {
           position: fixed;
           right: 18px;
