@@ -546,6 +546,8 @@ footer { width: min(1320px, calc(100% - 40px)); margin: 0 auto; padding: 22px 0 
 .exchange-live-chip { display: inline-flex; align-items: center; gap: 6px; color: var(--accent); font-size: 10px; font-weight: 850; text-transform: uppercase; }
 .exchange-live-chip i { width: 7px; height: 7px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 12%, transparent); }
 .exchange-retry-chip { color: var(--muted); font-size: 10px; font-weight: 800; text-transform: uppercase; }
+.exchange-listed-row { background: color-mix(in srgb, var(--accent) 4%, transparent); }
+.exchange-listed-chip { color: var(--muted); font-size: 10px; font-weight: 800; letter-spacing: .2px; text-transform: uppercase; }
 .exchange-list-panel .source-note { padding: 0 19px 18px; }
 
 @media (max-width: 1050px) {
