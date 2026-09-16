@@ -30,6 +30,12 @@ type MarketFeed = {
 
 const exchangeIds: ExchangeId[] = ['neoxex', 'noirtrade'];
 const exchangeNames: Record<ExchangeId, string> = { neoxex: 'NeoxEX', noirtrade: 'NoirTrade' };
+const listedMarkets = [{
+  id: 'nonkyc',
+  name: 'NonKYC',
+  pair: 'ZKAS/USDT',
+  tradeUrl: 'https://nonkyc.io/market/ZKAS_USDT',
+}] as const;
 const intervals: Interval[] = ['5m', '15m', '1h', '4h', '1d'];
 const number = new Intl.NumberFormat('en-US', { maximumFractionDigits: 2 });
 
@@ -244,12 +250,12 @@ export function ExchangesPage() {
       </div>
 
       <section className="panel exchange-list-panel">
-        <div className="panel-head"><div><span className="panel-icon"><Activity size={20} /></span><h2>Reporting exchanges</h2></div><span className="range-chip">{liveCount} LIVE</span></div>
+        <div className="panel-head"><div><span className="panel-icon"><Activity size={20} /></span><h2>ZKAS exchange markets</h2></div><span className="range-chip">{liveCount} LIVE · {listedMarkets.length} LISTED</span></div>
         <div className="exchange-table-scroll"><table><thead><tr><th>Exchange</th><th>Pair</th><th>Last price</th><th>Best bid</th><th>Best ask</th><th>24h USDT volume</th><th>Status</th><th /></tr></thead><tbody>{exchangeIds.map((exchangeId) => {
           const item = feeds[exchangeId];
           return <tr key={exchangeId}><td><b>{exchangeNames[exchangeId]}</b></td><td>ZKAS/USDT</td><td>{usd(item?.ticker?.lastPrice)}</td><td className="bid-text">{usd(item?.ticker?.bestBid)}</td><td className="ask-text">{usd(item?.ticker?.bestAsk)}</td><td>{item?.ticker ? usd(item.ticker.quoteVolume24h, 2) : '—'}</td><td>{item ? <span className="exchange-live-chip"><i /> Live</span> : <span className="exchange-retry-chip">Retrying</span>}</td><td><a href={item?.exchange.tradeUrl || (exchangeId === 'noirtrade' ? 'https://noirtrade.com/trade?pair=ZKAS_USDT' : 'https://neoxa.exchange')} target="_blank" rel="noreferrer">Trade <ExternalLink size={13} /></a></td></tr>;
-        })}</tbody></table></div>
-        <p className="source-note"><TriangleAlert size={15} /> Exchange prices are reported separately from completed OTC trades. Select an exchange above to inspect its live market and chart.</p>
+        })}{listedMarkets.map((market) => <tr key={market.id} className="exchange-listed-row"><td><b>{market.name}</b></td><td>{market.pair}</td><td>—</td><td className="bid-text">—</td><td className="ask-text">—</td><td>—</td><td><span className="exchange-listed-chip">Market listed · activity pending</span></td><td><a href={market.tradeUrl} target="_blank" rel="noreferrer">View market <ExternalLink size={13} /></a></td></tr>)}</tbody></table></div>
+        <p className="source-note"><TriangleAlert size={15} /> Live prices are reported separately from completed OTC trades. NonKYC is shown as listed and is not included in live totals until public trading data is available.</p>
       </section>
     </div>
   );
