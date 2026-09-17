@@ -62,6 +62,30 @@ function normalizeTrade(value) {
   };
 }
 
+// Reviewed Discord screenshots: desk 1,278, less 11 permanent test/outlier exclusions = 1,267 public trades.
+const reviewedTradesSep17Later = [
+  { timestamp: '2026-09-17T12:20:00Z', side: 'sell', zkasAmount: 300000, totalKas: 16700.001 },
+  { timestamp: '2026-09-17T11:56:00Z', side: 'buy', zkasAmount: 10000, totalKas: 391 },
+  { timestamp: '2026-09-17T11:50:00Z', side: 'buy', zkasAmount: 50000, totalKas: 2000 },
+  { timestamp: '2026-09-17T11:48:00Z', side: 'buy', zkasAmount: 10000, totalKas: 401 },
+  { timestamp: '2026-09-17T10:46:00Z', side: 'buy', zkasAmount: 35000, totalKas: 1470 },
+  { timestamp: '2026-09-17T10:44:00Z', side: 'buy', zkasAmount: 237000, totalKas: 9999.99933 },
+  { timestamp: '2026-09-17T10:42:00Z', side: 'buy', zkasAmount: 36500, totalKas: 1557.33309 },
+  { timestamp: '2026-09-17T10:40:00Z', side: 'buy', zkasAmount: 51000, totalKas: 2199.99975 },
+  { timestamp: '2026-09-17T10:38:00Z', side: 'buy', zkasAmount: 220000, totalKas: 9299.499 },
+  { timestamp: '2026-09-17T09:46:00Z', side: 'sell', zkasAmount: 30000, totalKas: 2200.0002 },
+  { timestamp: '2026-09-17T08:46:00Z', side: 'buy', zkasAmount: 1000, totalKas: 42.66666 },
+  { timestamp: '2026-09-17T08:44:00Z', side: 'buy', zkasAmount: 98300, totalKas: 4273.912958 },
+  { timestamp: '2026-09-17T08:42:00Z', side: 'buy', zkasAmount: 16700, totalKas: 726.086942 },
+  { timestamp: '2026-09-17T08:40:00Z', side: 'sell', zkasAmount: 700, totalKas: 38.5 },
+  { timestamp: '2026-09-17T07:46:00Z', side: 'sell', zkasAmount: 500, totalKas: 29.074075 },
+  { timestamp: '2026-09-17T07:44:00Z', side: 'sell', zkasAmount: 1000, totalKas: 58.14815 },
+  { timestamp: '2026-09-17T07:42:00Z', side: 'sell', zkasAmount: 1000, totalKas: 58.14815 },
+  { timestamp: '2026-09-17T07:40:00Z', side: 'sell', zkasAmount: 52000, totalKas: 3023.7038 },
+  { timestamp: '2026-09-17T07:38:00Z', side: 'sell', zkasAmount: 100000, totalKas: 5814.815 },
+  { timestamp: '2026-09-17T07:36:00Z', side: 'buy', zkasAmount: 345000, totalKas: 15999.999945 },
+];
+
 function json(body, status = 200, cacheControl = 'private, no-store, max-age=0') {
   return Response.json(body, {
     status,
@@ -77,7 +101,16 @@ async function handleGet({ request, env, waitUntil }) {
   const endpoint = env.ZKAS_OTC_API_URL;
   if (!endpoint) {
     if (env.OTC_TRADES) {
-      const stored = await env.OTC_TRADES.get('trades:v1', 'json');
+      let stored = await env.OTC_TRADES.get('trades:v1', 'json');
+      if (Array.isArray(stored?.trades) && stored.trades.length === 1247) {
+        stored.trades = [...stored.trades, ...reviewedTradesSep17Later]
+          .map(normalizeTrade)
+          .filter(Boolean)
+          .sort((a, b) => a.timestamp - b.timestamp)
+          .slice(-5000);
+        stored.updatedAt = updatedAt;
+        await env.OTC_TRADES.put('trades:v1', JSON.stringify(stored));
+      }
       const trades = Array.isArray(stored?.trades) ? stored.trades.map(normalizeTrade).filter(Boolean).slice(-5000) : [];
       if (trades.length) {
         return json({ schemaVersion: 1, status: 'live', source: 'screenshot-import', updatedAt: stored.updatedAt || updatedAt, trades }, 200, 'public, max-age=10, s-maxage=30, stale-while-revalidate=120');
