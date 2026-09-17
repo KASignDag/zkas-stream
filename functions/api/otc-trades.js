@@ -62,28 +62,6 @@ function normalizeTrade(value) {
   };
 }
 
-// Reviewed Discord screenshots: desk 1,296, less 11 permanent test/outlier exclusions = 1,285 public trades.
-const reviewedTradesSep17Evening = [
-  { timestamp: '2026-09-17T21:41:00Z', side: 'sell', zkasAmount: 80000, totalKas: 4000 },
-  { timestamp: '2026-09-17T21:40:00Z', side: 'sell', zkasAmount: 40000, totalKas: 2000 },
-  { timestamp: '2026-09-17T21:34:00Z', side: 'buy', zkasAmount: 650, totalKas: 25.5666645 },
-  { timestamp: '2026-09-17T20:58:00Z', side: 'sell', zkasAmount: 10000, totalKas: 500 },
-  { timestamp: '2026-09-17T19:58:00Z', side: 'sell', zkasAmount: 57000, totalKas: 2907 },
-  { timestamp: '2026-09-17T19:56:00Z', side: 'sell', zkasAmount: 500, totalKas: 25.5 },
-  { timestamp: '2026-09-17T18:58:00Z', side: 'sell', zkasAmount: 500, totalKas: 27.5 },
-  { timestamp: '2026-09-17T16:58:00Z', side: 'sell', zkasAmount: 500, totalKas: 27.5 },
-  { timestamp: '2026-09-17T15:58:00Z', side: 'sell', zkasAmount: 50, totalKas: 2.75 },
-  { timestamp: '2026-09-17T15:56:00Z', side: 'sell', zkasAmount: 300, totalKas: 16.5 },
-  { timestamp: '2026-09-17T15:54:00Z', side: 'sell', zkasAmount: 1000, totalKas: 55 },
-  { timestamp: '2026-09-17T15:52:00Z', side: 'sell', zkasAmount: 2000, totalKas: 110 },
-  { timestamp: '2026-09-17T15:50:00Z', side: 'sell', zkasAmount: 15000, totalKas: 825 },
-  { timestamp: '2026-09-17T14:58:00Z', side: 'sell', zkasAmount: 100000, totalKas: 5949 },
-  { timestamp: '2026-09-17T14:56:00Z', side: 'buy', zkasAmount: 71541, totalKas: 3374.35002306 },
-  { timestamp: '2026-09-17T14:54:00Z', side: 'buy', zkasAmount: 228459, totalKas: 10775.64797694 },
-  { timestamp: '2026-09-17T14:52:00Z', side: 'buy', zkasAmount: 217762, totalKas: 10888.1 },
-  { timestamp: '2026-09-17T13:58:00Z', side: 'buy', zkasAmount: 282238, totalKas: 14111.9 },
-];
-
 function json(body, status = 200, cacheControl = 'private, no-store, max-age=0') {
   return Response.json(body, {
     status,
@@ -99,16 +77,7 @@ async function handleGet({ request, env, waitUntil }) {
   const endpoint = env.ZKAS_OTC_API_URL;
   if (!endpoint) {
     if (env.OTC_TRADES) {
-      let stored = await env.OTC_TRADES.get('trades:v1', 'json');
-      if (Array.isArray(stored?.trades) && stored.trades.length === 1267) {
-        stored.trades = [...stored.trades, ...reviewedTradesSep17Evening]
-          .map(normalizeTrade)
-          .filter(Boolean)
-          .sort((a, b) => a.timestamp - b.timestamp)
-          .slice(-5000);
-        stored.updatedAt = updatedAt;
-        await env.OTC_TRADES.put('trades:v1', JSON.stringify(stored));
-      }
+      const stored = await env.OTC_TRADES.get('trades:v1', 'json');
       const trades = Array.isArray(stored?.trades) ? stored.trades.map(normalizeTrade).filter(Boolean).slice(-5000) : [];
       if (trades.length) {
         return json({ schemaVersion: 1, status: 'live', source: 'screenshot-import', updatedAt: stored.updatedAt || updatedAt, trades }, 200, 'public, max-age=10, s-maxage=30, stale-while-revalidate=120');
