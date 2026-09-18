@@ -133,16 +133,20 @@ function preserveGatewayTotals(state) {
 }
 
 function historicalMinerRow(alias, saved) {
+  const last = saved?.lastSnapshot && typeof saved.lastSnapshot === 'object' ? saved.lastSnapshot : {};
   return {
     alias,
     status: 'offline',
     historical: true,
-    hashrateHps: null,
-    uptimeSeconds: null,
-    acceptedShares: null,
-    invalidShares: null,
-    staleShares: null,
-    lastShareAt: null,
+    hashrateHps: finiteNonNegative(last.hashrateHps),
+    uptimeSeconds: finiteNonNegative(last.uptimeSeconds),
+    acceptedShares: finiteNonNegative(last.acceptedShares),
+    invalidShares: finiteNonNegative(last.invalidShares),
+    staleShares: finiteNonNegative(last.staleShares),
+    lastShareAt: finiteNonNegative(last.lastShareAt),
+    lastSeenAt: finiteNonNegative(saved?.lastSeenAt)
+      ?? finiteNonNegative(last.lastShareAt)
+      ?? finiteNonNegative(saved?.updatedAt),
     zkasBlocks: counterValue(saved?.zkas?.total),
     kasBlocks: counterValue(saved?.kas?.total),
     kasPayoutSet: saved?.kasPayoutSet === true,
@@ -165,14 +169,44 @@ function applyLifetimeBlockCounters(state, gateway, miners) {
     const previous = state.miners[miner.alias] || null;
     const zkas = accumulateCounter(previous?.zkas, miner.zkasBlocks);
     const kas = accumulateCounter(previous?.kas, miner.kasBlocks);
+    const now = Date.now();
+    const priorSnapshot = previous?.lastSnapshot && typeof previous.lastSnapshot === 'object'
+      ? previous.lastSnapshot
+      : {};
+    const shouldCapture = miner.status === 'online' || !previous?.lastSnapshot;
+    const lastSnapshot = shouldCapture ? {
+      hashrateHps: miner.hashrateHps ?? finiteNonNegative(priorSnapshot.hashrateHps),
+      uptimeSeconds: miner.uptimeSeconds ?? finiteNonNegative(priorSnapshot.uptimeSeconds),
+      acceptedShares: miner.acceptedShares ?? finiteNonNegative(priorSnapshot.acceptedShares),
+      invalidShares: miner.invalidShares ?? finiteNonNegative(priorSnapshot.invalidShares),
+      staleShares: miner.staleShares ?? finiteNonNegative(priorSnapshot.staleShares),
+      lastShareAt: miner.lastShareAt ?? finiteNonNegative(priorSnapshot.lastShareAt),
+    } : priorSnapshot;
+    const lastSeenAt = miner.status === 'online'
+      ? now
+      : finiteNonNegative(previous?.lastSeenAt)
+        ?? finiteNonNegative(miner.lastShareAt)
+        ?? finiteNonNegative(previous?.updatedAt)
+        ?? now;
+
     state.miners[miner.alias] = {
       ...previous,
       zkas,
       kas,
       kasPayoutSet: miner.kasPayoutSet,
-      updatedAt: Date.now(),
+      lastSnapshot,
+      lastSeenAt,
+      updatedAt: now,
     };
-    return { ...miner, zkasBlocks: zkas.total, kasBlocks: kas.total };
+
+    if (miner.status !== 'online') return historicalMinerRow(miner.alias, state.miners[miner.alias]);
+    return {
+      ...miner,
+      historical: false,
+      lastSeenAt,
+      zkasBlocks: zkas.total,
+      kasBlocks: kas.total,
+    };
   });
 
   const currentAliases = new Set(published.map((miner) => miner.alias));
@@ -226,7 +260,7 @@ export async function onRequest(context) {
     const counterState = await loadCounterState(store, gateway, previousSnapshot);
     const counted = applyLifetimeBlockCounters(counterState, gateway, cleanMiners);
     const snapshot = {
-      schemaVersion: 3,
+      schemaVersion: 4,
       gateway,
       updatedAt: Date.now(),
       gatewayOnline: body.gatewayOnline !== false,
