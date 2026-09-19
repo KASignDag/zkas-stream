@@ -1,4 +1,5 @@
 export type OtcTradeSide = 'buy' | 'sell' | 'unknown';
+export type OtcMarketSource = 'discord' | 'telegram';
 
 export type OtcTrade = {
   timestamp: number | null;
@@ -38,8 +39,8 @@ function isFeed(value: unknown): value is OtcTradeFeed {
     && Array.isArray(candidate.trades);
 }
 
-export async function fetchOtcTrades(signal?: AbortSignal): Promise<OtcTradeFeed> {
-  const response = await fetch('/api/otc-trades', {
+export async function fetchOtcTrades(source: OtcMarketSource = 'discord', signal?: AbortSignal): Promise<OtcTradeFeed> {
+  const response = await fetch(`/api/otc-trades?source=${source}`, {
     signal,
     headers: { Accept: 'application/json' },
   });

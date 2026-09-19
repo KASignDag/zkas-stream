@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
-import { CheckCircle2, Eye, FileImage, LockKeyhole, Plus, ScanText, Send, ShieldCheck, Trash2 } from 'lucide-react';
-import type { OtcTradeSide } from '../otc';
+import { CheckCircle2, Eye, FileImage, LockKeyhole, MessageCircle, Plus, ScanText, Send, ShieldCheck, Trash2 } from 'lucide-react';
+import type { OtcMarketSource, OtcTradeSide } from '../otc';
 
 type DraftTrade = {
   id: string;
@@ -133,6 +133,7 @@ async function detectTradeSides(file: File): Promise<OtcTradeSide[]> {
 }
 
 export function OtcScreenshotImporter() {
+  const [source, setSource] = useState<OtcMarketSource>('discord');
   const [secret, setSecret] = useState('');
   const [files, setFiles] = useState<File[]>([]);
   const [rows, setRows] = useState<DraftTrade[]>([]);
@@ -210,7 +211,7 @@ export function OtcScreenshotImporter() {
       const response = await fetch('/api/otc-import', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${secret}` },
-        body: JSON.stringify({ trades: validRows.map((row) => ({
+        body: JSON.stringify({ source, trades: validRows.map((row) => ({
           timestamp: new Date(row.timestamp).getTime(),
           side: row.side,
           zkasAmount: Number(row.zkasAmount),
@@ -220,7 +221,8 @@ export function OtcScreenshotImporter() {
       });
       const result = await response.json() as { added?: number; duplicates?: number; total?: number; error?: string };
       if (!response.ok) throw new Error(result.error === 'storage_not_configured' ? 'Cloudflare storage still needs to be connected.' : result.error || 'Import failed.');
-      setMessage({ tone: 'success', text: `Published ${result.added ?? 0} new trade${result.added === 1 ? '' : 's'}${result.duplicates ? `; ${result.duplicates} duplicate${result.duplicates === 1 ? '' : 's'} skipped` : ''}. ${result.total ?? 0} total trades are now stored.` });
+      const sourceName = source === 'telegram' ? 'Telegram OTC' : 'Discord OTC';
+      setMessage({ tone: 'success', text: `Published ${result.added ?? 0} new ${sourceName} trade${result.added === 1 ? '' : 's'}${result.duplicates ? `; ${result.duplicates} duplicate${result.duplicates === 1 ? '' : 's'} skipped` : ''}. ${result.total ?? 0} ${sourceName} trades are now stored.` });
       setRows([]);
       setFiles([]);
       setOcrText('');
@@ -233,21 +235,29 @@ export function OtcScreenshotImporter() {
 
   return (
     <div className="page-stack importer-page">
-      <div className="privacy-callout"><ShieldCheck size={20} /><div><b>Private, trade-facts-only importer</b><span>OCR runs in this browser. Screenshots, Discord names, message text and order IDs are never uploaded or stored. Publishing sends only the five reviewed trade facts.</span></div></div>
+      <div className="privacy-callout"><ShieldCheck size={20} /><div><b>Private, trade-facts-only importer</b><span>OCR runs in this browser. Screenshots, Discord or Telegram names, message text and order IDs are never uploaded or stored. Publishing sends only the five reviewed trade facts.</span></div></div>
 
       <section className="panel importer-step">
-        <div className="importer-step-head"><span>1</span><div><h2>Unlock publishing</h2><p>The password stays in this tab and is sent only when you publish reviewed rows.</p></div></div>
+        <div className="importer-step-head"><span>1</span><div><h2>Choose the trade source</h2><p>Discord and Telegram histories are stored separately and never mixed.</p></div></div>
+        <div className="importer-source-tabs" role="group" aria-label="Trade source">
+          <button className={source === 'discord' ? 'active discord' : ''} onClick={() => setSource('discord')}><MessageCircle size={17} /> Discord OTC</button>
+          <button className={source === 'telegram' ? 'active telegram' : ''} onClick={() => setSource('telegram')}><Send size={17} /> Telegram OTC</button>
+        </div>
+      </section>
+
+      <section className="panel importer-step">
+        <div className="importer-step-head"><span>2</span><div><h2>Unlock publishing</h2><p>The password stays in this tab and is sent only when you publish reviewed rows.</p></div></div>
         <label className="importer-secret"><LockKeyhole size={17} /><input type="password" autoComplete="off" value={secret} onChange={(event) => setSecret(event.target.value)} placeholder="OTC importer password" /></label>
       </section>
 
       <section className="panel importer-step">
-        <div className="importer-step-head"><span>2</span><div><h2>Choose trade-log screenshots</h2><p>PNG, JPEG or WebP. Select several screenshots to process them together.</p></div></div>
+        <div className="importer-step-head"><span>3</span><div><h2>Choose {source === 'telegram' ? 'Telegram' : 'Discord'} trade screenshots</h2><p>PNG, JPEG or WebP. Select several screenshots to process them together.</p></div></div>
         <label className="importer-drop"><FileImage size={28} /><b>{files.length ? `${files.length} screenshot${files.length === 1 ? '' : 's'} selected` : 'Choose screenshots'}</b><span>Images stay on this device</span><input type="file" multiple accept="image/png,image/jpeg,image/webp" onChange={(event) => setFiles(Array.from(event.target.files || []).slice(0, 10))} /></label>
         <button className="importer-primary" disabled={!files.length || busy} onClick={() => void scan()}><ScanText size={17} />{busy && progress ? progress : 'Read screenshots'}</button>
       </section>
 
       <section className="panel importer-step">
-        <div className="importer-step-head"><span>3</span><div><h2>Review every detected trade</h2><p>OCR can make mistakes. A row will publish only when all numeric fields and the date are valid.</p></div></div>
+        <div className="importer-step-head"><span>4</span><div><h2>Review every detected trade</h2><p>OCR can make mistakes. A row will publish only when all numeric fields and the date are valid.</p></div></div>
         <div className="importer-table-wrap"><table className="importer-table"><thead><tr><th>Date & time</th><th>Side</th><th>ZKAS amount</th><th>Price (KAS)</th><th>Total (KAS)</th><th /></tr></thead><tbody>
           {rows.map((row) => <tr key={row.id} className={row.warning ? 'review-warning' : ''}>
             <td><input type="datetime-local" value={row.timestamp} onChange={(event) => update(row.id, 'timestamp', event.target.value)} /></td>

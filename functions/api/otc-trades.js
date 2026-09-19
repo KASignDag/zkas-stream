@@ -74,6 +74,27 @@ function json(body, status = 200, cacheControl = 'private, no-store, max-age=0')
 
 async function handleGet({ request, env, waitUntil }) {
   const updatedAt = Date.now();
+  const requestUrl = new URL(request?.url || 'https://zkas.stream/api/otc-trades');
+  const requestedSource = requestUrl.searchParams.get('source') === 'telegram' ? 'telegram' : 'discord';
+  if (requestedSource === 'telegram') {
+    if (env.OTC_TRADES) {
+      const stored = await env.OTC_TRADES.get('trades:telegram:v1', 'json');
+      const trades = Array.isArray(stored?.trades) ? stored.trades.map(normalizeTrade).filter(Boolean).slice(-5000) : [];
+      if (trades.length) {
+        return json({ schemaVersion: 1, status: 'live', source: 'screenshot-import', market: 'telegram', updatedAt: stored.updatedAt || updatedAt, trades }, 200, 'public, max-age=10, s-maxage=30, stale-while-revalidate=120');
+      }
+      return json({
+        schemaVersion: 1,
+        status: 'awaiting_configuration',
+        source: 'screenshot-import',
+        market: 'telegram',
+        updatedAt,
+        trades: [],
+        message: 'The Telegram screenshot importer is ready for its first reviewed trade.',
+      });
+    }
+    return json({ schemaVersion: 1, status: 'awaiting_configuration', source: 'not-configured', market: 'telegram', updatedAt, trades: [], message: 'Telegram OTC storage is not configured yet.' });
+  }
   const endpoint = env.ZKAS_OTC_API_URL;
   if (!endpoint) {
     if (env.OTC_TRADES) {

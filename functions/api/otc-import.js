@@ -1,4 +1,3 @@
-const STORAGE_KEY = 'trades:v1';
 const MAX_ROWS = 5000;
 
 function json(body, status = 200) {
@@ -49,11 +48,14 @@ export async function onRequest(context) {
 
   let payload;
   try { payload = await context.request.json(); } catch { return json({ error: 'invalid_json' }, 400); }
+  const source = payload?.source === 'telegram' ? 'telegram' : payload?.source === 'discord' || payload?.source === undefined ? 'discord' : null;
+  if (!source) return json({ error: 'invalid_source' }, 400);
+  const storageKey = source === 'telegram' ? 'trades:telegram:v1' : 'trades:v1';
   if (!Array.isArray(payload?.trades) || payload.trades.length < 1 || payload.trades.length > 500) return json({ error: 'invalid_trade_batch' }, 400);
   const incoming = payload.trades.map(cleanTrade).filter(Boolean);
   if (incoming.length !== payload.trades.length) return json({ error: 'invalid_trade_facts' }, 400);
 
-  const stored = await context.env.OTC_TRADES.get(STORAGE_KEY, 'json');
+  const stored = await context.env.OTC_TRADES.get(storageKey, 'json');
   const existing = Array.isArray(stored?.trades) ? stored.trades.map(cleanTrade).filter(Boolean) : [];
   const seen = new Set(existing.map(fingerprint));
   const added = [];
@@ -64,6 +66,6 @@ export async function onRequest(context) {
     added.push(trade);
   }
   const trades = [...existing, ...added].sort((a, b) => a.timestamp - b.timestamp).slice(-MAX_ROWS);
-  await context.env.OTC_TRADES.put(STORAGE_KEY, JSON.stringify({ schemaVersion: 1, updatedAt: Date.now(), trades }));
-  return json({ ok: true, added: added.length, duplicates: incoming.length - added.length, total: trades.length });
+  await context.env.OTC_TRADES.put(storageKey, JSON.stringify({ schemaVersion: 1, source, updatedAt: Date.now(), trades }));
+  return json({ ok: true, source, added: added.length, duplicates: incoming.length - added.length, total: trades.length });
 }

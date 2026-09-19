@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { Activity, CalendarDays, CircleDollarSign, Clock3, Coins, ExternalLink, MessageCircle, RefreshCw, Send, TrendingUp, Trophy } from 'lucide-react';
-import { fetchKasUsd, fetchOtcTrades, type OtcTrade, type OtcTradeFeed } from '../otc';
+import { fetchKasUsd, fetchOtcTrades, type OtcMarketSource, type OtcTrade, type OtcTradeFeed } from '../otc';
 
 type Range = '4H' | '6H' | '1D' | '7D' | 'ALL';
 type TradeTableRange = '1D' | '3D' | '7D' | 'ALL';
@@ -79,16 +79,18 @@ function changePercent(first: number | null, last: number | null) {
   return ((last - first) / Math.abs(first)) * 100;
 }
 
-function statusCopy(feed: OtcTradeFeed | null, error: string | null, loading: boolean) {
-  if (loading && !feed) return { tone: 'waiting', title: 'Preparing the OTC trade feed', detail: 'Checking for the secure server connection…' };
-  if (feed?.source === 'screenshot-import' && feed.status === 'live') return { tone: 'live', title: 'Discord OTC screenshot trades loaded', detail: 'The chart updates when new reviewed Discord trade-log screenshots are published.' };
+function statusCopy(feed: OtcTradeFeed | null, error: string | null, loading: boolean, source: OtcMarketSource) {
+  const sourceName = source === 'telegram' ? 'Telegram OTC' : 'Discord OTC';
+  if (loading && !feed) return { tone: 'waiting', title: `Preparing the ${sourceName} trade feed`, detail: 'Checking for the secure server connection…' };
+  if (feed?.source === 'screenshot-import' && feed.status === 'live') return { tone: 'live', title: `${sourceName} screenshot trades loaded`, detail: `The chart updates when new reviewed ${sourceName} trade screenshots are published.` };
   if (feed?.status === 'live') return { tone: 'live', title: 'OTC trade log connected', detail: 'The chart refreshes automatically as completed trades become available.' };
-  if (feed?.status === 'awaiting_configuration' && feed.source === 'screenshot-import') return { tone: 'waiting', title: 'Screenshot importer ready', detail: 'Reviewed completed trades will appear here as soon as the first screenshot is published.' };
+  if (feed?.status === 'awaiting_configuration' && feed.source === 'screenshot-import') return { tone: 'waiting', title: `${sourceName} screenshot importer ready`, detail: `Reviewed ${sourceName} completed trades will appear here after the first screenshot is published.` };
   if (feed?.status === 'awaiting_configuration') return { tone: 'waiting', title: 'Ready for Ronnie’s API', detail: 'The private connection is prepared. The endpoint and access key still need to be added on the server.' };
   return { tone: 'error', title: 'OTC feed temporarily unavailable', detail: error || feed?.message || 'The last successful trade data will remain visible while the connection retries.' };
 }
 
 export function OtcMarketPage({ circulatingSupply }: { circulatingSupply: number | null }) {
+  const [marketSource, setMarketSource] = useState<OtcMarketSource>('discord');
   const [feed, setFeed] = useState<OtcTradeFeed | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -106,7 +108,7 @@ export function OtcMarketPage({ circulatingSupply }: { circulatingSupply: number
       const controller = new AbortController();
       activeController = controller;
       try {
-        const next = await fetchOtcTrades(controller.signal);
+        const next = await fetchOtcTrades(marketSource, controller.signal);
         if (stopped) return;
         setFeed((previous) => next.status === 'live' || !previous ? next : { ...next, trades: previous.trades });
         setError(null);
@@ -125,7 +127,7 @@ export function OtcMarketPage({ circulatingSupply }: { circulatingSupply: number
       activeController?.abort();
       window.clearInterval(timer);
     };
-  }, []);
+  }, [marketSource]);
 
   useEffect(() => {
     let stopped = false;
@@ -220,8 +222,19 @@ export function OtcMarketPage({ circulatingSupply }: { circulatingSupply: number
     const start = activeTradeTablePage * tradesPerPage;
     return orderedTableTrades.slice(start, start + tradesPerPage);
   }, [activeTradeTablePage, orderedTableTrades]);
-  const state = statusCopy(feed, error, loading);
+  const sourceName = marketSource === 'telegram' ? 'Telegram OTC' : 'Discord OTC';
+  const sourceShortName = marketSource === 'telegram' ? 'Telegram' : 'Discord';
+  const state = statusCopy(feed, error, loading, marketSource);
   const refreshLabel = feed?.source === 'screenshot-import' ? '30 sec data check' : '30 sec refresh';
+
+  function selectMarketSource(source: OtcMarketSource) {
+    if (source === marketSource) return;
+    setFeed(null);
+    setError(null);
+    setLoading(true);
+    setTradeTablePage(0);
+    setMarketSource(source);
+  }
 
   return (
     <div className="page-stack otc-page">
@@ -231,51 +244,63 @@ export function OtcMarketPage({ circulatingSupply }: { circulatingSupply: number
         <span className="otc-refresh"><RefreshCw size={13} className={loading ? 'spinning' : ''} /> {refreshLabel}</span>
       </div>
 
-      <section className="otc-market-links discord-source" aria-label="Discord OTC data source">
-        <article className="otc-market-link discord">
+      <section className="otc-market-links" aria-label="Choose an OTC market data source">
+        <article className={`otc-market-link discord ${marketSource === 'discord' ? 'selected' : ''}`} role="button" tabIndex={0} onClick={() => selectMarketSource('discord')} onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') selectMarketSource('discord'); }}>
           <span className="otc-market-mark" aria-hidden="true"><MessageCircle size={19} /></span>
           <div className="otc-market-copy">
             <span>DISCORD OTC</span>
             <h2>ZKAS / KAS</h2>
             <p>Community orders and completed-trade history</p>
           </div>
-          <span className="otc-venue-status live"><i /> CHART + HISTORY SOURCE</span>
-          <a href="https://discord.gg/kJCYVtGEe" target="_blank" rel="noopener noreferrer">
-            Open market <ExternalLink size={15} />
+          <span className={`otc-venue-status ${marketSource === 'discord' ? 'live' : ''}`}><i /> {marketSource === 'discord' ? 'VIEWING DATA' : 'VIEW STATS + CHART'}</span>
+          <a href="https://discord.gg/kJCYVtGEe" target="_blank" rel="noopener noreferrer" onClick={(event) => event.stopPropagation()}>
+            Open Discord <ExternalLink size={15} />
           </a>
         </article>
 
+        <article className={`otc-market-link telegram ${marketSource === 'telegram' ? 'selected' : ''}`} role="button" tabIndex={0} onClick={() => selectMarketSource('telegram')} onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') selectMarketSource('telegram'); }}>
+          <span className="otc-market-mark" aria-hidden="true"><Send size={19} /></span>
+          <div className="otc-market-copy">
+            <span>TELEGRAM OTC</span>
+            <h2>ZKAS / KAS</h2>
+            <p>Separate Telegram stats, chart and trade history</p>
+          </div>
+          <span className={`otc-venue-status ${marketSource === 'telegram' ? 'live' : ''}`}><i /> {marketSource === 'telegram' ? 'VIEWING DATA' : 'VIEW STATS + CHART'}</span>
+          <a href="https://t.me/ZKas_OTC_bot" target="_blank" rel="noopener noreferrer" onClick={(event) => event.stopPropagation()}>
+            Open Telegram Bot <ExternalLink size={15} />
+          </a>
+        </article>
       </section>
 
       <section className="otc-data-heading" aria-labelledby="discord-otc-data-title">
         <div>
-          <div className="eyebrow"><Activity size={14} /> DISCORD OTC MARKET DATA</div>
-          <h2 id="discord-otc-data-title">Discord price, statistics and chart</h2>
-          <p>Everything below is calculated from reviewed Discord OTC completed trades only. Telegram orders are not included yet.</p>
+          <div className="eyebrow"><Activity size={14} /> {sourceName.toUpperCase()} MARKET DATA</div>
+          <h2 id="discord-otc-data-title">{sourceShortName} price, statistics and chart</h2>
+          <p>Everything below is calculated only from reviewed {sourceName} completed trades. Discord and Telegram histories are stored separately.</p>
         </div>
-        <span className="otc-source-pill">Discord OTC</span>
+        <span className={`otc-source-pill ${marketSource}`}>{sourceName}</span>
       </section>
 
       <div className="otc-price-dock" aria-live="polite">
-        <div><span>DISCORD OTC · ZKAS / KAS</span><small>Completed-trade market</small></div>
+        <div><span>{sourceName.toUpperCase()} · ZKAS / KAS</span><small>Completed-trade market</small></div>
         <div className="otc-price-dock-value"><small>LAST TRADE</small><strong>{priceText(latestMarketPrice)}</strong>{usdPriceText(latestMarketUsd) && <em>≈ {usdPriceText(latestMarketUsd)}</em>}</div>
       </div>
 
       <section className="otc-summary-grid">
-        <OtcSummary icon={<TrendingUp size={18} />} label="Latest Discord price" value={priceText(lastPrice)} detail={usdPriceText(zkasUsd) ? `≈ ${usdPriceText(zkasUsd)} USD per ZKAS` : 'ZKAS/KAS · KAS per ZKAS'} />
+        <OtcSummary icon={<TrendingUp size={18} />} label={`Latest ${sourceShortName} price`} value={priceText(lastPrice)} detail={usdPriceText(zkasUsd) ? `≈ ${usdPriceText(zkasUsd)} USD per ZKAS` : 'ZKAS/KAS · KAS per ZKAS'} />
         <OtcSummary icon={<Activity size={18} />} label={`${range} price change`} value={change === null ? '—' : `${change >= 0 ? '+' : ''}${change.toFixed(2)}%`} detail={rangeLabel(range)} tone={change === null ? undefined : change >= 0 ? 'positive' : 'negative'} />
         <OtcSummary icon={<CircleDollarSign size={18} />} label="Estimated OTC market cap" value={marketCapText(marketCapUsd, 'USD')} detail={marketCapKas === null ? 'Waiting for trade history and supply' : `24H VWAP · ${compactFormat.format(circulatingSupply as number)} circulating`} />
-        <OtcSummary icon={<Coins size={18} />} label="Discord ZKAS volume" value={zkasVolume ? compactFormat.format(zkasVolume) : '—'} detail={`${amountFormat.format(kasVolume)} KAS exchanged`} />
-        <OtcSummary icon={<Clock3 size={18} />} label="Discord completed trades" value={filteredTrades.length ? amountFormat.format(filteredTrades.length) : '—'} detail={rangeLabel(range)} />
+        <OtcSummary icon={<Coins size={18} />} label={`${sourceShortName} ZKAS volume`} value={zkasVolume ? compactFormat.format(zkasVolume) : '—'} detail={`${amountFormat.format(kasVolume)} KAS exchanged`} />
+        <OtcSummary icon={<Clock3 size={18} />} label={`${sourceShortName} completed trades`} value={filteredTrades.length ? amountFormat.format(filteredTrades.length) : '—'} detail={rangeLabel(range)} />
       </section>
 
       <section className="panel otc-chart-panel">
         <div className="otc-chart-head">
           <div>
-            <div className="eyebrow"><Activity size={14} /> DISCORD OTC · ZKAS/KAS</div>
+            <div className="eyebrow"><Activity size={14} /> {sourceName.toUpperCase()} · ZKAS/KAS</div>
             <h2>ZKAS completed trade price</h2>
             <p>Each point shows the price of one ZKAS, quoted in KAS.</p>
-            <div className="otc-source-badge">Source: Discord OTC · reviewed trade-log screenshots</div>
+            <div className={`otc-source-badge ${marketSource}`}>Source: {sourceName} · reviewed trade screenshots</div>
           </div>
           <div className="segmented" aria-label="OTC chart time range">
             {(['4H', '6H', '1D', '7D', 'ALL'] as Range[]).map((item) => (
@@ -283,7 +308,7 @@ export function OtcMarketPage({ circulatingSupply }: { circulatingSupply: number
             ))}
           </div>
         </div>
-        <OtcPriceChart trades={pricedTrades} range={range} change={change} zkasUsd={zkasUsd} />
+        <OtcPriceChart trades={pricedTrades} range={range} change={change} zkasUsd={zkasUsd} sourceName={sourceName} />
         <div className="otc-legend"><span><i className="buy" /> Buy</span><span><i className="sell" /> Sell</span><span><i className="unknown" /> Unclassified trade</span></div>
       </section>
 
@@ -300,7 +325,7 @@ export function OtcMarketPage({ circulatingSupply }: { circulatingSupply: number
                 <tr key={`top-buy-${trade.timestamp ?? 'undated'}-${index}`}>
                   <td><span className={`otc-rank otc-rank-${index + 1}`}>#{index + 1}</span></td>
                   <td>{dateText(trade.timestamp)}</td>
-                  <td><span className="otc-source-pill">Discord OTC</span></td>
+                  <td><span className={`otc-source-pill ${marketSource}`}>{sourceName}</span></td>
                   <td>{trade.zkasAmount === null ? '—' : amountFormat.format(trade.zkasAmount)}</td>
                   <td>{priceText(trade.priceKas)}</td>
                   <td><b>{amountFormat.format(trade.totalKas as number)} KAS</b></td>
@@ -333,7 +358,7 @@ export function OtcMarketPage({ circulatingSupply }: { circulatingSupply: number
               {visibleTableTrades.map((trade, index) => (
                 <tr key={`${trade.timestamp ?? 'undated'}-${index}`}>
                   <td>{dateText(trade.timestamp)}</td>
-                  <td><span className="otc-source-pill">Discord OTC</span></td>
+                  <td><span className={`otc-source-pill ${marketSource}`}>{sourceName}</span></td>
                   <td><span className={`otc-side ${trade.side}`}>{trade.side === 'unknown' ? 'Trade' : trade.side}</span></td>
                   <td>{trade.zkasAmount === null ? '—' : amountFormat.format(trade.zkasAmount)}</td>
                   <td>{priceText(trade.priceKas)}</td>
@@ -352,18 +377,6 @@ export function OtcMarketPage({ circulatingSupply }: { circulatingSupply: number
         </div>
       </section>
 
-      <section className="otc-telegram-section" aria-labelledby="telegram-otc-title">
-        <div className="otc-telegram-section-head">
-          <div className="eyebrow"><Send size={14} /> SEPARATE TELEGRAM ORDER DESK</div>
-          <h2 id="telegram-otc-title">Telegram OTC bot</h2>
-          <p>Open the official Telegram bot to place or manage orders. Telegram data is not used in the Discord chart or completed-trade history above.</p>
-        </div>
-        <a className="otc-telegram-desk" href="https://t.me/ZKas_OTC_bot" target="_blank" rel="noopener noreferrer">
-          <span className="otc-market-mark" aria-hidden="true"><Send size={20} /></span>
-          <span className="otc-telegram-desk-copy"><small>TELEGRAM OTC BOT</small><b>ZKAS / KAS</b><em>Orders only · no Telegram chart data yet</em></span>
-          <span className="otc-telegram-open">Open Telegram bot <ExternalLink size={16} /></span>
-        </a>
-      </section>
     </div>
   );
 }
@@ -378,7 +391,7 @@ function OtcSummary({ icon, label, value, detail, tone }: { icon: ReactNode; lab
   );
 }
 
-function OtcPriceChart({ trades, range, change, zkasUsd }: { trades: OtcTrade[]; range: Range; change: number | null; zkasUsd: number | null }) {
+function OtcPriceChart({ trades, range, change, zkasUsd, sourceName }: { trades: OtcTrade[]; range: Range; change: number | null; zkasUsd: number | null; sourceName: string }) {
   const points = trades
     .map((trade) => ({ trade, value: trade.priceKas }))
     .filter((point): point is { trade: OtcTrade; value: number } => point.value !== null && Number.isFinite(point.value));
@@ -391,7 +404,7 @@ function OtcPriceChart({ trades, range, change, zkasUsd }: { trades: OtcTrade[];
   }, [points.length, range]);
 
   if (!points.length) {
-    return <div className="otc-chart-empty"><TrendingUp size={30} /><b>Waiting for completed trades</b><span>The secure chart connection is built and ready for Ronnie’s API details.</span></div>;
+    return <div className="otc-chart-empty"><TrendingUp size={30} /><b>Waiting for {sourceName} completed trades</b><span>Import reviewed {sourceName} screenshots and the chart will update automatically.</span></div>;
   }
 
   const left = 84;
