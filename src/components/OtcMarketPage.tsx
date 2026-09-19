@@ -94,7 +94,7 @@ export function OtcMarketPage({ circulatingSupply }: { circulatingSupply: number
   const [feed, setFeed] = useState<OtcTradeFeed | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
-  const [range, setRange] = useState<Range>('4H');
+  const [range, setRange] = useState<Range>('6H');
   const [tradeTableRange, setTradeTableRange] = useState<TradeTableRange>('1D');
   const [tradeTablePage, setTradeTablePage] = useState(0);
   const [kasUsd, setKasUsd] = useState<number | null>(null);
