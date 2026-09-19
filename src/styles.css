@@ -1152,37 +1152,39 @@ footer { width: min(1320px, calc(100% - 40px)); margin: 0 auto; padding: 22px 0 
 }
 .otc-market-link {
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
-  align-items: start;
-  gap: 13px;
-  padding: 17px 18px;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px 12px;
+  min-width: 0;
+  padding: 15px 16px;
   border: 1px solid var(--border);
-  border-radius: 15px;
-  box-shadow: 0 8px 24px rgba(5, 23, 18, .07);
+  border-radius: 13px;
+  background: var(--surface);
+  box-shadow: 0 3px 12px rgba(16, 35, 29, .025);
 }
 .otc-market-link.discord {
-  border-color: color-mix(in srgb, #5865f2 34%, var(--border));
-  background: linear-gradient(135deg, color-mix(in srgb, #5865f2 10%, var(--surface)), var(--surface) 68%);
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent-soft) 48%, var(--surface));
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 10%, transparent);
 }
 .otc-market-link.telegram {
-  border-color: color-mix(in srgb, #229ed9 34%, var(--border));
-  background: linear-gradient(135deg, color-mix(in srgb, #229ed9 10%, var(--surface)), var(--surface) 68%);
+  border-color: var(--border);
 }
 .otc-market-mark {
   display: inline-flex;
-  width: 44px;
-  height: 44px;
+  width: 38px;
+  height: 38px;
   align-items: center;
   justify-content: center;
-  border-radius: 50%;
+  border-radius: 10px;
   color: #fff;
 }
-.otc-market-link.discord .otc-market-mark { background: #5865f2; box-shadow: 0 7px 18px rgba(88, 101, 242, .25); }
-.otc-market-link.telegram .otc-market-mark { background: #229ed9; box-shadow: 0 7px 18px rgba(34, 158, 217, .25); }
+.otc-market-link.discord .otc-market-mark { background: #5865f2; }
+.otc-market-link.telegram .otc-market-mark { background: #229ed9; }
 .otc-market-copy { min-width: 0; }
 .otc-market-copy > span {
   display: block;
-  margin-bottom: 3px;
+  margin-bottom: 4px;
   font-size: 9px;
   font-weight: 900;
   letter-spacing: 1.15px;
@@ -1192,47 +1194,43 @@ footer { width: min(1320px, calc(100% - 40px)); margin: 0 auto; padding: 22px 0 
 .otc-market-copy h2 {
   margin: 0;
   color: var(--text);
-  font-size: 17px;
+  font-size: 19px;
   letter-spacing: -.25px;
 }
 .otc-market-copy p {
   margin: 4px 0 0;
   color: var(--muted);
-  font-size: 11px;
-  line-height: 1.5;
+  font-size: 10px;
+  line-height: 1.4;
 }
-.otc-market-copy small {
-  display: inline-flex;
-  margin-top: 9px;
-  padding: 4px 7px;
-  border-radius: 999px;
-  color: var(--muted);
-  background: color-mix(in srgb, var(--surface-3) 78%, transparent);
-  font-size: 9px;
-  font-weight: 800;
-}
+.otc-venue-status { display: inline-flex; align-items: center; justify-content: flex-end; gap: 6px; color: var(--muted); font-size: 9px; font-weight: 850; letter-spacing: .35px; white-space: nowrap; }
+.otc-venue-status.live { color: var(--accent); }
+.otc-venue-status i { width: 7px; height: 7px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 12%, transparent); }
 .otc-market-link > a {
-  grid-column: 1 / -1;
+  grid-column: 3;
   display: inline-flex;
-  min-height: 42px;
+  min-height: 36px;
   align-items: center;
   justify-content: center;
-  gap: 8px;
-  padding: 0 16px;
-  border-radius: 11px;
-  color: #fff;
-  font-size: 12px;
+  gap: 6px;
+  padding: 0 11px;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  color: var(--accent);
+  background: var(--surface);
+  font-size: 10px;
   font-weight: 850;
   text-decoration: none;
   white-space: nowrap;
-  transition: transform .16s ease, box-shadow .16s ease, background .16s ease;
+  transition: border-color .16s ease, color .16s ease, background .16s ease;
 }
-.otc-market-link.discord > a { background: #5865f2; box-shadow: 0 7px 18px rgba(88, 101, 242, .22); }
-.otc-market-link.telegram > a { background: #229ed9; box-shadow: 0 7px 18px rgba(34, 158, 217, .22); }
-.otc-market-link > a:hover { transform: translateY(-1px); }
-.otc-market-link.discord > a:hover { background: #4752c4; box-shadow: 0 10px 22px rgba(88, 101, 242, .28); }
-.otc-market-link.telegram > a:hover { background: #1687bd; box-shadow: 0 10px 22px rgba(34, 158, 217, .28); }
+.otc-market-link > a:hover { border-color: var(--accent); background: var(--accent-soft); }
 .otc-market-link > a:focus-visible { outline: 3px solid color-mix(in srgb, var(--accent) 34%, transparent); outline-offset: 3px; }
+@media (max-width: 1050px) {
+  .otc-market-link { grid-template-columns: auto minmax(0, 1fr); }
+  .otc-venue-status { grid-column: 2; justify-content: flex-start; }
+  .otc-market-link > a { grid-column: 1 / -1; }
+}
 @media (max-width: 820px) { .otc-market-links { grid-template-columns: 1fr; } }
 .otc-status {
   display: flex; align-items: center; gap: 12px; min-height: 62px; padding: 13px 16px;
@@ -1253,17 +1251,20 @@ footer { width: min(1320px, calc(100% - 40px)); margin: 0 auto; padding: 22px 0 
 @keyframes otc-spin { to { transform: rotate(360deg); } }
 
 .otc-summary-grid { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 12px; }
-.otc-summary { min-height: 128px; }
-.otc-summary .metric-value.positive { color: var(--accent); }
-.otc-summary .metric-value.negative { color: var(--danger); }
+.otc-summary { min-height: 124px; }
+.otc-summary > span { display: flex; align-items: center; gap: 7px; }
+.otc-summary-icon { display: inline-flex; }
+.otc-summary-icon svg { width: 15px; height: 15px; }
+.otc-summary.positive b { color: var(--accent); }
+.otc-summary.negative b { color: var(--danger); }
 
-.otc-price-dock { position: sticky; top: 76px; z-index: 40; min-height: 56px; display: flex; align-items: center; justify-content: space-between; gap: 18px; padding: 10px 16px; border: 1px solid color-mix(in srgb, var(--accent) 28%, var(--border)); border-radius: 13px; background: color-mix(in srgb, var(--surface) 92%, transparent); box-shadow: 0 8px 22px rgba(5, 23, 18, .1); backdrop-filter: blur(14px); font-variant-numeric: tabular-nums; }
+.otc-price-dock { position: sticky; top: 76px; z-index: 40; min-height: 56px; display: flex; align-items: center; justify-content: space-between; gap: 18px; padding: 10px 16px; border: 1px solid #274b41; border-radius: 13px; background: rgba(7, 20, 16, .95); color: #e8f6f1; box-shadow: 0 10px 28px rgba(2, 13, 10, .18); backdrop-filter: blur(12px); font-variant-numeric: tabular-nums; }
 .otc-price-dock > div:first-child { display: grid; gap: 2px; }
-.otc-price-dock span { color: var(--accent); font-size: 12px; font-weight: 900; letter-spacing: 1.1px; }
-.otc-price-dock small { color: var(--muted); font-size: 9px; font-style: normal; font-weight: 800; letter-spacing: .8px; }
+.otc-price-dock span { color: #63e3bd; font-size: 12px; font-weight: 900; letter-spacing: 1.1px; }
+.otc-price-dock small { color: #8da29a; font-size: 9px; font-style: normal; font-weight: 800; letter-spacing: .8px; }
 .otc-price-dock-value { display: flex; align-items: baseline; justify-content: flex-end; gap: 9px; text-align: right; }
-.otc-price-dock-value strong { color: var(--text); font-size: 18px; letter-spacing: -.3px; }
-.otc-price-dock-value em { color: var(--muted); font-size: 10px; font-style: normal; font-weight: 750; }
+.otc-price-dock-value strong { color: #e8f6f1; font-size: 20px; letter-spacing: -.3px; }
+.otc-price-dock-value em { color: #8da29a; font-size: 10px; font-style: normal; font-weight: 750; }
 
 .otc-chart-panel { padding: 0; overflow: hidden; }
 .otc-chart-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 22px; padding: 21px 22px 0; }
@@ -1355,8 +1356,9 @@ footer { width: min(1320px, calc(100% - 40px)); margin: 0 auto; padding: 22px 0 
 }
 @media (max-width: 480px) {
   .otc-summary-grid { grid-template-columns: 1fr 1fr; gap: 9px; }
-  .otc-summary { min-height: 118px; }
-  .otc-summary .metric-value { font-size: 18px; }
+  .otc-summary { min-height: 116px; padding: 14px; }
+  .otc-summary b { margin-top: 17px; font-size: 18px; }
+  .otc-summary-grid .otc-summary:last-child { grid-column: 1 / -1; }
   .otc-status { padding: 12px; }
   .otc-chart-head h2 { font-size: 19px; }
 }

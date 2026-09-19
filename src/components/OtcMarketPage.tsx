@@ -233,28 +233,28 @@ export function OtcMarketPage({ circulatingSupply }: { circulatingSupply: number
 
       <section className="otc-market-links" aria-label="Choose where to trade ZKAS">
         <article className="otc-market-link discord">
-          <span className="otc-market-mark" aria-hidden="true"><MessageCircle size={22} /></span>
+          <span className="otc-market-mark" aria-hidden="true"><MessageCircle size={19} /></span>
           <div className="otc-market-copy">
-            <span>DISCORD OTC MARKET</span>
-            <h2>Trade ZKAS in Discord</h2>
-            <p>Visit the ZKAS OTC channel to view community orders and arrange trades.</p>
-            <small>Current chart and history source</small>
+            <span>DISCORD OTC</span>
+            <h2>ZKAS / KAS</h2>
+            <p>Community orders and completed-trade history</p>
           </div>
+          <span className="otc-venue-status live"><i /> HISTORY SOURCE</span>
           <a href="https://discord.gg/kJCYVtGEe" target="_blank" rel="noopener noreferrer">
-            Open Discord OTC <ExternalLink size={16} />
+            Open market <ExternalLink size={15} />
           </a>
         </article>
 
         <article className="otc-market-link telegram">
-          <span className="otc-market-mark" aria-hidden="true"><Send size={22} /></span>
+          <span className="otc-market-mark" aria-hidden="true"><Send size={19} /></span>
           <div className="otc-market-copy">
-            <span>OFFICIAL TELEGRAM OTC BOT</span>
-            <h2>Trade ZKAS in Telegram</h2>
-            <p>Open the ZKAS OTC bot to place and manage orders directly in Telegram.</p>
-            <small>Automatic market data pending API access</small>
+            <span>TELEGRAM OTC BOT</span>
+            <h2>ZKAS / KAS</h2>
+            <p>Place and manage orders in the official bot</p>
           </div>
+          <span className="otc-venue-status pending">DATA API PENDING</span>
           <a href="https://t.me/ZKas_OTC_bot" target="_blank" rel="noopener noreferrer">
-            Open Telegram OTC <ExternalLink size={16} />
+            Open bot <ExternalLink size={15} />
           </a>
         </article>
       </section>
@@ -360,10 +360,10 @@ export function OtcMarketPage({ circulatingSupply }: { circulatingSupply: number
 
 function OtcSummary({ icon, label, value, detail, tone }: { icon: ReactNode; label: string; value: string; detail: string; tone?: 'positive' | 'negative' }) {
   return (
-    <div className="metric-card otc-summary">
-      <div className="metric-label"><span className="metric-icon">{icon}</span>{label}</div>
-      <div className={`metric-value ${tone || ''}`}>{value}</div>
-      <div className="metric-sub">{detail}</div>
+    <div className={`exchange-metric otc-summary ${tone || ''}`}>
+      <span><i className="otc-summary-icon">{icon}</i>{label}</span>
+      <b>{value}</b>
+      <small>{detail}</small>
     </div>
   );
 }
