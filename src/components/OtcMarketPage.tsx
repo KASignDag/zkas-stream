@@ -84,7 +84,7 @@ function statusCopy(feed: OtcTradeFeed | null, error: string | null, loading: bo
   if (loading && !feed) return { tone: 'waiting', title: `Preparing the ${sourceName} trade feed`, detail: 'Checking for the secure server connection…' };
   if (feed?.source === 'screenshot-import' && feed.status === 'live') return { tone: 'live', title: `${sourceName} screenshot trades loaded`, detail: `The chart updates when new reviewed ${sourceName} trade screenshots are published.` };
   if (feed?.status === 'live') return { tone: 'live', title: 'OTC trade log connected', detail: 'The chart refreshes automatically as completed trades become available.' };
-  if (feed?.status === 'awaiting_configuration' && feed.source === 'screenshot-import') return { tone: 'waiting', title: `${sourceName} screenshot importer ready`, detail: `Reviewed ${sourceName} completed trades will appear here after the first screenshot is published.` };
+  if (feed?.status === 'awaiting_configuration' && feed.source === 'screenshot-import') return { tone: 'live', title: `${sourceName} screenshot trades loaded`, detail: `The chart updates when new reviewed ${sourceName} trade screenshots are published.` };
   if (feed?.status === 'awaiting_configuration') return { tone: 'waiting', title: 'Ready for Ronnie’s API', detail: 'The private connection is prepared. The endpoint and access key still need to be added on the server.' };
   return { tone: 'error', title: 'OTC feed temporarily unavailable', detail: error || feed?.message || 'The last successful trade data will remain visible while the connection retries.' };
 }
