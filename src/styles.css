@@ -1232,6 +1232,20 @@ footer { width: min(1320px, calc(100% - 40px)); margin: 0 auto; padding: 22px 0 
   .otc-market-link > a { grid-column: 1 / -1; }
 }
 @media (max-width: 820px) { .otc-market-links { grid-template-columns: 1fr; } }
+.otc-data-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  padding: 18px 20px;
+  border: 1px solid color-mix(in srgb, #5865f2 30%, var(--border));
+  border-radius: 13px;
+  background: color-mix(in srgb, #5865f2 6%, var(--surface));
+}
+.otc-data-heading > div { min-width: 0; }
+.otc-data-heading h2 { margin: 7px 0 4px; font-size: 20px; letter-spacing: -.4px; }
+.otc-data-heading p { margin: 0; color: var(--muted); font-size: 11px; line-height: 1.5; }
+.otc-data-heading > .otc-source-pill { flex: 0 0 auto; }
 .otc-status {
   display: flex; align-items: center; gap: 12px; min-height: 62px; padding: 13px 16px;
   border: 1px solid var(--border); border-radius: 13px; background: var(--surface);
@@ -1361,6 +1375,7 @@ footer { width: min(1320px, calc(100% - 40px)); margin: 0 auto; padding: 22px 0 
   .otc-summary-grid .otc-summary:last-child { grid-column: 1 / -1; }
   .otc-status { padding: 12px; }
   .otc-chart-head h2 { font-size: 19px; }
+  .otc-data-heading { align-items: flex-start; flex-direction: column; padding: 16px; }
 }
 
 /* Explorer — Kaspa and ZKAS daily network hashrate */

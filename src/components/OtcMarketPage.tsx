@@ -239,7 +239,7 @@ export function OtcMarketPage({ circulatingSupply }: { circulatingSupply: number
             <h2>ZKAS / KAS</h2>
             <p>Community orders and completed-trade history</p>
           </div>
-          <span className="otc-venue-status live"><i /> HISTORY SOURCE</span>
+          <span className="otc-venue-status live"><i /> CHART + HISTORY SOURCE</span>
           <a href="https://discord.gg/kJCYVtGEe" target="_blank" rel="noopener noreferrer">
             Open market <ExternalLink size={15} />
           </a>
@@ -252,30 +252,39 @@ export function OtcMarketPage({ circulatingSupply }: { circulatingSupply: number
             <h2>ZKAS / KAS</h2>
             <p>Place and manage orders in the official bot</p>
           </div>
-          <span className="otc-venue-status pending">DATA API PENDING</span>
+          <span className="otc-venue-status pending">ORDERS ONLY · NOT IN CHART</span>
           <a href="https://t.me/ZKas_OTC_bot" target="_blank" rel="noopener noreferrer">
             Open bot <ExternalLink size={15} />
           </a>
         </article>
       </section>
 
+      <section className="otc-data-heading" aria-labelledby="discord-otc-data-title">
+        <div>
+          <div className="eyebrow"><Activity size={14} /> DISCORD OTC MARKET DATA</div>
+          <h2 id="discord-otc-data-title">Discord price, statistics and chart</h2>
+          <p>Everything below is calculated from reviewed Discord OTC completed trades only. Telegram orders are not included yet.</p>
+        </div>
+        <span className="otc-source-pill">Discord OTC</span>
+      </section>
+
       <div className="otc-price-dock" aria-live="polite">
-        <div><span>ZKAS / KAS OTC</span><small>Completed-trade market</small></div>
+        <div><span>DISCORD OTC · ZKAS / KAS</span><small>Completed-trade market</small></div>
         <div className="otc-price-dock-value"><small>LAST TRADE</small><strong>{priceText(latestMarketPrice)}</strong>{usdPriceText(latestMarketUsd) && <em>≈ {usdPriceText(latestMarketUsd)}</em>}</div>
       </div>
 
       <section className="otc-summary-grid">
-        <OtcSummary icon={<TrendingUp size={18} />} label="Latest ZKAS price" value={priceText(lastPrice)} detail={usdPriceText(zkasUsd) ? `≈ ${usdPriceText(zkasUsd)} USD per ZKAS` : 'ZKAS/KAS · KAS per ZKAS'} />
+        <OtcSummary icon={<TrendingUp size={18} />} label="Latest Discord price" value={priceText(lastPrice)} detail={usdPriceText(zkasUsd) ? `≈ ${usdPriceText(zkasUsd)} USD per ZKAS` : 'ZKAS/KAS · KAS per ZKAS'} />
         <OtcSummary icon={<Activity size={18} />} label={`${range} price change`} value={change === null ? '—' : `${change >= 0 ? '+' : ''}${change.toFixed(2)}%`} detail={rangeLabel(range)} tone={change === null ? undefined : change >= 0 ? 'positive' : 'negative'} />
         <OtcSummary icon={<CircleDollarSign size={18} />} label="Estimated OTC market cap" value={marketCapText(marketCapUsd, 'USD')} detail={marketCapKas === null ? 'Waiting for trade history and supply' : `24H VWAP · ${compactFormat.format(circulatingSupply as number)} circulating`} />
-        <OtcSummary icon={<Coins size={18} />} label="ZKAS volume" value={zkasVolume ? compactFormat.format(zkasVolume) : '—'} detail={`${amountFormat.format(kasVolume)} KAS exchanged`} />
-        <OtcSummary icon={<Clock3 size={18} />} label="Completed trades" value={filteredTrades.length ? amountFormat.format(filteredTrades.length) : '—'} detail={rangeLabel(range)} />
+        <OtcSummary icon={<Coins size={18} />} label="Discord ZKAS volume" value={zkasVolume ? compactFormat.format(zkasVolume) : '—'} detail={`${amountFormat.format(kasVolume)} KAS exchanged`} />
+        <OtcSummary icon={<Clock3 size={18} />} label="Discord completed trades" value={filteredTrades.length ? amountFormat.format(filteredTrades.length) : '—'} detail={rangeLabel(range)} />
       </section>
 
       <section className="panel otc-chart-panel">
         <div className="otc-chart-head">
           <div>
-            <div className="eyebrow"><Activity size={14} /> ZKAS/KAS OTC MARKET</div>
+            <div className="eyebrow"><Activity size={14} /> DISCORD OTC · ZKAS/KAS</div>
             <h2>ZKAS completed trade price</h2>
             <p>Each point shows the price of one ZKAS, quoted in KAS.</p>
             <div className="otc-source-badge">Source: Discord OTC · reviewed trade-log screenshots</div>

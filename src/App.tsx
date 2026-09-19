@@ -600,7 +600,7 @@ const heroDescriptions: Record<Tab, string> = {
   nodes: 'Privacy-aware observations of the public nodes currently visible to the ZKas network scanner.',
   events: 'Recent public block and network activity, organized into stable signals instead of a reconstructed animated DAG.',
   explorer: 'Inspect recent BlockDAG activity, blocks and transactions without exposing shielded addresses, balances or transferred amounts.',
-  otc: 'Completed ZKAS OTC trades, actual traded prices and volume—prepared to update automatically from the private trade-log connection.',
+  otc: 'Current price, statistics, chart and history use reviewed Discord OTC completed trades. Telegram orders are available separately and are not yet included.',
   exchanges: 'Live ZKAS exchange prices, bid and ask liquidity, actual trading volume and real-time market charts.',
   importer: 'Privately read trade-log screenshots, review the detected facts and publish completed trades to the OTC chart.',
   history: 'Chain-derived work history and observer history, kept separate so unavailable historical data is never invented.',
