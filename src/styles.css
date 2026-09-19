@@ -1145,6 +1145,79 @@ footer { width: min(1320px, calc(100% - 40px)); margin: 0 auto; padding: 22px 0 
 
 /* OTC completed-trade market */
 .otc-page { gap: 16px; }
+.otc-telegram-cta {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 15px;
+  padding: 17px 18px;
+  border: 1px solid color-mix(in srgb, #229ed9 34%, var(--border));
+  border-radius: 15px;
+  background: linear-gradient(135deg, color-mix(in srgb, #229ed9 10%, var(--surface)), var(--surface) 68%);
+  box-shadow: 0 8px 24px rgba(5, 23, 18, .07);
+}
+.otc-telegram-mark {
+  display: inline-flex;
+  width: 44px;
+  height: 44px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  color: #fff;
+  background: #229ed9;
+  box-shadow: 0 7px 18px rgba(34, 158, 217, .25);
+}
+.otc-telegram-copy { min-width: 0; }
+.otc-telegram-copy > span {
+  display: block;
+  margin-bottom: 3px;
+  color: #1687bd;
+  font-size: 9px;
+  font-weight: 900;
+  letter-spacing: 1.15px;
+}
+.otc-telegram-copy h2 {
+  margin: 0;
+  color: var(--text);
+  font-size: 17px;
+  letter-spacing: -.25px;
+}
+.otc-telegram-copy p {
+  margin: 4px 0 0;
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.5;
+}
+.otc-telegram-cta > a {
+  display: inline-flex;
+  min-height: 42px;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 0 16px;
+  border-radius: 11px;
+  color: #fff;
+  background: #229ed9;
+  box-shadow: 0 7px 18px rgba(34, 158, 217, .22);
+  font-size: 12px;
+  font-weight: 850;
+  text-decoration: none;
+  white-space: nowrap;
+  transition: transform .16s ease, box-shadow .16s ease, background .16s ease;
+}
+.otc-telegram-cta > a:hover {
+  transform: translateY(-1px);
+  background: #1687bd;
+  box-shadow: 0 10px 22px rgba(34, 158, 217, .28);
+}
+.otc-telegram-cta > a:focus-visible {
+  outline: 3px solid color-mix(in srgb, #229ed9 34%, transparent);
+  outline-offset: 3px;
+}
+@media (max-width: 720px) {
+  .otc-telegram-cta { grid-template-columns: auto minmax(0, 1fr); align-items: start; }
+  .otc-telegram-cta > a { grid-column: 1 / -1; width: 100%; }
+}
 .otc-status {
   display: flex; align-items: center; gap: 12px; min-height: 62px; padding: 13px 16px;
   border: 1px solid var(--border); border-radius: 13px; background: var(--surface);

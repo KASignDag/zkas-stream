@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { Activity, CalendarDays, CircleDollarSign, Clock3, Coins, RefreshCw, TrendingUp, Trophy } from 'lucide-react';
+import { Activity, CalendarDays, CircleDollarSign, Clock3, Coins, ExternalLink, RefreshCw, Send, TrendingUp, Trophy } from 'lucide-react';
 import { fetchKasUsd, fetchOtcTrades, type OtcTrade, type OtcTradeFeed } from '../otc';
 
 type Range = '4H' | '6H' | '1D' | '7D' | 'ALL';
@@ -230,6 +230,18 @@ export function OtcMarketPage({ circulatingSupply }: { circulatingSupply: number
         <div><b>{state.title}</b><span>{state.detail}</span></div>
         <span className="otc-refresh"><RefreshCw size={13} className={loading ? 'spinning' : ''} /> {refreshLabel}</span>
       </div>
+
+      <section className="otc-telegram-cta" aria-label="Official ZKAS Telegram OTC bot">
+        <span className="otc-telegram-mark" aria-hidden="true"><Send size={22} /></span>
+        <div className="otc-telegram-copy">
+          <span>OFFICIAL TELEGRAM OTC BOT</span>
+          <h2>Trade ZKAS in Telegram</h2>
+          <p>Open the ZKAS OTC bot to place and manage trades. This page’s completed-trade chart currently remains sourced from the ZKAS Discord OTC history.</p>
+        </div>
+        <a href="https://t.me/ZKas_OTC_bot" target="_blank" rel="noopener noreferrer">
+          Open OTC bot <ExternalLink size={16} />
+        </a>
+      </section>
 
       <div className="otc-price-dock" aria-live="polite">
         <div><span>ZKAS / KAS OTC</span><small>Completed-trade market</small></div>
