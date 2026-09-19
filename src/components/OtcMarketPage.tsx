@@ -231,7 +231,7 @@ export function OtcMarketPage({ circulatingSupply }: { circulatingSupply: number
         <span className="otc-refresh"><RefreshCw size={13} className={loading ? 'spinning' : ''} /> {refreshLabel}</span>
       </div>
 
-      <section className="otc-market-links" aria-label="Choose where to trade ZKAS">
+      <section className="otc-market-links discord-source" aria-label="Discord OTC data source">
         <article className="otc-market-link discord">
           <span className="otc-market-mark" aria-hidden="true"><MessageCircle size={19} /></span>
           <div className="otc-market-copy">
@@ -245,18 +245,6 @@ export function OtcMarketPage({ circulatingSupply }: { circulatingSupply: number
           </a>
         </article>
 
-        <article className="otc-market-link telegram">
-          <span className="otc-market-mark" aria-hidden="true"><Send size={19} /></span>
-          <div className="otc-market-copy">
-            <span>TELEGRAM OTC BOT</span>
-            <h2>ZKAS / KAS</h2>
-            <p>Place and manage orders in the official bot</p>
-          </div>
-          <span className="otc-venue-status pending">ORDERS ONLY · NOT IN CHART</span>
-          <a href="https://t.me/ZKas_OTC_bot" target="_blank" rel="noopener noreferrer">
-            Open bot <ExternalLink size={15} />
-          </a>
-        </article>
       </section>
 
       <section className="otc-data-heading" aria-labelledby="discord-otc-data-title">
@@ -362,6 +350,19 @@ export function OtcMarketPage({ circulatingSupply }: { circulatingSupply: number
           <span>Trades {orderedTableTrades.length ? activeTradeTablePage * tradesPerPage + 1 : 0}–{Math.min((activeTradeTablePage + 1) * tradesPerPage, orderedTableTrades.length)} of {amountFormat.format(orderedTableTrades.length)}</span>
           <button disabled={activeTradeTablePage >= tradeTablePageCount - 1} onClick={() => setTradeTablePage((page) => Math.min(tradeTablePageCount - 1, page + 1))}>Next</button>
         </div>
+      </section>
+
+      <section className="otc-telegram-section" aria-labelledby="telegram-otc-title">
+        <div className="otc-telegram-section-head">
+          <div className="eyebrow"><Send size={14} /> SEPARATE TELEGRAM ORDER DESK</div>
+          <h2 id="telegram-otc-title">Telegram OTC bot</h2>
+          <p>Open the official Telegram bot to place or manage orders. Telegram data is not used in the Discord chart or completed-trade history above.</p>
+        </div>
+        <a className="otc-telegram-desk" href="https://t.me/ZKas_OTC_bot" target="_blank" rel="noopener noreferrer">
+          <span className="otc-market-mark" aria-hidden="true"><Send size={20} /></span>
+          <span className="otc-telegram-desk-copy"><small>TELEGRAM OTC BOT</small><b>ZKAS / KAS</b><em>Orders only · no Telegram chart data yet</em></span>
+          <span className="otc-telegram-open">Open Telegram bot <ExternalLink size={16} /></span>
+        </a>
       </section>
     </div>
   );
