@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { Activity, CalendarDays, CircleDollarSign, Clock3, Coins, ExternalLink, RefreshCw, Send, TrendingUp, Trophy } from 'lucide-react';
+import { Activity, CalendarDays, CircleDollarSign, Clock3, Coins, ExternalLink, MessageCircle, RefreshCw, Send, TrendingUp, Trophy } from 'lucide-react';
 import { fetchKasUsd, fetchOtcTrades, type OtcTrade, type OtcTradeFeed } from '../otc';
 
 type Range = '4H' | '6H' | '1D' | '7D' | 'ALL';
@@ -231,16 +231,32 @@ export function OtcMarketPage({ circulatingSupply }: { circulatingSupply: number
         <span className="otc-refresh"><RefreshCw size={13} className={loading ? 'spinning' : ''} /> {refreshLabel}</span>
       </div>
 
-      <section className="otc-telegram-cta" aria-label="Official ZKAS Telegram OTC bot">
-        <span className="otc-telegram-mark" aria-hidden="true"><Send size={22} /></span>
-        <div className="otc-telegram-copy">
-          <span>OFFICIAL TELEGRAM OTC BOT</span>
-          <h2>Trade ZKAS in Telegram</h2>
-          <p>Open the ZKAS OTC bot to place and manage trades. This page’s completed-trade chart currently remains sourced from the ZKAS Discord OTC history.</p>
-        </div>
-        <a href="https://t.me/ZKas_OTC_bot" target="_blank" rel="noopener noreferrer">
-          Open OTC bot <ExternalLink size={16} />
-        </a>
+      <section className="otc-market-links" aria-label="Choose where to trade ZKAS">
+        <article className="otc-market-link discord">
+          <span className="otc-market-mark" aria-hidden="true"><MessageCircle size={22} /></span>
+          <div className="otc-market-copy">
+            <span>DISCORD OTC MARKET</span>
+            <h2>Trade ZKAS in Discord</h2>
+            <p>Visit the ZKAS OTC channel to view community orders and arrange trades.</p>
+            <small>Current chart and history source</small>
+          </div>
+          <a href="https://discord.gg/kJCYVtGEe" target="_blank" rel="noopener noreferrer">
+            Open Discord OTC <ExternalLink size={16} />
+          </a>
+        </article>
+
+        <article className="otc-market-link telegram">
+          <span className="otc-market-mark" aria-hidden="true"><Send size={22} /></span>
+          <div className="otc-market-copy">
+            <span>OFFICIAL TELEGRAM OTC BOT</span>
+            <h2>Trade ZKAS in Telegram</h2>
+            <p>Open the ZKAS OTC bot to place and manage orders directly in Telegram.</p>
+            <small>Automatic market data pending API access</small>
+          </div>
+          <a href="https://t.me/ZKas_OTC_bot" target="_blank" rel="noopener noreferrer">
+            Open Telegram OTC <ExternalLink size={16} />
+          </a>
+        </article>
       </section>
 
       <div className="otc-price-dock" aria-live="polite">
@@ -262,6 +278,7 @@ export function OtcMarketPage({ circulatingSupply }: { circulatingSupply: number
             <div className="eyebrow"><Activity size={14} /> ZKAS/KAS OTC MARKET</div>
             <h2>ZKAS completed trade price</h2>
             <p>Each point shows the price of one ZKAS, quoted in KAS.</p>
+            <div className="otc-source-badge">Source: Discord OTC · reviewed trade-log screenshots</div>
           </div>
           <div className="segmented" aria-label="OTC chart time range">
             {(['4H', '6H', '1D', '7D', 'ALL'] as Range[]).map((item) => (
@@ -280,19 +297,20 @@ export function OtcMarketPage({ circulatingSupply }: { circulatingSupply: number
         </div>
         <div className="table-scroll">
           <table>
-            <thead><tr><th>Rank</th><th>Date & time</th><th>ZKAS bought</th><th>Price (KAS per ZKAS)</th><th>Total paid</th><th>Est. USD value</th></tr></thead>
+            <thead><tr><th>Rank</th><th>Date & time</th><th>Source</th><th>ZKAS bought</th><th>Price (KAS per ZKAS)</th><th>Total paid</th><th>Est. USD value</th></tr></thead>
             <tbody>
               {topBuys.map((trade, index) => (
                 <tr key={`top-buy-${trade.timestamp ?? 'undated'}-${index}`}>
                   <td><span className={`otc-rank otc-rank-${index + 1}`}>#{index + 1}</span></td>
                   <td>{dateText(trade.timestamp)}</td>
+                  <td><span className="otc-source-pill">Discord OTC</span></td>
                   <td>{trade.zkasAmount === null ? '—' : amountFormat.format(trade.zkasAmount)}</td>
                   <td>{priceText(trade.priceKas)}</td>
                   <td><b>{amountFormat.format(trade.totalKas as number)} KAS</b></td>
                   <td>{usdValueText(kasUsd === null ? null : (trade.totalKas as number) * kasUsd)}</td>
                 </tr>
               ))}
-              {!topBuys.length && <tr><td colSpan={6} className="empty-cell">Completed buy trades will appear here as they are published.</td></tr>}
+              {!topBuys.length && <tr><td colSpan={7} className="empty-cell">Completed buy trades will appear here as they are published.</td></tr>}
             </tbody>
           </table>
         </div>
@@ -313,11 +331,12 @@ export function OtcMarketPage({ circulatingSupply }: { circulatingSupply: number
         </div>
         <div className="table-scroll">
           <table>
-            <thead><tr><th>Date & time</th><th>Side</th><th>ZKAS amount</th><th>Price (KAS per ZKAS)</th><th>Est. USD per ZKAS</th><th>Total</th></tr></thead>
+            <thead><tr><th>Date & time</th><th>Source</th><th>Side</th><th>ZKAS amount</th><th>Price (KAS per ZKAS)</th><th>Est. USD per ZKAS</th><th>Total</th></tr></thead>
             <tbody>
               {visibleTableTrades.map((trade, index) => (
                 <tr key={`${trade.timestamp ?? 'undated'}-${index}`}>
                   <td>{dateText(trade.timestamp)}</td>
+                  <td><span className="otc-source-pill">Discord OTC</span></td>
                   <td><span className={`otc-side ${trade.side}`}>{trade.side === 'unknown' ? 'Trade' : trade.side}</span></td>
                   <td>{trade.zkasAmount === null ? '—' : amountFormat.format(trade.zkasAmount)}</td>
                   <td>{priceText(trade.priceKas)}</td>
@@ -325,7 +344,7 @@ export function OtcMarketPage({ circulatingSupply }: { circulatingSupply: number
                   <td>{trade.totalKas === null ? '—' : `${amountFormat.format(trade.totalKas)} KAS`}</td>
                 </tr>
               ))}
-              {!tableTrades.length && <tr><td colSpan={6} className="empty-cell">No completed trades were recorded in this time range.</td></tr>}
+              {!tableTrades.length && <tr><td colSpan={7} className="empty-cell">No completed trades were recorded in this time range.</td></tr>}
             </tbody>
           </table>
         </div>
