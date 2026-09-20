@@ -1240,6 +1240,37 @@ footer { width: min(1320px, calc(100% - 40px)); margin: 0 auto; padding: 22px 0 
   .otc-market-link > a { grid-column: 1 / -1; }
 }
 @media (max-width: 820px) { .otc-market-links { grid-template-columns: 1fr; } }
+.otc-verification {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 13px;
+  padding: 15px 17px;
+  border: 1px solid color-mix(in srgb, var(--accent) 32%, var(--border));
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--accent-soft) 52%, var(--surface));
+}
+.otc-verification-icon {
+  display: inline-flex;
+  width: 40px;
+  height: 40px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 13%, var(--surface));
+}
+.otc-verification h2 { margin: 1px 0 5px; color: var(--text); font-size: 15px; letter-spacing: -.2px; }
+.otc-verification p { margin: 3px 0 0; color: var(--muted); font-size: 10px; line-height: 1.55; }
+.otc-verification strong { color: var(--text); }
+.otc-verification code {
+  padding: 2px 5px;
+  border-radius: 5px;
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 10%, var(--surface));
+  font: 800 10px/1.4 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  white-space: nowrap;
+}
+
 .otc-data-heading {
   display: flex;
   align-items: center;
