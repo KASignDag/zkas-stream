@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { Activity, CalendarDays, CircleDollarSign, Clock3, Coins, ExternalLink, MessageCircle, RefreshCw, Send, TrendingUp, Trophy } from 'lucide-react';
+import { Activity, CalendarDays, CircleDollarSign, Clock3, Coins, ExternalLink, MessageCircle, RefreshCw, Send, ShieldCheck, TrendingUp, Trophy } from 'lucide-react';
 import { fetchKasUsd, fetchOtcTrades, type OtcMarketSource, type OtcTrade, type OtcTradeFeed } from '../otc';
 
 type Range = '4H' | '6H' | '1D' | '7D' | 'ALL';
@@ -271,6 +271,15 @@ export function OtcMarketPage({ circulatingSupply }: { circulatingSupply: number
           </a>
         </article>
       </section>
+
+      <aside className="otc-verification" aria-labelledby="otc-verification-title">
+        <span className="otc-verification-icon" aria-hidden="true"><ShieldCheck size={22} /></span>
+        <div>
+          <h2 id="otc-verification-title">Verify before you trade</h2>
+          <p><strong>ZKAS controls both OTC bots.</strong> Open them only through the official Discord and Telegram buttons above, and confirm the Telegram username is exactly <code>@ZKas_OTC_bot</code> before depositing or placing an order.</p>
+          <p>Ignore unsolicited DMs and look-alike groups. Never share your seed phrase or private keys. ZKAS.stream displays market information only and does not custody funds or execute trades.</p>
+        </div>
+      </aside>
 
       <section className="otc-data-heading" aria-labelledby="discord-otc-data-title">
         <div>
