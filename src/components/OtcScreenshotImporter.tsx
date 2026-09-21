@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { CheckCircle2, Eye, FileImage, LockKeyhole, MessageCircle, Plus, ScanText, Send, ShieldCheck, Trash2 } from 'lucide-react';
+import { CheckCircle2, Eye, FileCheck2, FileImage, LockKeyhole, MessageCircle, Plus, ScanText, Send, ShieldCheck, Trash2 } from 'lucide-react';
 import type { OtcMarketSource, OtcTradeSide } from '../otc';
 
 type DraftTrade = {
@@ -12,9 +12,50 @@ type DraftTrade = {
   warning: boolean;
 };
 
+type ReviewedTradeFile = {
+  source: OtcMarketSource;
+  trades: Array<{
+    timestamp: string | number;
+    side: OtcTradeSide;
+    zkasAmount: number;
+    priceKas?: number;
+    totalKas: number;
+  }>;
+};
+
 function blankTrade(): DraftTrade {
   const local = new Date(Date.now() - new Date().getTimezoneOffset() * 60_000).toISOString().slice(0, 16);
   return { id: crypto.randomUUID(), timestamp: local, side: 'unknown', zkasAmount: '', priceKas: '', totalKas: '', warning: false };
+}
+
+function localTimestamp(value: string | number) {
+  const parsed = new Date(value);
+  if (!Number.isFinite(parsed.getTime())) return '';
+  return new Date(parsed.getTime() - parsed.getTimezoneOffset() * 60_000).toISOString().slice(0, 16);
+}
+
+function reviewedRows(payload: ReviewedTradeFile): DraftTrade[] {
+  if (!payload || !Array.isArray(payload.trades) || !['discord', 'telegram'].includes(payload.source)) {
+    throw new Error('This is not a valid reviewed OTC trade file.');
+  }
+  return payload.trades.map((trade) => {
+    const amount = Number(trade.zkasAmount);
+    const total = Number(trade.totalKas);
+    const suppliedPrice = Number(trade.priceKas);
+    const price = suppliedPrice > 0 ? suppliedPrice : total / amount;
+    if (!localTimestamp(trade.timestamp) || amount <= 0 || total <= 0 || price <= 0 || !['buy', 'sell', 'unknown'].includes(trade.side)) {
+      throw new Error('The reviewed trade file contains an invalid row.');
+    }
+    return {
+      id: crypto.randomUUID(),
+      timestamp: localTimestamp(trade.timestamp),
+      side: trade.side,
+      zkasAmount: String(amount),
+      priceKas: String(price),
+      totalKas: String(total),
+      warning: amount < 10,
+    };
+  });
 }
 
 function numberText(value: string | undefined) {
@@ -203,6 +244,26 @@ export function OtcScreenshotImporter() {
     }
   }
 
+  async function loadReviewedUpdate() {
+    setBusy(true);
+    setMessage(null);
+    try {
+      const response = await fetch('/reviewed/discord-otc-2026-09-20.json', { cache: 'no-store' });
+      if (!response.ok) throw new Error('The reviewed update file could not be loaded.');
+      const payload = await response.json() as ReviewedTradeFile;
+      const importedRows = reviewedRows(payload);
+      setSource(payload.source);
+      setRows(importedRows);
+      setFiles([]);
+      setOcrText('');
+      setMessage({ tone: 'success', text: `Loaded ${importedRows.length} reviewed Discord OTC trades. Check the rows below, then publish them.` });
+    } catch (reason) {
+      setMessage({ tone: 'error', text: reason instanceof Error ? reason.message : 'The reviewed update could not be loaded.' });
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function publish() {
     if (!secret || !validRows.length) return;
     setBusy(true);
@@ -252,6 +313,7 @@ export function OtcScreenshotImporter() {
 
       <section className="panel importer-step">
         <div className="importer-step-head"><span>3</span><div><h2>Choose {source === 'telegram' ? 'Telegram' : 'Discord'} trade screenshots</h2><p>PNG, JPEG or WebP. Select several screenshots to process them together.</p></div></div>
+        {source === 'discord' && <button className="importer-primary" disabled={busy} onClick={() => void loadReviewedUpdate()}><FileCheck2 size={17} /> Load 44 reviewed Discord trades</button>}
         <label className="importer-drop"><FileImage size={28} /><b>{files.length ? `${files.length} screenshot${files.length === 1 ? '' : 's'} selected` : 'Choose screenshots'}</b><span>Images stay on this device</span><input type="file" multiple accept="image/png,image/jpeg,image/webp" onChange={(event) => setFiles(Array.from(event.target.files || []).slice(0, 10))} /></label>
         <button className="importer-primary" disabled={!files.length || busy} onClick={() => void scan()}><ScanText size={17} />{busy && progress ? progress : 'Read screenshots'}</button>
       </section>
