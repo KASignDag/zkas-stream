@@ -313,7 +313,7 @@ export function OtcScreenshotImporter() {
 
       <section className="panel importer-step">
         <div className="importer-step-head"><span>3</span><div><h2>Choose {source === 'telegram' ? 'Telegram' : 'Discord'} trade screenshots</h2><p>PNG, JPEG or WebP. Select several screenshots to process them together.</p></div></div>
-        {source === 'discord' && <button className="importer-primary" disabled={busy} onClick={() => void loadReviewedUpdate()}><FileCheck2 size={17} /> Load 40 reviewed Discord trades</button>}
+        {source === 'discord' && <button className="importer-primary" disabled={busy} onClick={() => void loadReviewedUpdate()}><FileCheck2 size={17} /> Load 1 reviewed Discord trade</button>}
         <label className="importer-drop"><FileImage size={28} /><b>{files.length ? `${files.length} screenshot${files.length === 1 ? '' : 's'} selected` : 'Choose screenshots'}</b><span>Images stay on this device</span><input type="file" multiple accept="image/png,image/jpeg,image/webp" onChange={(event) => setFiles(Array.from(event.target.files || []).slice(0, 10))} /></label>
         <button className="importer-primary" disabled={!files.length || busy} onClick={() => void scan()}><ScanText size={17} />{busy && progress ? progress : 'Read screenshots'}</button>
       </section>
