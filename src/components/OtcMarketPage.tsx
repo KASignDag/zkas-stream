@@ -92,7 +92,11 @@ function statusCopy(feed: OtcTradeFeed | null, error: string | null, loading: bo
 function tradeRouteText(trade: OtcTrade) {
   const maker = trade.makerVia === 'telegram' ? 'Telegram' : trade.makerVia === 'discord' ? 'Discord' : null;
   const taker = trade.takerVia === 'telegram' ? 'Telegram' : trade.takerVia === 'discord' ? 'Discord' : null;
-  if (maker && taker && maker !== taker) return `${maker} ↔ ${taker}`;
+  if (maker && taker && maker !== taker) {
+    if (trade.side === 'buy') return `${maker} buyer • ${taker} seller`;
+    if (trade.side === 'sell') return `${maker} seller • ${taker} buyer`;
+    return `${maker} ↔ ${taker}`;
+  }
   return maker || taker || 'Shared OTC';
 }
 
@@ -339,8 +343,8 @@ export function OtcMarketPage({ circulatingSupply, mode = 'separate', previewNot
         <span className="otc-verification-icon" aria-hidden="true"><ShieldCheck size={22} /></span>
         <div>
           <h2 id="otc-verification-title">Verify before you trade</h2>
-          <p><strong>ZKAS controls both OTC bots.</strong> {sharedPreview ? 'They are two official access points to the same shared order book. ' : ''}Open them only through the official Discord and Telegram buttons above, and confirm the Telegram username is exactly <code>@ZKas_OTC_bot</code> before depositing or placing an order.</p>
-          <p>Ignore unsolicited DMs and look-alike groups. Never share your seed phrase or private keys. ZKAS.stream displays market information only and does not custody funds or execute trades.</p>
+          <p><strong>ZKAS controls the official Discord and Telegram OTC bots, both connected to the same order book.</strong> Access them only through the buttons above and verify the Telegram username is <code>@ZKas_OTC_bot</code>.</p>
+          <p>Ignore unsolicited DMs. Never share your seed phrase or private keys. ZKAS.stream displays market data only and never holds funds or executes trades.</p>
         </div>
       </aside>
 
