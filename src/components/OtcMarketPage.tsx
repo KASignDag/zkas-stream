@@ -475,8 +475,7 @@ function OtcOpenOrders({ feed, error, loading }: { feed: OtcOpenOrderFeed | null
   const orderKey = (order: OtcOpenOrder, index: number) => `${order.market}-${order.side}-${order.price}-${order.zkasRemaining}-${index}`;
   const marketOrders = (market: OtcOrderMarket, side: 'buy' | 'sell') => orders
     .filter((order) => order.market === market && order.side === side)
-    .sort((a, b) => side === 'buy' ? b.price - a.price : a.price - b.price)
-    .slice(0, 5);
+    .sort((a, b) => side === 'buy' ? b.price - a.price : a.price - b.price);
   const updated = feed ? new Date(feed.updatedAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', second: '2-digit' }) : null;
 
   return (
