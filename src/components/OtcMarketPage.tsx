@@ -21,6 +21,7 @@ const tradeTableRangeMs: Record<Exclude<TradeTableRange, 'ALL'>, number> = {
 const amountFormat = new Intl.NumberFormat('en-US', { maximumFractionDigits: 2 });
 const compactFormat = new Intl.NumberFormat('en-US', { notation: 'compact', maximumFractionDigits: 2 });
 const tradesPerPage = 20;
+const otcReferralUrl = 'https://zkas.info/otc/trade/invite/F6WL5V';
 
 function priceText(value: number | null) {
   if (value === null || !Number.isFinite(value)) return '—';
@@ -308,7 +309,7 @@ export function OtcMarketPage({ circulatingSupply, mode = 'separate', previewNot
             <p>Community orders and completed-trade history</p>
           </div>
           <span className={`otc-venue-status ${marketSource === 'discord' ? 'live' : ''}`}><i /> {marketSource === 'discord' ? 'VIEWING DATA' : 'VIEW STATS + CHART'}</span>
-          <a href="https://discord.gg/kJCYVtGEe" target="_blank" rel="noopener noreferrer" onClick={(event) => event.stopPropagation()}>
+          <a href={otcReferralUrl} target="_blank" rel="noopener noreferrer" onClick={(event) => event.stopPropagation()}>
             Open Discord <ExternalLink size={15} />
           </a>
         </article>
@@ -321,7 +322,7 @@ export function OtcMarketPage({ circulatingSupply, mode = 'separate', previewNot
             <p>Separate Telegram stats, chart and trade history</p>
           </div>
           <span className={`otc-venue-status ${marketSource === 'telegram' ? 'live' : ''}`}><i /> {marketSource === 'telegram' ? 'VIEWING DATA' : 'VIEW STATS + CHART'}</span>
-          <a href="https://t.me/ZKas_OTC_bot" target="_blank" rel="noopener noreferrer" onClick={(event) => event.stopPropagation()}>
+          <a href={otcReferralUrl} target="_blank" rel="noopener noreferrer" onClick={(event) => event.stopPropagation()}>
             Open Telegram Bot <ExternalLink size={15} />
           </a>
         </article>
@@ -332,10 +333,11 @@ export function OtcMarketPage({ circulatingSupply, mode = 'separate', previewNot
           <div className="eyebrow"><Activity size={14} /> ONE SHARED ZKAS ORDER BOOK</div>
           <h2 id="shared-otc-access-title">Trade through Discord or Telegram</h2>
           <p>Both official bots connect to the same market. The statistics, chart and completed trades below combine that one shared order book.</p>
+          <p className="otc-referral-disclosure">Referral disclosure: OTC trading links include a ZKAS.stream referral code. ZKAS.stream may receive part of the desk fee at no additional cost to the user.</p>
         </div>
         <div className="otc-shared-access-buttons">
-          <a className="discord" href="https://discord.gg/kJCYVtGEe" target="_blank" rel="noopener noreferrer"><MessageCircle size={18} /> Open Discord OTC <ExternalLink size={15} /></a>
-          <a className="telegram" href="https://t.me/ZKas_OTC_bot" target="_blank" rel="noopener noreferrer"><Send size={18} /> Open Telegram Bot <ExternalLink size={15} /></a>
+          <a className="discord" href={otcReferralUrl} target="_blank" rel="noopener noreferrer"><MessageCircle size={18} /> Open Discord OTC <ExternalLink size={15} /></a>
+          <a className="telegram" href={otcReferralUrl} target="_blank" rel="noopener noreferrer"><Send size={18} /> Open Telegram Bot <ExternalLink size={15} /></a>
         </div>
       </section>}
 
@@ -507,11 +509,11 @@ function OtcOpenOrders({ feed, error, loading }: { feed: OtcOpenOrderFeed | null
                       </button>
                       {selected === key && <div className="otc-order-venue">
                         <p>This order is on {order.via === 'telegram' ? 'Telegram OTC' : order.via === 'discord' ? 'Discord OTC' : 'the shared OTC orderbook'}. Open the official bot and select the matching price and amount.</p>
-                        {order.via === 'telegram' && <a href="https://t.me/ZKas_OTC_bot" target="_blank" rel="noopener noreferrer"><Send size={15} /> Open Telegram OTC</a>}
-                        {order.via === 'discord' && <a href="https://discord.gg/kJCYVtGEe" target="_blank" rel="noopener noreferrer"><MessageCircle size={15} /> Open Discord OTC</a>}
+                        {order.via === 'telegram' && <a href={otcReferralUrl} target="_blank" rel="noopener noreferrer"><Send size={15} /> Open Telegram OTC</a>}
+                        {order.via === 'discord' && <a href={otcReferralUrl} target="_blank" rel="noopener noreferrer"><MessageCircle size={15} /> Open Discord OTC</a>}
                         {!order.via && <>
-                          <a href="https://discord.gg/kJCYVtGEe" target="_blank" rel="noopener noreferrer"><MessageCircle size={15} /> Discord OTC</a>
-                          <a href="https://t.me/ZKas_OTC_bot" target="_blank" rel="noopener noreferrer"><Send size={15} /> Telegram OTC</a>
+                          <a href={otcReferralUrl} target="_blank" rel="noopener noreferrer"><MessageCircle size={15} /> Discord OTC</a>
+                          <a href={otcReferralUrl} target="_blank" rel="noopener noreferrer"><Send size={15} /> Telegram OTC</a>
                         </>}
                       </div>}
                     </div>;
