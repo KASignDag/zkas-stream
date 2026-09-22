@@ -96,7 +96,7 @@ function tradeRouteText(trade: OtcTrade) {
   return maker || taker || 'Shared OTC';
 }
 
-export function OtcMarketPage({ circulatingSupply, mode = 'separate' }: { circulatingSupply: number | null; mode?: 'separate' | 'shared-preview' }) {
+export function OtcMarketPage({ circulatingSupply, mode = 'separate', previewNotice = false }: { circulatingSupply: number | null; mode?: 'separate' | 'shared-preview'; previewNotice?: boolean }) {
   const sharedPreview = mode === 'shared-preview';
   const [marketSource, setMarketSource] = useState<OtcMarketSource>('discord');
   const [feed, setFeed] = useState<OtcTradeFeed | null>(null);
@@ -288,7 +288,7 @@ export function OtcMarketPage({ circulatingSupply, mode = 'separate' }: { circul
 
   return (
     <div className="page-stack otc-page">
-      {sharedPreview && <div className="otc-preview-banner"><b>PREVIEW — NOT LIVE</b><span>This new API page does not replace the current OTC page.</span></div>}
+      {sharedPreview && previewNotice && <div className="otc-preview-banner"><b>PREVIEW — NOT LIVE</b><span>This new API page does not replace the current OTC page.</span></div>}
       <div className={`otc-status ${state.tone}`}>
         <span className="otc-status-dot" />
         <div><b>{state.title}</b><span>{state.detail}</span></div>
@@ -348,7 +348,7 @@ export function OtcMarketPage({ circulatingSupply, mode = 'separate' }: { circul
         <div>
           <div className="eyebrow"><Activity size={14} /> {sourceName.toUpperCase()} MARKET DATA</div>
           <h2 id="discord-otc-data-title">{sourceShortName} price, statistics and chart</h2>
-          <p>{sharedPreview ? 'Everything below is calculated from completed trades in the shared ZKAS order book. Open orders remain available only inside the official bots.' : `Everything below is calculated only from reviewed ${sourceName} completed trades. Discord and Telegram histories are stored separately.`}</p>
+          <p>{sharedPreview ? 'Everything below is calculated from completed trades in the shared ZKAS order book. Open orders are displayed below; placement and execution remain inside the official bots.' : `Everything below is calculated only from reviewed ${sourceName} completed trades. Discord and Telegram histories are stored separately.`}</p>
         </div>
         <span className={`otc-source-pill ${sharedPreview ? 'shared' : marketSource}`}>{sourceName}</span>
       </section>

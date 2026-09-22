@@ -602,7 +602,7 @@ const heroDescriptions: Record<Tab, string> = {
   nodes: 'Privacy-aware observations of the public nodes currently visible to the ZKas network scanner.',
   events: 'Recent public block and network activity, organized into stable signals instead of a reconstructed animated DAG.',
   explorer: 'Inspect recent BlockDAG activity, blocks and transactions without exposing shielded addresses, balances or transferred amounts.',
-  otc: 'Choose Discord OTC or Telegram OTC to view separate prices, statistics, charts and completed-trade histories from reviewed screenshots.',
+  otc: 'View the shared ZKAS OTC order book, completed-trade price chart and live buy and sell offers across the official Discord and Telegram bots.',
   otcPreview: 'Preview the unified completed-trade market powered by the shared Discord and Telegram OTC order-book API.',
   exchanges: 'Live ZKAS exchange prices, bid and ask liquidity, actual trading volume and real-time market charts.',
   importer: 'Privately read trade-log screenshots, review the detected facts and publish completed trades to the OTC chart.',
@@ -847,8 +847,8 @@ function App() {
         {tab === 'nodes' && <NodesPage data={data} />}
         {tab === 'events' && <EventsPage data={data} history={history} />}
         {tab === 'explorer' && <ExplorerPage data={data} txs={txs} onSelect={(value) => void doSearch(value)} />}
-        {tab === 'otc' && <OtcMarketPage circulatingSupply={data.supply} />}
-        {tab === 'otcPreview' && <OtcMarketPage circulatingSupply={data.supply} mode="shared-preview" />}
+        {tab === 'otc' && <OtcMarketPage circulatingSupply={data.supply} mode="shared-preview" />}
+        {tab === 'otcPreview' && <OtcMarketPage circulatingSupply={data.supply} mode="shared-preview" previewNotice />}
         {tab === 'exchanges' && <ExchangesPage />}
         {tab === 'importer' && <OtcScreenshotImporter />}
         {tab === 'history' && <HistoryPage data={data} history={history} range={historyRange} onRange={setHistoryRange} />}
