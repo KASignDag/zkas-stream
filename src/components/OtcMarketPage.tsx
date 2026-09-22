@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { Activity, CalendarDays, CircleDollarSign, Clock3, Coins, ExternalLink, MessageCircle, RefreshCw, Send, ShieldCheck, TrendingUp, Trophy } from 'lucide-react';
-import { fetchKasUsd, fetchOtcTrades, fetchSharedOtcTrades, type OtcMarketSource, type OtcTrade, type OtcTradeFeed } from '../otc';
+import { fetchKasUsd, fetchOtcOpenOrders, fetchOtcTrades, fetchSharedOtcTrades, type OtcMarketSource, type OtcOpenOrder, type OtcOpenOrderFeed, type OtcOrderMarket, type OtcTrade, type OtcTradeFeed } from '../otc';
 
 type Range = '4H' | '6H' | '1D' | '7D' | 'ALL';
 type TradeTableRange = '1D' | '3D' | '7D' | 'ALL';
@@ -106,6 +106,9 @@ export function OtcMarketPage({ circulatingSupply, mode = 'separate' }: { circul
   const [tradeTableRange, setTradeTableRange] = useState<TradeTableRange>('1D');
   const [tradeTablePage, setTradeTablePage] = useState(0);
   const [kasUsd, setKasUsd] = useState<number | null>(null);
+  const [orderFeed, setOrderFeed] = useState<OtcOpenOrderFeed | null>(null);
+  const [orderError, setOrderError] = useState<string | null>(null);
+  const [ordersLoading, setOrdersLoading] = useState(sharedPreview);
 
   useEffect(() => {
     let stopped = false;
@@ -163,6 +166,37 @@ export function OtcMarketPage({ circulatingSupply, mode = 'separate' }: { circul
       window.clearInterval(timer);
     };
   }, []);
+
+  useEffect(() => {
+    if (!sharedPreview) return;
+    let stopped = false;
+    let activeController: AbortController | null = null;
+
+    async function refreshOrders() {
+      activeController?.abort();
+      const controller = new AbortController();
+      activeController = controller;
+      try {
+        const next = await fetchOtcOpenOrders(controller.signal);
+        if (stopped) return;
+        setOrderFeed((previous) => next.status === 'live' || !previous ? next : { ...next, orders: previous.orders });
+        setOrderError(null);
+      } catch (reason) {
+        if (controller.signal.aborted || stopped) return;
+        setOrderError(reason instanceof Error ? reason.message : 'Unable to load open ZKAS orders.');
+      } finally {
+        if (!stopped) setOrdersLoading(false);
+      }
+    }
+
+    void refreshOrders();
+    const timer = window.setInterval(refreshOrders, 30_000);
+    return () => {
+      stopped = true;
+      activeController?.abort();
+      window.clearInterval(timer);
+    };
+  }, [sharedPreview]);
 
   const allTrades = useMemo(() => {
     return (feed?.trades ?? [])
@@ -415,7 +449,75 @@ export function OtcMarketPage({ circulatingSupply, mode = 'separate' }: { circul
         </div>
       </section>
 
+      {sharedPreview && <OtcOpenOrders feed={orderFeed} error={orderError} loading={ordersLoading} />}
+
     </div>
+  );
+}
+
+function orderPriceText(value: number, market: OtcOrderMarket) {
+  if (market === 'USD') return `$${value.toLocaleString('en-US', { minimumFractionDigits: value < 0.01 ? 6 : 4, maximumFractionDigits: 8 })}`;
+  return priceText(value);
+}
+
+function orderTotalText(value: number, market: OtcOrderMarket) {
+  if (market === 'USD') return `$${value.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  return `${amountFormat.format(value)} KAS`;
+}
+
+function OtcOpenOrders({ feed, error, loading }: { feed: OtcOpenOrderFeed | null; error: string | null; loading: boolean }) {
+  const [selected, setSelected] = useState<string | null>(null);
+  const orders = feed?.orders ?? [];
+  const orderKey = (order: OtcOpenOrder, index: number) => `${order.market}-${order.side}-${order.price}-${order.zkasRemaining}-${index}`;
+  const marketOrders = (market: OtcOrderMarket, side: 'buy' | 'sell') => orders
+    .filter((order) => order.market === market && order.side === side)
+    .sort((a, b) => side === 'buy' ? b.price - a.price : a.price - b.price)
+    .slice(0, 5);
+  const updated = feed ? new Date(feed.updatedAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', second: '2-digit' }) : null;
+
+  return (
+    <section className="panel otc-open-orders" aria-labelledby="otc-open-orders-title">
+      <div className="panel-head otc-orders-head">
+        <div><span className="panel-icon"><Activity size={20} /></span><div><h2 id="otc-open-orders-title">Open ZKAS buy and sell orders</h2><p>KAS and USD are the payment currencies used to quote each ZKAS order.</p></div></div>
+        <span className="otc-orders-refresh"><RefreshCw size={13} className={loading ? 'spinning' : ''} /> {updated ? `Updated ${updated}` : '30 sec refresh'}</span>
+      </div>
+
+      {error && !orders.length && <div className="otc-orders-empty error"><b>Open orders temporarily unavailable</b><span>{error}</span></div>}
+      {!error && !loading && !orders.length && <div className="otc-orders-empty"><b>No open ZKAS orders right now</b><span>There are currently no open offers in either the ZKAS/KAS or ZKAS/USD market. This section checks again every 30 seconds.</span></div>}
+      {loading && !feed && <div className="otc-orders-empty"><b>Checking for open ZKAS orders…</b><span>Loading the shared order book.</span></div>}
+
+      {!!orders.length && <div className="otc-orders-markets">
+        {(['KAS', 'USD'] as OtcOrderMarket[]).map((market) => (
+          <article className="otc-order-market" key={market}>
+            <div className="otc-order-market-head"><div><span>ZKAS / {market}</span><small>{market === 'USD' ? 'USDT or USDC held at par' : 'Quoted and settled in KAS'}</small></div><b>{orders.filter((order) => order.market === market).length} open</b></div>
+            <div className="otc-order-columns">
+              {(['buy', 'sell'] as const).map((side) => {
+                const sideOrders = marketOrders(market, side);
+                return <div className={`otc-order-side ${side}`} key={side}>
+                  <h3>{side === 'buy' ? 'Buy ZKAS offers' : 'Sell ZKAS offers'}</h3>
+                  <div className="otc-order-labels"><span>Price</span><span>ZKAS left</span><span>Total</span></div>
+                  {sideOrders.map((order, index) => {
+                    const key = orderKey(order, index);
+                    return <div className="otc-order-wrap" key={key}>
+                      <button className="otc-order-row" onClick={() => setSelected((current) => current === key ? null : key)} aria-expanded={selected === key}>
+                        <b>{orderPriceText(order.price, market)}</b><span>{amountFormat.format(order.zkasRemaining)}</span><span>{orderTotalText(order.totalQuote, market)}</span>
+                      </button>
+                      {selected === key && <div className="otc-order-venue">
+                        <p>Open the shared orderbook and select this offer inside the official bot.</p>
+                        <a href="https://discord.gg/kJCYVtGEe" target="_blank" rel="noopener noreferrer"><MessageCircle size={15} /> Discord OTC</a>
+                        <a href="https://t.me/ZKas_OTC_bot" target="_blank" rel="noopener noreferrer"><Send size={15} /> Telegram OTC</a>
+                      </div>}
+                    </div>;
+                  })}
+                  {!sideOrders.length && <div className="otc-order-none">No open {side} offers</div>}
+                </div>;
+              })}
+            </div>
+          </article>
+        ))}
+      </div>}
+      <p className="otc-orders-note">ZKAS.stream displays public order information only. Orders are placed and completed inside the official ZKAS-controlled bots.</p>
+    </section>
   );
 }
 

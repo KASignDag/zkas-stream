@@ -26,6 +26,25 @@ export type OtcTradeFeed = {
   message?: string;
 };
 
+export type OtcOrderMarket = 'KAS' | 'USD';
+
+export type OtcOpenOrder = {
+  market: OtcOrderMarket;
+  side: 'buy' | 'sell';
+  price: number;
+  zkasRemaining: number;
+  totalQuote: number;
+};
+
+export type OtcOpenOrderFeed = {
+  schemaVersion: 1;
+  status: 'live' | 'upstream_unavailable';
+  source: 'shared-otc-api';
+  updatedAt: number;
+  orders: OtcOpenOrder[];
+  message?: string;
+};
+
 const excludedSharedTestTimestamps = new Set([
   1787495298851, 1787497853961, 1787498655454, 1787498871400,
   1787502384097, 1787503314996, 1787503919556, 1789721677580,
@@ -109,6 +128,15 @@ export async function fetchSharedOtcTrades(signal?: AbortSignal): Promise<OtcTra
   }
   const trades = rows.map(normalizeSharedTrade).filter((trade): trade is OtcTrade => trade !== null);
   return { schemaVersion: 1, status: 'live', source: 'shared-otc-api', updatedAt: Date.now(), trades };
+}
+
+export async function fetchOtcOpenOrders(signal?: AbortSignal): Promise<OtcOpenOrderFeed> {
+  const response = await fetch('/api/otc-open-orders', { signal, headers: { Accept: 'application/json' } });
+  const payload = await response.json() as Partial<OtcOpenOrderFeed>;
+  if (payload.schemaVersion === 1 && typeof payload.status === 'string' && typeof payload.updatedAt === 'number' && Array.isArray(payload.orders)) {
+    return payload as OtcOpenOrderFeed;
+  }
+  throw new Error('The open ZKAS order feed returned an unexpected format.');
 }
 
 export async function fetchKasUsd(signal?: AbortSignal): Promise<KasUsdQuote> {

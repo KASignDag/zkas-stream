@@ -1156,10 +1156,46 @@ footer { width: min(1320px, calc(100% - 40px)); margin: 0 auto; padding: 22px 0 
 .otc-shared-access-buttons .discord { color: #5865f2; }
 .otc-shared-access-buttons .telegram { color: #279bd3; }
 .otc-source-pill.shared, .otc-source-badge.shared { color: var(--accent); border-color: color-mix(in srgb, var(--accent) 40%, var(--border)); background: color-mix(in srgb, var(--accent-soft) 75%, var(--surface)); }
+.otc-open-orders { overflow: hidden; padding: 0; }
+.otc-orders-head { padding: 20px 22px; border-bottom: 1px solid var(--border); }
+.otc-orders-refresh { display: inline-flex; align-items: center; gap: 7px; color: var(--muted); font-size: 11px; font-weight: 850; letter-spacing: .03em; white-space: nowrap; }
+.otc-orders-empty { display: grid; place-items: center; min-height: 170px; padding: 32px; text-align: center; background: color-mix(in srgb, var(--accent-soft) 32%, var(--surface)); }
+.otc-orders-empty b { font-size: 18px; }
+.otc-orders-empty span { max-width: 620px; margin-top: 7px; color: var(--muted); line-height: 1.55; }
+.otc-orders-empty.error b { color: var(--danger); }
+.otc-orders-markets { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; padding: 20px; }
+.otc-order-market { overflow: hidden; border: 1px solid var(--border); border-radius: 17px; background: var(--surface); }
+.otc-order-market-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 15px 16px; border-bottom: 1px solid var(--border); background: color-mix(in srgb, var(--accent-soft) 43%, var(--surface)); }
+.otc-order-market-head span { display: block; color: var(--accent); font-size: 13px; font-weight: 900; letter-spacing: .09em; }
+.otc-order-market-head small { display: block; margin-top: 3px; color: var(--muted); font-weight: 700; }
+.otc-order-market-head > b { padding: 6px 9px; border-radius: 999px; color: var(--accent); background: var(--accent-soft); font-size: 11px; }
+.otc-order-columns { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.otc-order-side { min-width: 0; padding: 14px; }
+.otc-order-side + .otc-order-side { border-left: 1px solid var(--border); }
+.otc-order-side h3 { margin: 0 0 10px; font-size: 14px; }
+.otc-order-side.buy h3 { color: #168f67; }
+.otc-order-side.sell h3 { color: #d15454; }
+.otc-order-labels, .otc-order-row { display: grid; grid-template-columns: 1.05fr .9fr .9fr; gap: 8px; align-items: center; }
+.otc-order-labels { padding: 0 9px 6px; color: var(--muted); font-size: 9px; font-weight: 850; letter-spacing: .06em; text-transform: uppercase; }
+.otc-order-labels span:not(:first-child), .otc-order-row span { text-align: right; }
+.otc-order-wrap + .otc-order-wrap { margin-top: 6px; }
+.otc-order-row { width: 100%; padding: 10px 9px; border: 1px solid var(--border); border-radius: 10px; color: var(--text); text-align: left; background: var(--surface); cursor: pointer; }
+.otc-order-row:hover, .otc-order-row[aria-expanded="true"] { border-color: color-mix(in srgb, var(--accent) 52%, var(--border)); background: color-mix(in srgb, var(--accent-soft) 48%, var(--surface)); }
+.otc-order-row b { color: var(--accent); font-size: 12px; }
+.otc-order-row span { overflow: hidden; font-size: 11px; font-weight: 750; text-overflow: ellipsis; white-space: nowrap; }
+.otc-order-venue { display: grid; grid-template-columns: 1fr 1fr; gap: 7px; margin-top: 6px; padding: 10px; border: 1px solid color-mix(in srgb, var(--accent) 28%, var(--border)); border-radius: 10px; background: color-mix(in srgb, var(--accent-soft) 35%, var(--surface)); }
+.otc-order-venue p { grid-column: 1 / -1; margin: 0 0 2px; color: var(--muted); font-size: 10px; line-height: 1.4; }
+.otc-order-venue a { display: inline-flex; align-items: center; justify-content: center; gap: 5px; min-height: 34px; border: 1px solid var(--border); border-radius: 8px; color: var(--accent); font-size: 10px; font-weight: 850; text-decoration: none; background: var(--surface); }
+.otc-order-none { padding: 18px 8px; color: var(--muted); font-size: 11px; font-weight: 700; text-align: center; }
+.otc-orders-note { margin: 0; padding: 0 22px 20px; color: var(--muted); font-size: 10px; font-weight: 700; line-height: 1.5; }
 @media (max-width: 760px) {
   .otc-preview-banner { align-items: flex-start; flex-direction: column; }
   .otc-shared-access { grid-template-columns: 1fr; }
   .otc-shared-access-buttons { min-width: 0; }
+  .otc-orders-markets { grid-template-columns: 1fr; padding: 12px; }
+  .otc-order-columns { grid-template-columns: 1fr; }
+  .otc-order-side + .otc-order-side { border-top: 1px solid var(--border); border-left: 0; }
+  .otc-orders-head { align-items: flex-start; gap: 12px; }
 }
 .otc-market-links {
   display: grid;
