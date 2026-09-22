@@ -30,9 +30,11 @@ function normalizeOrder(row, market) {
   const price = numberish(row.price ?? row.rate ?? row.unitPrice);
   const zkasRemaining = numberish(row.zkasRemaining ?? row.zkas_remaining ?? row.remaining ?? row.zkas ?? row.amount ?? row.quantity);
   let totalQuote = numberish(row.totalQuote ?? row.total_quote ?? row.total ?? row.notional);
+  const viaValue = typeof row.via === 'string' ? row.via.trim().toLowerCase() : '';
+  const via = viaValue === 'discord' || viaValue === 'telegram' ? viaValue : null;
   if (totalQuote === null && price !== null && zkasRemaining !== null) totalQuote = price * zkasRemaining;
   if (side === 'unknown' || price === null || zkasRemaining === null || totalQuote === null) return null;
-  return { market, side, price, zkasRemaining, totalQuote };
+  return { market, side, price, zkasRemaining, totalQuote, via };
 }
 
 function json(body, status = 200) {

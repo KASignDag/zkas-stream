@@ -1186,6 +1186,7 @@ footer { width: min(1320px, calc(100% - 40px)); margin: 0 auto; padding: 22px 0 
 .otc-order-venue { display: grid; grid-template-columns: 1fr 1fr; gap: 7px; margin-top: 6px; padding: 10px; border: 1px solid color-mix(in srgb, var(--accent) 28%, var(--border)); border-radius: 10px; background: color-mix(in srgb, var(--accent-soft) 35%, var(--surface)); }
 .otc-order-venue p { grid-column: 1 / -1; margin: 0 0 2px; color: var(--muted); font-size: 10px; line-height: 1.4; }
 .otc-order-venue a { display: inline-flex; align-items: center; justify-content: center; gap: 5px; min-height: 34px; border: 1px solid var(--border); border-radius: 8px; color: var(--accent); font-size: 10px; font-weight: 850; text-decoration: none; background: var(--surface); }
+.otc-order-venue a:only-of-type { grid-column: 1 / -1; }
 .otc-order-none { padding: 18px 8px; color: var(--muted); font-size: 11px; font-weight: 700; text-align: center; }
 .otc-orders-note { margin: 0; padding: 0 22px 20px; color: var(--muted); font-size: 10px; font-weight: 700; line-height: 1.5; }
 @media (max-width: 760px) {

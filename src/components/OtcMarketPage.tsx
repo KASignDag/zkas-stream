@@ -503,9 +503,13 @@ function OtcOpenOrders({ feed, error, loading }: { feed: OtcOpenOrderFeed | null
                         <b>{orderPriceText(order.price, market)}</b><span>{amountFormat.format(order.zkasRemaining)}</span><span>{orderTotalText(order.totalQuote, market)}</span>
                       </button>
                       {selected === key && <div className="otc-order-venue">
-                        <p>Open the shared orderbook and select this offer inside the official bot.</p>
-                        <a href="https://discord.gg/kJCYVtGEe" target="_blank" rel="noopener noreferrer"><MessageCircle size={15} /> Discord OTC</a>
-                        <a href="https://t.me/ZKas_OTC_bot" target="_blank" rel="noopener noreferrer"><Send size={15} /> Telegram OTC</a>
+                        <p>This order is on {order.via === 'telegram' ? 'Telegram OTC' : order.via === 'discord' ? 'Discord OTC' : 'the shared OTC orderbook'}. Open the official bot and select the matching price and amount.</p>
+                        {order.via === 'telegram' && <a href="https://t.me/ZKas_OTC_bot" target="_blank" rel="noopener noreferrer"><Send size={15} /> Open Telegram OTC</a>}
+                        {order.via === 'discord' && <a href="https://discord.gg/kJCYVtGEe" target="_blank" rel="noopener noreferrer"><MessageCircle size={15} /> Open Discord OTC</a>}
+                        {!order.via && <>
+                          <a href="https://discord.gg/kJCYVtGEe" target="_blank" rel="noopener noreferrer"><MessageCircle size={15} /> Discord OTC</a>
+                          <a href="https://t.me/ZKas_OTC_bot" target="_blank" rel="noopener noreferrer"><Send size={15} /> Telegram OTC</a>
+                        </>}
                       </div>}
                     </div>;
                   })}

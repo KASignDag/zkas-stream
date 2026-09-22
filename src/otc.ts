@@ -34,6 +34,7 @@ export type OtcOpenOrder = {
   price: number;
   zkasRemaining: number;
   totalQuote: number;
+  via: OtcMarketSource | null;
 };
 
 export type OtcOpenOrderFeed = {
