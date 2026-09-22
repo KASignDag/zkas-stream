@@ -380,7 +380,7 @@ export function OtcMarketPage({ circulatingSupply, mode = 'separate' }: { circul
             ))}
           </div>
         </div>
-        <OtcPriceChart trades={pricedTrades} range={range} change={change} zkasUsd={zkasUsd} sourceName={sourceName} />
+        <OtcPriceChart trades={pricedTrades} range={range} change={change} zkasUsd={zkasUsd} sourceName={sourceName} expandedSpacing={sharedPreview} />
         <div className="otc-legend"><span><i className="buy" /> Buy</span><span><i className="sell" /> Sell</span><span><i className="unknown" /> Unclassified trade</span></div>
       </section>
 
@@ -535,7 +535,7 @@ function OtcSummary({ icon, label, value, detail, tone }: { icon: ReactNode; lab
   );
 }
 
-function OtcPriceChart({ trades, range, change, zkasUsd, sourceName }: { trades: OtcTrade[]; range: Range; change: number | null; zkasUsd: number | null; sourceName: string }) {
+function OtcPriceChart({ trades, range, change, zkasUsd, sourceName, expandedSpacing = false }: { trades: OtcTrade[]; range: Range; change: number | null; zkasUsd: number | null; sourceName: string; expandedSpacing?: boolean }) {
   const points = trades
     .map((trade) => ({ trade, value: trade.priceKas }))
     .filter((point): point is { trade: OtcTrade; value: number } => point.value !== null && Number.isFinite(point.value));
@@ -555,8 +555,10 @@ function OtcPriceChart({ trades, range, change, zkasUsd, sourceName }: { trades:
   const right = 108;
   const top = 24;
   const bottom = 52;
-  const preferredPointGap = range === '4H' ? 24 : range === '6H' ? 18 : range === '1D' ? 13 : 9;
-  const minimumPlotWidth = 728;
+  const preferredPointGap = expandedSpacing
+    ? range === '4H' ? 34 : range === '6H' ? 30 : range === '1D' ? 26 : 18
+    : range === '4H' ? 24 : range === '6H' ? 18 : range === '1D' ? 13 : 9;
+  const minimumPlotWidth = expandedSpacing ? 960 : 728;
   const plotWidth = Math.max(minimumPlotWidth, Math.max(1, points.length - 1) * preferredPointGap);
   const width = left + plotWidth + right;
   const height = 360;
