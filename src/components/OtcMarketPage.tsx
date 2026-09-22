@@ -333,7 +333,7 @@ export function OtcMarketPage({ circulatingSupply, mode = 'separate', previewNot
           <div className="eyebrow"><Activity size={14} /> ONE SHARED ZKAS ORDER BOOK</div>
           <h2 id="shared-otc-access-title">Trade through Discord or Telegram</h2>
           <p>Both official bots connect to the same market. The statistics, chart and completed trades below combine that one shared order book.</p>
-          <p className="otc-referral-disclosure">Referral disclosure: OTC trading links include a ZKAS.stream referral code. ZKAS.stream may receive part of the desk fee at no additional cost to the user.</p>
+          <p className="otc-referral-disclosure">Referral disclosure: ZKAS.stream earns a portion of the desk fee when you use these links, at no extra cost to you.</p>
         </div>
         <div className="otc-shared-access-buttons">
           <a className="discord" href={otcReferralUrl} target="_blank" rel="noopener noreferrer"><MessageCircle size={18} /> Open Discord OTC <ExternalLink size={15} /></a>
