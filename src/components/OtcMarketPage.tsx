@@ -22,6 +22,7 @@ const amountFormat = new Intl.NumberFormat('en-US', { maximumFractionDigits: 2 }
 const compactFormat = new Intl.NumberFormat('en-US', { notation: 'compact', maximumFractionDigits: 2 });
 const tradesPerPage = 20;
 const otcReferralUrl = 'https://zkas.info/otc/trade/invite/F6WL5V';
+const otcReservesUrl = 'https://zkas.info/reserves';
 
 function priceText(value: number | null) {
   if (value === null || !Number.isFinite(value)) return '—';
@@ -334,10 +335,12 @@ export function OtcMarketPage({ circulatingSupply, mode = 'separate', previewNot
           <h2 id="shared-otc-access-title">Trade through Discord or Telegram</h2>
           <p>Both official bots connect to the same market. The statistics, chart and completed trades below combine that one shared order book.</p>
           <p className="otc-referral-disclosure">Referral disclosure: ZKAS.stream earns a portion of the desk fee when you use these links, at no extra cost to you.</p>
+          <p className="otc-reserves-disclosure">Growth Fund transparency: View aggregate OTC fees collected, current reserves and reported spending on the ZKAS team’s live dashboard.</p>
         </div>
         <div className="otc-shared-access-buttons">
           <a className="discord" href={otcReferralUrl} target="_blank" rel="noopener noreferrer"><MessageCircle size={18} /> Open Discord OTC <ExternalLink size={15} /></a>
           <a className="telegram" href={otcReferralUrl} target="_blank" rel="noopener noreferrer"><Send size={18} /> Open Telegram Bot <ExternalLink size={15} /></a>
+          <a className="reserves" href={otcReservesUrl} target="_blank" rel="noopener noreferrer"><Coins size={18} /> Growth Fund &amp; Reserves <ExternalLink size={15} /></a>
         </div>
       </section>}
 
