@@ -42,8 +42,9 @@ function Root() {
         }
         .community-mining-fab {
           position: fixed;
-          right: 18px;
-          bottom: 18px;
+          left: 22px;
+          right: auto;
+          bottom: 24px;
           z-index: 40;
           display: inline-flex;
           align-items: center;
@@ -73,20 +74,23 @@ function Root() {
           body:has(.nav.open) .community-mining-fab { display: none; }
           .community-mining-fab {
             left: 12px;
-            right: 12px;
+            right: auto;
             bottom: max(12px, env(safe-area-inset-bottom));
-            min-height: 50px;
-            padding: 12px 18px;
+            width: calc(58vw - 18px);
+            max-width: 230px;
+            min-height: 46px;
+            padding: 10px 12px;
             border-color: rgba(21,154,126,.38);
             background: rgba(8,27,22,.96);
-            font-size: 14px;
+            font-size: 12.5px;
             box-shadow: 0 10px 30px rgba(0,0,0,.2);
+            white-space: nowrap;
           }
         }
       `}</style>
       <a className="community-mining-fab" href="/community-mining.html" aria-label="Open Community Mining live dashboard">
         <span className="community-mining-fab-dot" aria-hidden="true" />
-        Community Mining · Live
+        Community Mining
       </a>
     </>
   );
