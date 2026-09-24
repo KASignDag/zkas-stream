@@ -44,12 +44,21 @@ export function ShareZkasUpdate({ data }: { data: DashboardData }) {
   const canvas=useRef<HTMLCanvasElement|null>(null);
 
   useEffect(()=>{
-    if(!open||community) return;
-    const ctl=new AbortController();
-    fetch('/api/community-mining',{signal:ctl.signal,cache:'no-store'})
-      .then(r=>r.ok?r.json():Promise.reject()).then(setCommunity).catch(()=>undefined);
-    return ()=>ctl.abort();
-  },[open,community]);
+    if(!open) return;
+    let stopped=false;
+    let ctl: AbortController | null=null;
+    const refresh=()=>{
+      ctl?.abort();
+      ctl=new AbortController();
+      fetch('/api/community-mining',{signal:ctl.signal,cache:'no-store'})
+        .then(r=>r.ok?r.json():Promise.reject())
+        .then(body=>{if(!stopped)setCommunity(body as Community);})
+        .catch(()=>undefined);
+    };
+    refresh();
+    const timer=window.setInterval(refresh,15_000);
+    return ()=>{stopped=true;ctl?.abort();window.clearInterval(timer);};
+  },[open]);
 
   useEffect(()=>{
     if(!open) return;
