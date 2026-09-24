@@ -140,7 +140,7 @@ export function ShareZkasUpdate({ data }: { data: DashboardData }) {
       {label:'KAS BLOCKS',value:communities.length?compact(totals.kas):'Loading…'},
     ],
     market:[
-      {label:'ZKAS PRICE',value:usd(exchangePrice??data.priceUsd)},
+      {label:'ZKAS EXCHANGE PRICE',value:usd(exchangePrice??data.priceUsd),tag:'EXCHANGES'},
       {label:'MARKET CAP',value:usd((exchangePrice??data.priceUsd)!==null&&data.supply!==null?(exchangePrice??data.priceUsd)!*data.supply:data.marketCapUsd)},
       {label:'CIRCULATING SUPPLY',value:compact(data.supply)},
       {label:'BLOCK REWARD',value:reward(data.reward)},
