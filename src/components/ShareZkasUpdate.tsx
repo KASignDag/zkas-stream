@@ -153,11 +153,14 @@ export function ShareZkasUpdate({ data }: { data: DashboardData }) {
   function blob(){return new Promise<Blob|null>(resolve=>canvas.current?.toBlob(resolve,'image/png',.96));}
   async function download(){const b=await blob();if(!b)return;const u=URL.createObjectURL(b),a=document.createElement('a');a.href=u;a.download=`zkas-${mode}-update.png`;a.click();setTimeout(()=>URL.revokeObjectURL(u),1000);}
   async function copy(){try{await navigator.clipboard.writeText(caption);setCopied(true);setTimeout(()=>setCopied(false),1600);}catch{}}
+  function postToX(){
+    window.open(`https://x.com/intent/post?text=${encodeURIComponent(caption)}`,'_blank','noopener,noreferrer');
+  }
   async function share(){
     const b=await blob();
     if(b&&navigator.share){const f=new File([b],`zkas-${mode}-update.png`,{type:'image/png'});if(navigator.canShare?.({files:[f]})){await navigator.share({files:[f],text:caption,title:titles[mode]});return;}}
     try{await navigator.clipboard.writeText(caption);}catch{}
-    window.open(`https://x.com/intent/post?text=${encodeURIComponent(caption)}`,'_blank','noopener,noreferrer');
+    postToX();
   }
 
   return <>
@@ -173,9 +176,10 @@ export function ShareZkasUpdate({ data }: { data: DashboardData }) {
         <div className="share-zkas-actions">
           <button onClick={download}><Download size={17}/> Download image</button>
           <button onClick={copy}><Copy size={17}/> {copied?'Copied!':'Copy caption'}</button>
+          <button className="x-post" onClick={postToX}><span className="x-mark">𝕏</span> Post to X</button>
           <button className="primary" onClick={()=>void share()}><Share2 size={17}/> Share</button>
         </div>
-        <small>On desktop, Share opens X with the caption copied; attach the downloaded card. On supported phones, the image can open directly in the system share sheet.</small>
+        <small><b>Post to X</b> opens X with the caption already filled in. <b>Share</b> uses your phone's share sheet and can include the generated image on supported devices.</small>
       </section>
     </div>}
   </>;
