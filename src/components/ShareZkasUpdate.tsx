@@ -37,6 +37,7 @@ function rr(c: CanvasRenderingContext2D,x:number,y:number,w:number,h:number,r:nu
 
 export function ShareZkasUpdate({ data }: { data: DashboardData }) {
   const [open,setOpen]=useState(false);
+  const android=typeof navigator!=='undefined'&&/Android/i.test(navigator.userAgent);
   const [mode,setMode]=useState<Mode>('network');
   const [communities,setCommunities]=useState<Community[]>([]);
   const [exchangePrice,setExchangePrice]=useState<number|null>(null);
@@ -155,7 +156,6 @@ export function ShareZkasUpdate({ data }: { data: DashboardData }) {
   async function copy(){try{await navigator.clipboard.writeText(caption);setCopied(true);setTimeout(()=>setCopied(false),1600);}catch{}}
   function postToX(){
     const webUrl=`https://x.com/intent/post?text=${encodeURIComponent(caption)}`;
-    const android=/Android/i.test(navigator.userAgent);
     const appleMobile=/iPhone|iPad|iPod/i.test(navigator.userAgent);
 
     // Android X can open the legacy compose scheme while dropping its message.
@@ -187,13 +187,15 @@ export function ShareZkasUpdate({ data }: { data: DashboardData }) {
         <div className="share-zkas-head"><div><span>SHARE ZKAS TODAY</span><h2>Create a live ZKAS card</h2></div><button onClick={()=>setOpen(false)} aria-label="Close"><X size={20}/></button></div>
         <div className="share-zkas-tabs">{(['network','mining','community','market'] as Mode[]).map(m=><button key={m} className={mode===m?'active':''} onClick={()=>setMode(m)}>{m}</button>)}</div>
         <canvas ref={canvas} className="share-zkas-canvas"/>
-        <div className="share-zkas-actions">
-          <button onClick={download}><Download size={17}/> Download image</button>
+        <div className={`share-zkas-actions ${android?'android-clean-flow':''}`}>
+          <button onClick={download}><Download size={17}/> {android?'1. Download image':'Download image'}</button>
           <button onClick={copy}><Copy size={17}/> {copied?'Copied!':'Copy caption'}</button>
-          <button className="x-post" onClick={postToX}><span className="x-mark">𝕏</span> Post to X</button>
-          <button className="primary" onClick={()=>void share()}><Share2 size={17}/> Share image + text</button>
+          <button className="x-post" onClick={postToX}><span className="x-mark">𝕏</span> {android?'2. Post to X':'Post to X'}</button>
+          {!android&&<button className="primary" onClick={()=>void share()}><Share2 size={17}/> Share image + text</button>}
         </div>
-        <small><b>Post to X</b> opens a prefilled X composer. <b>Share image + text</b> sends the generated card and caption to your phone's share sheet so you can choose X or another app.</small>
+        {android
+          ? <small className="android-share-help"><b>Android:</b> Download the card, tap <b>Post to X</b> for the prefilled caption, then attach the downloaded image in X. This avoids X Chat.</small>
+          : <small><b>Post to X</b> opens a prefilled X composer. <b>Share image + text</b> sends the generated card and caption to your phone's share sheet so you can choose X or another app.</small>}
       </section>
     </div>}
   </>;
