@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Camera, Copy, Download, Share2, X } from 'lucide-react';
+import { Copy, Download, Share2, X } from 'lucide-react';
 import type { DashboardData } from '../api';
 import './ShareZkasUpdate.css';
 
@@ -195,10 +195,7 @@ export function ShareZkasUpdate({ data }: { data: DashboardData }) {
   }
 
   return <>
-    <section className="share-zkas-strip">
-      <div><span className="share-zkas-eyebrow"><Camera size={16}/> SHARE ZKAS TODAY</span><h2>Turn live ZKAS data into a shareable update.</h2><p>Create a branded card from the public stats already on ZKAS.stream.</p></div>
-      <button className="share-zkas-open" onClick={()=>setOpen(true)}><Share2 size={18}/> Create & share update</button>
-    </section>
+    <button className="share-zkas-fab" onClick={()=>setOpen(true)} aria-label="Create a ZKAS post for X" title="Post ZKAS update to X"><span className="share-zkas-fab-x">𝕏</span><span>Post to X</span></button>
     {open&&<div className="share-zkas-backdrop" onMouseDown={e=>{if(e.target===e.currentTarget)setOpen(false)}}>
       <section className="share-zkas-modal" role="dialog" aria-modal="true" aria-label="Create ZKAS share card">
         <div className="share-zkas-head"><div><span>SHARE ZKAS TODAY</span><h2>Create a live ZKAS card</h2></div><button onClick={()=>setOpen(false)} aria-label="Close"><X size={20}/></button></div>

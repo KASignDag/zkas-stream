@@ -839,8 +839,6 @@ function App() {
         {tab !== 'otc' && tab !== 'otcPreview' && tab !== 'exchanges' && tab !== 'importer' && tab !== 'supporters' && status === 'stale' && <div className="demo-banner"><b>Live refresh delayed.</b> Showing the last good public mainnet snapshot while the API retries. {error && <span>{error}</span>}</div>}
         {tab !== 'otc' && tab !== 'otcPreview' && tab !== 'exchanges' && tab !== 'importer' && tab !== 'supporters' && status === 'connecting' && <div className="demo-banner"><b>Connecting to ZKas mainnet.</b> Waiting for the first public API snapshot. {error && <span>{error}</span>}</div>}
 
-        {tab === 'intelligence' && <ShareZkasUpdate data={data} />}
-
         {tab === 'intelligence' && (
           <IntelligenceHome data={data} txValues={txValues} pulseTimes={pulseTimes} onReference={() => navigateToTab('reference')} />
         )}
@@ -859,6 +857,8 @@ function App() {
         {tab === 'reference' && <ReferencePage data={data} txs={txs} onSelect={(value) => void doSearch(value)} />}
         {tab === 'supporters' && <GenesisSupportersPage />}
       </main>
+
+      <ShareZkasUpdate data={data} />
 
       <footer>
         <div className="footer-brand"><ShieldCheck size={17} /> ZKAS Stream <span>v0.8.0</span></div>
