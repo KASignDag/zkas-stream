@@ -139,7 +139,7 @@ export function ShareZkasUpdate({ data }: { data: DashboardData }) {
     });
     c.fillStyle='#e6ffff';c.font='800 23px system-ui';c.fillText('Privacy by default • Proof-of-work secured • Built for real payments',64,550);
     rr(c,64,586,1072,54,27);c.fillStyle='rgba(44,221,205,.14)';c.fill();c.strokeStyle='rgba(64,240,223,.5)';c.stroke();
-    c.fillStyle='#fff';c.font='800 23px system-ui';c.fillText('Explore live ZKAS data at',92,621);c.fillStyle='#43efdd';c.fillText('zkas.stream',365,621);
+    c.fillStyle='#fff';c.font='800 23px system-ui';const footerLead='Explore live ZKAS data at';c.fillText(footerLead,92,621);const footerLinkX=92+c.measureText(footerLead).width+14;c.fillStyle='#43efdd';c.fillText('zkas.stream',footerLinkX,621);
     c.textAlign='right';c.fillStyle='#94b0b1';c.font='600 14px system-ui';c.fillText('#ZKAS  #Kaspa  #Mining  #Privacy',1108,620);c.textAlign='left';
   }
 
