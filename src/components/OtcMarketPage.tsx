@@ -612,7 +612,12 @@ function OtcPriceChart({ trades, range, change, zkasUsd, sourceName, expandedSpa
                 : max <= 1 ? [0, 0.2, 0.4, 0.6, 0.8, 1]
                   : Array.from({ length: 6 }, (_, index) => (max / 5) * index);
   const grid = [...preferredGridValues].reverse().map((value) => ({ y: yFor(value), value }));
-  const xLabels = [coordinates[0], coordinates[Math.floor((coordinates.length - 1) / 2)], coordinates.at(-1)!];
+  const xLabelCount = range === 'ALL' || range === '7D' ? 6 : range === '1D' ? 5 : 4;
+  const xLabels = Array.from({ length: Math.min(xLabelCount, coordinates.length) }, (_, index) => {
+    if (coordinates.length === 1) return coordinates[0];
+    const position = index / Math.max(1, Math.min(xLabelCount, coordinates.length) - 1);
+    return coordinates[Math.round(position * (coordinates.length - 1))];
+  }).filter((point, index, labels) => index === 0 || point !== labels[index - 1]);
   const plotRight = left + plotWidth;
   const dayGroups = coordinates.reduce<Array<{ key: string; start: number; end: number }>>((groups, point, index) => {
     if (point.trade.timestamp === null) return groups;
@@ -641,9 +646,10 @@ function OtcPriceChart({ trades, range, change, zkasUsd, sourceName, expandedSpa
       <div className="otc-chart-overview">
         <div>
           <strong>ZKAS / KAS</strong>
+          <small>OTC PRICE HISTORY</small>
           <span>{range} &nbsp; {priceText(latest.value)} &nbsp; {usdPriceText(zkasUsd) ? `≈ ${usdPriceText(zkasUsd)}` : ''} &nbsp; {change === null ? '' : `${change >= 0 ? '+' : ''}${change.toFixed(1)}%`}</span>
         </div>
-        <b>{amountFormat.format(points.length)} TRADES{offScaleCount ? ` · ${offScaleCount} OFF SCALE` : ''}</b>
+        <b>{amountFormat.format(points.length)} COMPLETED TRADES{offScaleCount ? ` · ${offScaleCount} OFF SCALE` : ''}</b>
       </div>
       <div className="otc-chart-stage">
         <div className="otc-chart-fixed-axis" aria-hidden="true">
@@ -674,7 +680,7 @@ function OtcPriceChart({ trades, range, change, zkasUsd, sourceName, expandedSpa
         {coordinates.map((point, index) => point.offScale
           ? <path key={`${point.trade.timestamp ?? 'undated'}-${index}`} className={`otc-point ${point.trade.side}`} d={`M ${point.x - 4} ${top + 8} L ${point.x} ${top} L ${point.x + 4} ${top + 8} Z`}><title>{`${dateText(point.trade.timestamp)} · ${priceText(point.value)} · off scale`}</title></path>
           : <circle key={`${point.trade.timestamp ?? 'undated'}-${index}`} className={`otc-point ${point.trade.side}`} cx={point.x} cy={point.y} r="4.5"><title>{`${dateText(point.trade.timestamp)} · ${priceText(point.value)}`}</title></circle>)}
-        {xLabels.map((point, index) => <text key={`${point.trade.timestamp ?? 'undated'}-${index}`} className="otc-axis-label" x={point.x} y={height - 18} textAnchor={index === 0 ? 'start' : index === 2 ? 'end' : 'middle'}>{point.trade.timestamp === null ? `Trade ${index + 1}` : new Date(point.trade.timestamp).toLocaleDateString([], { month: 'short', day: 'numeric' })}</text>)}
+        {xLabels.map((point, index) => <text key={`${point.trade.timestamp ?? 'undated'}-${index}`} className="otc-axis-label" x={point.x} y={height - 18} textAnchor={index === 0 ? 'start' : index === xLabels.length - 1 ? 'end' : 'middle'}>{point.trade.timestamp === null ? `Trade ${index + 1}` : new Date(point.trade.timestamp).toLocaleDateString([], { month: 'short', day: 'numeric' })}</text>)}
           </svg>
         </div>
       </div>
