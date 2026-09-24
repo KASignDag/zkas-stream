@@ -5,7 +5,7 @@ import './ShareZkasUpdate.css';
 
 type Mode = 'network' | 'mining' | 'community' | 'market';
 type Metric = { label: string; value: string };
-type Community = { miners?: Array<{ status: string; hashrateHps: number | null; zkasBlocks: number | null; kasBlocks: number | null }> };
+type Community = { gateway?: string; miners?: Array<{ alias?: string; status: string; hashrateHps: number | null; zkasBlocks: number | null; kasBlocks: number | null }>; lifetimeZkasBlocks?: number | null; lifetimeKasBlocks?: number | null };
 type ExchangeFeed = { ticker?: { lastPrice?: number | null } | null; updatedAt?: number | null };
 
 const titles: Record<Mode, string> = {
@@ -38,7 +38,7 @@ function rr(c: CanvasRenderingContext2D,x:number,y:number,w:number,h:number,r:nu
 export function ShareZkasUpdate({ data }: { data: DashboardData }) {
   const [open,setOpen]=useState(false);
   const [mode,setMode]=useState<Mode>('network');
-  const [community,setCommunity]=useState<Community|null>(null);
+  const [communities,setCommunities]=useState<Community[]>([]);
   const [exchangePrice,setExchangePrice]=useState<number|null>(null);
   const [copied,setCopied]=useState(false);
   const canvas=useRef<HTMLCanvasElement|null>(null);
@@ -47,16 +47,23 @@ export function ShareZkasUpdate({ data }: { data: DashboardData }) {
     if(!open) return;
     let stopped=false;
     let ctl: AbortController | null=null;
-    const refresh=()=>{
+    const refresh=async()=>{
       ctl?.abort();
       ctl=new AbortController();
-      fetch('/api/community-mining',{signal:ctl.signal,cache:'no-store'})
-        .then(r=>r.ok?r.json():Promise.reject())
-        .then(body=>{if(!stopped)setCommunity(body as Community);})
-        .catch(()=>undefined);
+      const urls=['/api/community-mining?gateway=community','/api/community-mining?gateway=community-107'];
+      const results=await Promise.allSettled(urls.map(async url=>{
+        const response=await fetch(url,{signal:ctl!.signal,cache:'no-store'});
+        if(!response.ok) throw new Error('Community gateway unavailable');
+        return await response.json() as Community;
+      }));
+      if(stopped||ctl.signal.aborted) return;
+      const live=results
+        .filter((result): result is PromiseFulfilledResult<Community>=>result.status==='fulfilled')
+        .map(result=>result.value);
+      if(live.length)setCommunities(live);
     };
-    refresh();
-    const timer=window.setInterval(refresh,15_000);
+    void refresh();
+    const timer=window.setInterval(()=>void refresh(),15_000);
     return ()=>{stopped=true;ctl?.abort();window.clearInterval(timer);};
   },[open]);
 
@@ -78,14 +85,14 @@ export function ShareZkasUpdate({ data }: { data: DashboardData }) {
   },[open]);
 
   const totals=useMemo(()=>{
-    const miners=community?.miners??[];
+    const miners=communities.flatMap(snapshot=>snapshot.miners??[]);
     return {
       online: miners.filter(m=>m.status==='online').length,
-      hashrate: miners.reduce((s,m)=>s+(m.hashrateHps??0),0),
-      zkas: miners.reduce((s,m)=>s+(m.zkasBlocks??0),0),
-      kas: miners.reduce((s,m)=>s+(m.kasBlocks??0),0),
+      hashrate: miners.filter(m=>m.status==='online').reduce((sum,m)=>sum+(m.hashrateHps??0),0),
+      zkas: communities.reduce((sum,snapshot)=>sum+(snapshot.lifetimeZkasBlocks??0),0),
+      kas: communities.reduce((sum,snapshot)=>sum+(snapshot.lifetimeKasBlocks??0),0),
     };
-  },[community]);
+  },[communities]);
 
   const all=useMemo<Record<Mode,Metric[]>>(()=>({
     network:[
@@ -101,10 +108,10 @@ export function ShareZkasUpdate({ data }: { data: DashboardData }) {
       {label:'DIFFICULTY',value:compact(data.difficulty)},
     ],
     community:[
-      {label:'ONLINE MINERS',value:community?String(totals.online):'Loading…'},
-      {label:'COMBINED HASHRATE',value:community?hash(totals.hashrate):'Loading…'},
-      {label:'ZKAS BLOCKS',value:community?compact(totals.zkas):'Loading…'},
-      {label:'KAS BLOCKS',value:community?compact(totals.kas):'Loading…'},
+      {label:'ONLINE MINERS',value:communities.length?String(totals.online):'Loading…'},
+      {label:'COMBINED HASHRATE',value:communities.length?hash(totals.hashrate):'Loading…'},
+      {label:'ZKAS BLOCKS',value:communities.length?compact(totals.zkas):'Loading…'},
+      {label:'KAS BLOCKS',value:communities.length?compact(totals.kas):'Loading…'},
     ],
     market:[
       {label:'ZKAS PRICE',value:usd(exchangePrice??data.priceUsd)},
@@ -112,7 +119,7 @@ export function ShareZkasUpdate({ data }: { data: DashboardData }) {
       {label:'CIRCULATING SUPPLY',value:compact(data.supply)},
       {label:'BLOCK REWARD',value:reward(data.reward)},
     ],
-  }),[data,community,totals,exchangePrice]);
+  }),[data,communities,totals,exchangePrice]);
 
   const caption=useMemo(()=>[
     mode==='community'?'⛏️ ZKAS Community Mining update':mode==='mining'?'⛏️ ZKAS mining update':mode==='market'?'📊 ZKAS market snapshot':'⚡ ZKAS network update',
