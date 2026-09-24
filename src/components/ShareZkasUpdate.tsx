@@ -191,9 +191,9 @@ export function ShareZkasUpdate({ data }: { data: DashboardData }) {
           <button onClick={download}><Download size={17}/> Download image</button>
           <button onClick={copy}><Copy size={17}/> {copied?'Copied!':'Copy caption'}</button>
           <button className="x-post" onClick={postToX}><span className="x-mark">𝕏</span> Post to X</button>
-          <button className="primary" onClick={()=>void share()}><Share2 size={17}/> Share</button>
+          <button className="primary" onClick={()=>void share()}><Share2 size={17}/> Share image + text</button>
         </div>
-        <small><b>Post to X</b> opens a prefilled X composer. Android uses X's web composer so the caption is preserved; iPhone attempts the X app. <b>Share</b> uses your phone's share sheet and can include the generated image.</small>
+        <small><b>Post to X</b> opens a prefilled X composer. <b>Share image + text</b> sends the generated card and caption to your phone's share sheet so you can choose X or another app.</small>
       </section>
     </div>}
   </>;
