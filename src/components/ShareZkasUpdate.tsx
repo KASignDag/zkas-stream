@@ -161,18 +161,9 @@ export function ShareZkasUpdate({ data }: { data: DashboardData }) {
       return;
     }
 
-    // X still supports the long-standing Twitter compose URL scheme on its
-    // iOS/Android apps. Try the installed app first, then fall back to X web
-    // if the device/browser does not hand the custom scheme to the app.
-    const appUrl=`twitter://post?message=${encodeURIComponent(caption)}`;
-    let leftPage=false;
-    const onVisibility=()=>{if(document.hidden)leftPage=true;};
-    document.addEventListener('visibilitychange',onVisibility,{once:true});
-    window.location.href=appUrl;
-    window.setTimeout(()=>{
-      document.removeEventListener('visibilitychange',onVisibility);
-      if(!leftPage&&!document.hidden)window.location.href=webUrl;
-    },1200);
+    // Avoid a timed web fallback on phones: iOS can suspend this page during
+    // the app handoff and resume the timer later, pulling the user back to Safari.
+    window.location.href=`twitter://post?message=${encodeURIComponent(caption)}`;
   }
   async function share(){
     const b=await blob();
@@ -197,7 +188,7 @@ export function ShareZkasUpdate({ data }: { data: DashboardData }) {
           <button className="x-post" onClick={postToX}><span className="x-mark">𝕏</span> Post to X</button>
           <button className="primary" onClick={()=>void share()}><Share2 size={17}/> Share</button>
         </div>
-        <small><b>Post to X</b> tries the X app first on iPhone and Android, then falls back to X in your browser. <b>Share</b> uses your phone's share sheet and can include the generated image on supported devices.</small>
+        <small><b>Post to X</b> opens the X app directly on iPhone and Android. On desktop it opens X in your browser. <b>Share</b> uses your phone's share sheet and can include the generated image.</small>
       </section>
     </div>}
   </>;
