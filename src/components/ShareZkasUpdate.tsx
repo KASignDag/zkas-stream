@@ -143,7 +143,6 @@ export function ShareZkasUpdate({ data }: { data: DashboardData }) {
       {label:'ZKAS EXCHANGE PRICE',value:usd(exchangePrice??data.priceUsd),tag:'EXCHANGES'},
       {label:'MARKET CAP',value:usd((exchangePrice??data.priceUsd)!==null&&data.supply!==null?(exchangePrice??data.priceUsd)!*data.supply:data.marketCapUsd)},
       {label:'CIRCULATING SUPPLY',value:compact(data.supply)},
-      {label:'BLOCK REWARD',value:reward(data.reward)},
       {label:'24H VOLUME',value:combinedVolume24h===null?'—':`${compact(combinedVolume24h)} ZKAS`,tag:'OTC + EXCHANGES'},
     ],
   }),[data,communities,totals,exchangePrice,combinedVolume24h]);
