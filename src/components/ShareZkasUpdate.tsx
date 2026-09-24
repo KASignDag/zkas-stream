@@ -155,15 +155,20 @@ export function ShareZkasUpdate({ data }: { data: DashboardData }) {
   async function copy(){try{await navigator.clipboard.writeText(caption);setCopied(true);setTimeout(()=>setCopied(false),1600);}catch{}}
   function postToX(){
     const webUrl=`https://x.com/intent/post?text=${encodeURIComponent(caption)}`;
-    const mobile=/Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
-    if(!mobile){
-      window.open(webUrl,'_blank','noopener,noreferrer');
+    const android=/Android/i.test(navigator.userAgent);
+    const appleMobile=/iPhone|iPad|iPod/i.test(navigator.userAgent);
+
+    // Android X can open the legacy compose scheme while dropping its message.
+    // Use X's web intent there so the generated caption is preserved.
+    if(android){
+      window.location.href=webUrl;
       return;
     }
-
-    // Avoid a timed web fallback on phones: iOS can suspend this page during
-    // the app handoff and resume the timer later, pulling the user back to Safari.
-    window.location.href=`twitter://post?message=${encodeURIComponent(caption)}`;
+    if(appleMobile){
+      window.location.href=`twitter://post?message=${encodeURIComponent(caption)}`;
+      return;
+    }
+    window.open(webUrl,'_blank','noopener,noreferrer');
   }
   async function share(){
     const b=await blob();
@@ -188,7 +193,7 @@ export function ShareZkasUpdate({ data }: { data: DashboardData }) {
           <button className="x-post" onClick={postToX}><span className="x-mark">𝕏</span> Post to X</button>
           <button className="primary" onClick={()=>void share()}><Share2 size={17}/> Share</button>
         </div>
-        <small><b>Post to X</b> opens the X app directly on iPhone and Android. On desktop it opens X in your browser. <b>Share</b> uses your phone's share sheet and can include the generated image.</small>
+        <small><b>Post to X</b> opens a prefilled X composer. Android uses X's web composer so the caption is preserved; iPhone attempts the X app. <b>Share</b> uses your phone's share sheet and can include the generated image.</small>
       </section>
     </div>}
   </>;
