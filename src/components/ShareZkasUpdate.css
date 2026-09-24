@@ -9,3 +9,8 @@
 .share-zkas-canvas{display:block;width:100%;height:auto;aspect-ratio:16/9;border-radius:16px;border:1px solid rgba(58,221,207,.28);background:#071519}
 .share-zkas-actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:15px}.share-zkas-actions button{background:rgba(12,34,38,.96);color:#f2ffff;border-color:rgba(58,226,211,.55);opacity:1}.share-zkas-actions button:hover{background:rgba(24,58,62,.98);color:#fff;border-color:rgba(73,238,222,.8)}.share-zkas-actions button.x-post{background:#080b0c;color:#fff;border-color:rgba(255,255,255,.3)}.share-zkas-actions button.x-post:hover{background:#15191b;border-color:rgba(255,255,255,.55)}.share-zkas-actions .x-mark{font-size:19px;line-height:1;font-weight:800}.share-zkas-actions button.primary{background:linear-gradient(135deg,#12a997,#167f91);color:#fff;border:0}.share-zkas-modal>small{display:block;margin-top:11px;color:var(--muted);line-height:1.45}
 @media(max-width:720px){.share-zkas-strip{align-items:flex-start;flex-direction:column}.share-zkas-open{width:100%}.share-zkas-backdrop{padding:10px}.share-zkas-modal{padding:15px;border-radius:16px}.share-zkas-actions{display:grid;grid-template-columns:1fr}.share-zkas-actions button{width:100%}}
+
+.share-zkas-actions.android-clean-flow{display:grid;grid-template-columns:1fr 1fr}
+.share-zkas-actions.android-clean-flow button{width:100%}
+.android-share-help{padding:10px 12px;border:1px solid rgba(58,226,211,.25);border-radius:10px;background:rgba(20,70,70,.12)}
+@media(max-width:720px){.share-zkas-actions.android-clean-flow{grid-template-columns:1fr}.share-zkas-actions.android-clean-flow .x-post{order:2}}
