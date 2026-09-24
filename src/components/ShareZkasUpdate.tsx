@@ -42,6 +42,8 @@ export function ShareZkasUpdate({ data }: { data: DashboardData }) {
   const [communities,setCommunities]=useState<Community[]>([]);
   const [exchangePrice,setExchangePrice]=useState<number|null>(null);
   const [copied,setCopied]=useState(false);
+  const [imageCopied,setImageCopied]=useState(false);
+  const [imageCopyFailed,setImageCopyFailed]=useState(false);
   const canvas=useRef<HTMLCanvasElement|null>(null);
 
   useEffect(()=>{
@@ -154,6 +156,21 @@ export function ShareZkasUpdate({ data }: { data: DashboardData }) {
   function blob(){return new Promise<Blob|null>(resolve=>canvas.current?.toBlob(resolve,'image/png',.96));}
   async function download(){const b=await blob();if(!b)return;const u=URL.createObjectURL(b),a=document.createElement('a');a.href=u;a.download=`zkas-${mode}-update.png`;a.click();setTimeout(()=>URL.revokeObjectURL(u),1000);}
   async function copy(){try{await navigator.clipboard.writeText(caption);setCopied(true);setTimeout(()=>setCopied(false),1600);}catch{}}
+  async function copyImage(){
+    setImageCopyFailed(false);
+    const b=await blob();
+    if(!b)return;
+    try{
+      const ClipboardItemCtor=(window as typeof window & {ClipboardItem?: typeof ClipboardItem}).ClipboardItem;
+      if(!ClipboardItemCtor||!navigator.clipboard?.write)throw new Error('Image clipboard unavailable');
+      await navigator.clipboard.write([new ClipboardItemCtor({'image/png':b})]);
+      setImageCopied(true);
+      setTimeout(()=>setImageCopied(false),2200);
+    }catch{
+      setImageCopyFailed(true);
+      setTimeout(()=>setImageCopyFailed(false),3500);
+    }
+  }
   function postToX(){
     const webUrl=`https://x.com/intent/post?text=${encodeURIComponent(caption)}`;
     const appleMobile=/iPhone|iPad|iPod/i.test(navigator.userAgent);
@@ -188,13 +205,14 @@ export function ShareZkasUpdate({ data }: { data: DashboardData }) {
         <div className="share-zkas-tabs">{(['network','mining','community','market'] as Mode[]).map(m=><button key={m} className={mode===m?'active':''} onClick={()=>setMode(m)}>{m}</button>)}</div>
         <canvas ref={canvas} className="share-zkas-canvas"/>
         <div className={`share-zkas-actions ${android?'android-clean-flow':''}`}>
-          <button onClick={download}><Download size={17}/> {android?'1. Download image':'Download image'}</button>
+          {android&&<button onClick={()=>void copyImage()}><Copy size={17}/> {imageCopied?'Image copied!':'1. Copy image'}</button>}
+          <button onClick={download}><Download size={17}/> {android?'Download image':'Download image'}</button>
           <button onClick={copy}><Copy size={17}/> {copied?'Copied!':'Copy caption'}</button>
           <button className="x-post" onClick={postToX}><span className="x-mark">𝕏</span> {android?'2. Post to X':'Post to X'}</button>
           {!android&&<button className="primary" onClick={()=>void share()}><Share2 size={17}/> Share image + text</button>}
         </div>
         {android
-          ? <small className="android-share-help"><b>Android:</b> Download the card, tap <b>Post to X</b> for the prefilled caption, then attach the downloaded image in X. This avoids X Chat.</small>
+          ? <small className="android-share-help"><b>Android test:</b> Tap <b>Copy image</b>, then <b>Post to X</b>. In X, long-press and choose <b>Paste</b>. {imageCopyFailed&&<strong>Image copy is not supported by this browser — use Download image instead.</strong>}</small>
           : <small><b>Post to X</b> opens a prefilled X composer. <b>Share image + text</b> sends the generated card and caption to your phone's share sheet so you can choose X or another app.</small>}
       </section>
     </div>}
