@@ -53,7 +53,8 @@ import { SparkChart } from './components/SparkChart';
 import { GenesisSupportersPage } from './components/GenesisSupportersPage';
 import { MiningPayoutRanking } from './components/MiningPayoutRanking';
 import { ExchangesPage } from './components/ExchangesPage';
-import { NetworkMap } from './components/NetworkMap';\nimport { ShareZkasUpdate } from './components/ShareZkasUpdate';
+import { NetworkMap } from './components/NetworkMap';
+import { ShareZkasUpdate } from './components/ShareZkasUpdate';
 import { useGenesisArchive } from './genesisHistory';
 
 type Tab = 'intelligence' | 'merged' | 'health' | 'nodes' | 'events' | 'explorer' | 'otc' | 'otcPreview' | 'exchanges' | 'importer' | 'history' | 'supply' | 'reference' | 'supporters';
