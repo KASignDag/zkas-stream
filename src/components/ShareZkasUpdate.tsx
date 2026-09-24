@@ -4,9 +4,10 @@ import type { DashboardData } from '../api';
 import './ShareZkasUpdate.css';
 
 type Mode = 'network' | 'mining' | 'community' | 'market';
-type Metric = { label: string; value: string };
+type Metric = { label: string; value: string; tag?: string };
 type Community = { gateway?: string; miners?: Array<{ alias?: string; status: string; hashrateHps: number | null; zkasBlocks: number | null; kasBlocks: number | null }>; lifetimeZkasBlocks?: number | null; lifetimeKasBlocks?: number | null };
-type ExchangeFeed = { ticker?: { lastPrice?: number | null } | null; updatedAt?: number | null };
+type ExchangeFeed = { ticker?: { lastPrice?: number | null; volume24h?: number | null } | null; updatedAt?: number | null };
+type OtcFeed = { trades?: Array<{ timestamp?: number | null; zkasAmount?: number | null }> };
 
 const titles: Record<Mode, string> = {
   network: 'ZKAS NETWORK TODAY',
@@ -41,6 +42,7 @@ export function ShareZkasUpdate({ data }: { data: DashboardData }) {
   const [mode,setMode]=useState<Mode>('network');
   const [communities,setCommunities]=useState<Community[]>([]);
   const [exchangePrice,setExchangePrice]=useState<number|null>(null);
+  const [combinedVolume24h,setCombinedVolume24h]=useState<number|null>(null);
   const [copied,setCopied]=useState(false);
   const [imageCopied,setImageCopied]=useState(false);
   const [imageCopyFailed,setImageCopyFailed]=useState(false);
@@ -73,16 +75,37 @@ export function ShareZkasUpdate({ data }: { data: DashboardData }) {
   useEffect(()=>{
     if(!open) return;
     const ctl=new AbortController();
-    Promise.allSettled(['neoxex','noirtrade'].map(async exchange=>{
+    const exchangeRequests=['neoxex','noirtrade'].map(async exchange=>{
       const response=await fetch(`/api/exchange-market?exchange=${exchange}&pair=ZKAS_USDT&interval=15m`,{signal:ctl.signal,cache:'no-store'});
       if(!response.ok) throw new Error('Exchange feed unavailable');
       return await response.json() as ExchangeFeed;
-    })).then(results=>{
-      const prices=results
+    });
+    const otcRequest=fetch('/api/otc-shared-trades',{signal:ctl.signal,cache:'no-store'})
+      .then(response=>response.ok?response.json() as Promise<OtcFeed>:Promise.reject(new Error('OTC feed unavailable')));
+    Promise.allSettled([...exchangeRequests,otcRequest]).then(results=>{
+      const exchangeResults=results.slice(0,2)
         .filter((result): result is PromiseFulfilledResult<ExchangeFeed>=>result.status==='fulfilled')
-        .map(result=>result.value.ticker?.lastPrice)
+        .map(result=>result.value);
+      const prices=exchangeResults
+        .map(result=>result.ticker?.lastPrice)
         .filter((price): price is number=>typeof price==='number'&&Number.isFinite(price)&&price>0);
-      if(prices.length) setExchangePrice(prices[0]);
+      if(prices.length)setExchangePrice(prices[0]);
+
+      const exchangeVolume=exchangeResults.reduce((sum,result)=>{
+        const volume=result.ticker?.volume24h;
+        return sum+(typeof volume==='number'&&Number.isFinite(volume)&&volume>0?volume:0);
+      },0);
+      const otcResult=results[2];
+      let otcVolume=0;
+      if(otcResult?.status==='fulfilled'){
+        const cutoff=Date.now()-86_400_000;
+        otcVolume=(otcResult.value as OtcFeed).trades?.reduce((sum,trade)=>{
+          const timestamp=trade.timestamp;
+          const amount=trade.zkasAmount;
+          return sum+(typeof timestamp==='number'&&timestamp>=cutoff&&typeof amount==='number'&&Number.isFinite(amount)&&amount>0?amount:0);
+        },0)??0;
+      }
+      if(exchangeResults.length||(otcResult&&otcResult.status==='fulfilled'))setCombinedVolume24h(exchangeVolume+otcVolume);
     }).catch(()=>undefined);
     return ()=>ctl.abort();
   },[open]);
@@ -121,8 +144,9 @@ export function ShareZkasUpdate({ data }: { data: DashboardData }) {
       {label:'MARKET CAP',value:usd((exchangePrice??data.priceUsd)!==null&&data.supply!==null?(exchangePrice??data.priceUsd)!*data.supply:data.marketCapUsd)},
       {label:'CIRCULATING SUPPLY',value:compact(data.supply)},
       {label:'BLOCK REWARD',value:reward(data.reward)},
+      {label:'24H VOLUME',value:combinedVolume24h===null?'—':`${compact(combinedVolume24h)} ZKAS`,tag:'OTC + EXCHANGES'},
     ],
-  }),[data,communities,totals,exchangePrice]);
+  }),[data,communities,totals,exchangePrice,combinedVolume24h]);
 
   const caption=useMemo(()=>[
     mode==='community'?'⛏️ ZKAS Community Mining update':mode==='mining'?'⛏️ ZKAS mining update':mode==='market'?'📊 ZKAS market snapshot':'⚡ ZKAS network update',
@@ -141,11 +165,14 @@ export function ShareZkasUpdate({ data }: { data: DashboardData }) {
     c.font='600 15px system-ui';c.fillStyle='#8ca9aa';c.fillText('PUBLIC NETWORK INTELLIGENCE',180,116);
     c.textAlign='right';c.fillStyle='#70fff0';c.font='700 16px system-ui';c.fillText('LIVE • PUBLIC • SHAREABLE',1136,76);c.textAlign='left';
     c.fillStyle='#fff';c.font='900 55px system-ui';c.fillText(titles[mode],64,215);c.fillStyle='#35ead8';c.fillRect(64,235,180,5);
+    const cardCount=all[mode].length;
+    const cardGap=cardCount>4?16:24;
+    const cardW=(1072-cardGap*(cardCount-1))/cardCount;
     all[mode].forEach((m,i)=>{
-      const x=64+i*274,y=290,w=250,h=190;rr(c,x,y,w,h,22);c.fillStyle='rgba(3,17,21,.9)';c.fill();c.strokeStyle=i%2?'rgba(105,166,255,.55)':'rgba(53,234,216,.7)';c.lineWidth=2;c.stroke();
-      c.fillStyle='#86a7a8';c.font='700 14px system-ui';c.fillText(m.label,x+22,y+42);
-      c.fillStyle='#fff';c.font='800 29px system-ui';c.fillText(m.value.slice(0,18),x+22,y+98);
-      c.fillStyle='#3cebd9';c.font='700 13px system-ui';c.fillText('ZKAS MAINNET',x+22,y+152);
+      const x=64+i*(cardW+cardGap),y=290,w=cardW,h=190;rr(c,x,y,w,h,22);c.fillStyle='rgba(3,17,21,.9)';c.fill();c.strokeStyle=i%2?'rgba(105,166,255,.55)':'rgba(53,234,216,.7)';c.lineWidth=2;c.stroke();
+      c.fillStyle='#86a7a8';c.font=`700 ${cardCount>4?12:14}px system-ui`;c.fillText(m.label,x+18,y+42);
+      c.fillStyle='#fff';c.font=`800 ${cardCount>4?24:29}px system-ui`;c.fillText(m.value.slice(0,18),x+18,y+98);
+      c.fillStyle='#3cebd9';c.font=`700 ${cardCount>4?11:13}px system-ui`;c.fillText(m.tag??'ZKAS MAINNET',x+18,y+152);
     });
     c.fillStyle='#e6ffff';c.font='800 23px system-ui';c.fillText('Privacy by default • Proof-of-work secured • Built for real payments',64,550);
     rr(c,64,586,1072,54,27);c.fillStyle='rgba(44,221,205,.14)';c.fill();c.strokeStyle='rgba(64,240,223,.5)';c.stroke();
