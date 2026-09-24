@@ -54,6 +54,7 @@ import { GenesisSupportersPage } from './components/GenesisSupportersPage';
 import { MiningPayoutRanking } from './components/MiningPayoutRanking';
 import { ExchangesPage } from './components/ExchangesPage';
 import { NetworkMap } from './components/NetworkMap';
+import { ShareZkasUpdate } from './components/ShareZkasUpdate';
 import { useGenesisArchive } from './genesisHistory';
 
 type Tab = 'intelligence' | 'merged' | 'health' | 'nodes' | 'events' | 'explorer' | 'otc' | 'otcPreview' | 'exchanges' | 'importer' | 'history' | 'supply' | 'reference' | 'supporters';
@@ -837,6 +838,8 @@ function App() {
         </>}
         {tab !== 'otc' && tab !== 'otcPreview' && tab !== 'exchanges' && tab !== 'importer' && tab !== 'supporters' && status === 'stale' && <div className="demo-banner"><b>Live refresh delayed.</b> Showing the last good public mainnet snapshot while the API retries. {error && <span>{error}</span>}</div>}
         {tab !== 'otc' && tab !== 'otcPreview' && tab !== 'exchanges' && tab !== 'importer' && tab !== 'supporters' && status === 'connecting' && <div className="demo-banner"><b>Connecting to ZKas mainnet.</b> Waiting for the first public API snapshot. {error && <span>{error}</span>}</div>}
+
+        {tab === 'intelligence' && <ShareZkasUpdate data={data} />}
 
         {tab === 'intelligence' && (
           <IntelligenceHome data={data} txValues={txValues} pulseTimes={pulseTimes} onReference={() => navigateToTab('reference')} />
