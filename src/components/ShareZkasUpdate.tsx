@@ -126,7 +126,7 @@ export function ShareZkasUpdate({ data }: { data: DashboardData }) {
 
   const caption=useMemo(()=>[
     mode==='community'?'⛏️ ZKAS Community Mining update':mode==='mining'?'⛏️ ZKAS mining update':mode==='market'?'📊 ZKAS market snapshot':'⚡ ZKAS network update',
-    '',...all[mode].map(m=>`${m.label}: ${m.value}`),'','Live ZKAS intelligence: https://zkas.stream','','#ZKAS #Kaspa #Mining #Privacy'
+    '',...all[mode].map(m=>`${m.label}: ${m.value}`),'','Live ZKAS intelligence: https://zkas.stream','Official ZKAS: https://zkas.info','ZKAS on X: https://x.com/ZKas_X','ZKAS Stream on X: https://x.com/ZKas_Stream','','#ZKAS #Kaspa #Mining #Privacy'
   ].join('\n'),[all,mode]);
 
   useEffect(()=>{ if(open) draw(); },[open,mode,all]);
