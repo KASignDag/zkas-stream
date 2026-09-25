@@ -571,8 +571,14 @@ function OtcPriceChart({ trades, range, change, zkasUsd, sourceName, expandedSpa
   const width = left + plotWidth + right;
   const height = 360;
   const values = points.map((point) => point.value);
-  const rawMax = Math.max(...values);
-  const rawMin = Math.min(...values);
+  const sortedValues = [...values].sort((a,b)=>a-b);
+  const percentile = (p:number) => sortedValues[Math.min(sortedValues.length-1,Math.max(0,Math.floor((sortedValues.length-1)*p)))];
+  const useRobustRange = (range === '7D' || range === 'ALL') && sortedValues.length >= 20;
+  // Long views can contain a few historical outliers that flatten the useful
+  // trading band. Focus 7D/ALL on the central 96% while retaining off-scale
+  // markers for trades outside the visible range.
+  const rawMin = useRobustRange ? percentile(.02) : sortedValues[0];
+  const rawMax = useRobustRange ? percentile(.98) : sortedValues[sortedValues.length-1];
   const rawSpan = Math.max(rawMax - rawMin, rawMax * 0.04, 0.000001);
   const padding = rawSpan * 0.16;
   const min = Math.max(0, rawMin - padding);
@@ -584,7 +590,7 @@ function OtcPriceChart({ trades, range, change, zkasUsd, sourceName, expandedSpa
     ...point,
     x: xFor(point, index),
     y: yFor(Math.min(point.value, max)),
-    offScale: point.value > max,
+    offScale: point.value > max || point.value < min,
   }));
   const coloredSegments = coordinates.slice(0, -1).flatMap((from, index) => {
     const to = coordinates[index + 1];
@@ -667,7 +673,7 @@ function OtcPriceChart({ trades, range, change, zkasUsd, sourceName, expandedSpa
         <text className="otc-current-label" x={plotRight + 14} y={latest.y - 5}>LAST TRADE</text>
         <text className="otc-current-text" x={plotRight + 14} y={latest.y + 10}>{latest.value.toLocaleString('en-US', { minimumFractionDigits: 6, maximumFractionDigits: 6 })}</text>
         {coordinates.map((point, index) => point.offScale
-          ? <path key={`${point.trade.timestamp ?? 'undated'}-${index}`} className={`otc-point ${point.trade.side}`} d={`M ${point.x - 4} ${top + 8} L ${point.x} ${top} L ${point.x + 4} ${top + 8} Z`}><title>{`${dateText(point.trade.timestamp)} · ${priceText(point.value)} · off scale`}</title></path>
+          ? <path key={`${point.trade.timestamp ?? 'undated'}-${index}`} className={`otc-point ${point.trade.side}`} d={point.value > max ? `M ${point.x - 4} ${top + 8} L ${point.x} ${top} L ${point.x + 4} ${top + 8} Z` : `M ${point.x - 4} ${height-bottom-8} L ${point.x} ${height-bottom} L ${point.x + 4} ${height-bottom-8} Z`}><title>{`${dateText(point.trade.timestamp)} · ${priceText(point.value)} · off scale`}</title></path>
           : <circle key={`${point.trade.timestamp ?? 'undated'}-${index}`} className={`otc-point ${point.trade.side}`} cx={point.x} cy={point.y} r="4.5"><title>{`${dateText(point.trade.timestamp)} · ${priceText(point.value)}`}</title></circle>)}
         {xLabels.map((point, index) => <text key={`${point.trade.timestamp ?? 'undated'}-${index}`} className="otc-axis-label" x={point.x} y={height - 18} textAnchor={index === 0 ? 'start' : index === xLabels.length - 1 ? 'end' : 'middle'}>{point.trade.timestamp === null ? `Trade ${index + 1}` : new Date(point.trade.timestamp).toLocaleDateString([], { month: 'short', day: 'numeric' })}</text>)}
           </svg>
