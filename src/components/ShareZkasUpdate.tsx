@@ -165,7 +165,7 @@ export function ShareZkasUpdate({ data }: { data: DashboardData }) {
     const bg=c.createLinearGradient(0,0,1200,675); bg.addColorStop(0,'#061318'); bg.addColorStop(1,'#0b2528'); c.fillStyle=bg;c.fillRect(0,0,1200,675);
     const glow=c.createRadialGradient(930,80,20,930,80,520);glow.addColorStop(0,'rgba(31,235,216,.25)');glow.addColorStop(1,'rgba(0,0,0,0)');c.fillStyle=glow;c.fillRect(0,0,1200,675);
     try { const img=new Image(); await new Promise<void>((ok,bad)=>{img.onload=()=>ok();img.onerror=()=>bad();img.src='/zkas-logo.jpg'}); c.drawImage(img,64,48,92,92); } catch {}
-    c.font='800 38px system-ui';c.fillStyle='#fff';c.fillText('ZKAS',178,86);c.fillStyle='#35ead8';c.fillText('.stream',280,86);
+    c.font='800 38px system-ui';c.fillStyle='#fff';c.fillText('ZKAS',178,86);
     c.font='600 15px system-ui';c.fillStyle='#8ca9aa';c.fillText('PUBLIC NETWORK INTELLIGENCE',180,116);
     c.textAlign='right';c.fillStyle='#70fff0';c.font='700 16px system-ui';c.fillText('LIVE • PUBLIC • SHAREABLE',1136,76);c.textAlign='left';
     c.fillStyle='#fff';c.font='900 55px system-ui';c.fillText(titles[mode],64,215);c.fillStyle='#35ead8';c.fillRect(64,235,180,5);
