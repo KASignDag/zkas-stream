@@ -166,7 +166,8 @@ export function ShareZkasUpdate({ data }: { data: DashboardData }) {
     const glow=c.createRadialGradient(930,80,20,930,80,520);glow.addColorStop(0,'rgba(31,235,216,.25)');glow.addColorStop(1,'rgba(0,0,0,0)');c.fillStyle=glow;c.fillRect(0,0,1200,675);
     try { const img=new Image(); await new Promise<void>((ok,bad)=>{img.onload=()=>ok();img.onerror=()=>bad();img.src='/zkas-logo.jpg'}); c.drawImage(img,64,48,92,92); } catch {}
     c.font='800 38px system-ui';c.fillStyle='#fff';c.fillText('ZKAS',178,86);
-    c.font='600 15px system-ui';c.fillStyle='#8ca9aa';c.fillText('PUBLIC NETWORK INTELLIGENCE',180,116);
+    c.font='900 18px system-ui';c.fillStyle='#dcebea';c.fillText('Hardcore privacy',180,113);
+    c.font='700 14px system-ui';c.fillStyle='#8ca9aa';c.fillText('With DAG architecture',180,134);
     c.textAlign='right';c.fillStyle='#70fff0';c.font='700 16px system-ui';c.fillText('LIVE • PUBLIC • SHAREABLE',1136,76);c.textAlign='left';
     c.fillStyle='#fff';c.font='900 55px system-ui';c.fillText(titles[mode],64,215);c.fillStyle='#35ead8';c.fillRect(64,235,180,5);
     const cardCount=all[mode].length;
@@ -178,7 +179,7 @@ export function ShareZkasUpdate({ data }: { data: DashboardData }) {
       c.fillStyle='#fff';c.font=`800 ${cardCount>4?24:29}px system-ui`;c.fillText(m.value.slice(0,18),x+18,y+98);
       c.fillStyle='#3cebd9';c.font=`700 ${cardCount>4?11:13}px system-ui`;c.fillText(m.tag??'ZKAS MAINNET',x+18,y+152);
     });
-    c.fillStyle='#e6ffff';c.font='900 29px system-ui';c.fillText('Hardcore privacy',64,540);c.fillStyle='#9fc2c0';c.font='750 20px system-ui';c.fillText('With DAG architecture',64,568);
+
     rr(c,64,586,1072,54,27);c.fillStyle='rgba(44,221,205,.14)';c.fill();c.strokeStyle='rgba(64,240,223,.5)';c.stroke();
     c.fillStyle='#fff';c.font='800 23px system-ui';const footerLead='Explore live ZKAS data at';c.fillText(footerLead,92,621);const footerLinkX=92+c.measureText(footerLead).width+14;c.fillStyle='#43efdd';c.fillText('zkas.stream',footerLinkX,621);
     c.textAlign='right';c.fillStyle='#94b0b1';c.font='600 14px system-ui';c.fillText('#ZKAS  #Kaspa  #Mining  #Privacy',1108,620);c.textAlign='left';
