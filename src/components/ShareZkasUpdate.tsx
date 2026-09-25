@@ -178,7 +178,7 @@ export function ShareZkasUpdate({ data }: { data: DashboardData }) {
       c.fillStyle='#fff';c.font=`800 ${cardCount>4?24:29}px system-ui`;c.fillText(m.value.slice(0,18),x+18,y+98);
       c.fillStyle='#3cebd9';c.font=`700 ${cardCount>4?11:13}px system-ui`;c.fillText(m.tag??'ZKAS MAINNET',x+18,y+152);
     });
-    c.fillStyle='#e6ffff';c.font='800 23px system-ui';c.fillText('Privacy by default • Proof-of-work secured • Built for real payments',64,550);
+    c.fillStyle='#e6ffff';c.font='900 29px system-ui';c.fillText('Hardcore privacy',64,540);c.fillStyle='#9fc2c0';c.font='750 20px system-ui';c.fillText('With DAG architecture',64,568);
     rr(c,64,586,1072,54,27);c.fillStyle='rgba(44,221,205,.14)';c.fill();c.strokeStyle='rgba(64,240,223,.5)';c.stroke();
     c.fillStyle='#fff';c.font='800 23px system-ui';const footerLead='Explore live ZKAS data at';c.fillText(footerLead,92,621);const footerLinkX=92+c.measureText(footerLead).width+14;c.fillStyle='#43efdd';c.fillText('zkas.stream',footerLinkX,621);
     c.textAlign='right';c.fillStyle='#94b0b1';c.font='600 14px system-ui';c.fillText('#ZKAS  #Kaspa  #Mining  #Privacy',1108,620);c.textAlign='left';
