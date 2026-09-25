@@ -49,6 +49,11 @@ export function ShareZkasUpdate({ data }: { data: DashboardData }) {
   const canvas=useRef<HTMLCanvasElement|null>(null);
 
   useEffect(()=>{
+    const route=window.location.pathname.replace(/\/+$/,'').toLowerCase();
+    if(route==='/post'||window.location.hash.toLowerCase()==='#post')setOpen(true);
+  },[]);
+
+  useEffect(()=>{
     if(!open) return;
     let stopped=false;
     let ctl: AbortController | null=null;
