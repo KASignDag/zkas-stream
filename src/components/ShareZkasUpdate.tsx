@@ -224,7 +224,7 @@ export function ShareZkasUpdate({ data }: { data: DashboardData }) {
     <button className="share-zkas-fab" onClick={()=>setOpen(true)} aria-label="Create a ZKAS post for X" title="Post ZKAS update to X"><span className="share-zkas-fab-x">𝕏</span><span>Post to X</span></button>
     {open&&<div className="share-zkas-backdrop" onMouseDown={e=>{if(e.target===e.currentTarget)setOpen(false)}}>
       <section className="share-zkas-modal" role="dialog" aria-modal="true" aria-label="Create ZKAS share card">
-        <div className="share-zkas-head"><div><span>SHARE ZKAS TODAY</span><h2>Create a live ZKAS card</h2></div><button onClick={()=>setOpen(false)} aria-label="Close"><X size={20}/></button></div>
+        <div className="share-zkas-head"><div><span>SHARE ZKAS TODAY</span><h2>Create a live ZKAS card</h2></div><button className="share-zkas-close" onClick={()=>setOpen(false)} aria-label="Close"><X size={24}/></button></div>
         <div className="share-zkas-tabs">{(['network','mining','community','market'] as Mode[]).map(m=><button key={m} className={mode===m?'active':''} onClick={()=>setMode(m)}>{m}</button>)}</div>
         <canvas ref={canvas} className="share-zkas-canvas"/>
         <div className={`share-zkas-actions ${android?'android-clean-flow':''}`}>
