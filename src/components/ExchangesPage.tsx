@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Activity, BarChart3, BookOpen, ExternalLink, RefreshCw, TriangleAlert } from 'lucide-react';
 
 type Interval = '5m' | '15m' | '1h' | '4h' | '1d';
-type ExchangeId = 'neoxex' | 'noirtrade';
+type ExchangeId = 'neoxex' | 'noirtrade' | 'arrrex';
 type Candle = { time: number; open: number; high: number; low: number; close: number; volume: number };
 type Level = { price: number; quantity: number; orders: number };
 type Trade = { trade_id: string; side: 'buy' | 'sell'; quantity: number; price: number; total: number; executed_at: string };
@@ -28,8 +28,13 @@ type MarketFeed = {
   updatedAt: number;
 };
 
-const exchangeIds: ExchangeId[] = ['neoxex', 'noirtrade'];
-const exchangeNames: Record<ExchangeId, string> = { neoxex: 'NeoxEX', noirtrade: 'NoirTrade' };
+const exchangeIds: ExchangeId[] = ['neoxex', 'noirtrade', 'arrrex'];
+const exchangeNames: Record<ExchangeId, string> = { neoxex: 'NeoxEX', noirtrade: 'NoirTrade', arrrex: 'ARRREX' };
+const fallbackTradeUrls: Record<ExchangeId, string> = {
+  neoxex: 'https://neoxa.exchange/trade/ZKAS_USDT',
+  noirtrade: 'https://noirtrade.com/trade?pair=ZKAS_USDT',
+  arrrex: 'https://arrrex.com/app/trade?market=ZKAS-USDT',
+};
 const listedMarkets = [{
   id: 'nonkyc',
   name: 'NonKYC',
@@ -209,7 +214,7 @@ export function ExchangesPage() {
     <div className="page-stack exchanges-page">
       <div className={`exchange-status ${liveCount === 0 ? 'error' : 'live'}`}>
         <span className="exchange-status-dot" />
-        <div><b>{liveCount ? `${liveCount} live exchange ${liveCount === 1 ? 'market' : 'markets'} connected` : 'Exchange feeds retrying'}</b><span>{liveCount ? 'NeoxEX and NoirTrade public market data refresh every 10 seconds.' : Object.values(errors)[0] || 'Unable to load exchange data.'}</span></div>
+        <div><b>{liveCount ? `${liveCount} live exchange ${liveCount === 1 ? 'market' : 'markets'} connected` : 'Exchange feeds retrying'}</b><span>{liveCount ? 'NeoxEX, NoirTrade, and ARRREX public market data refresh every 10 seconds.' : Object.values(errors)[0] || 'Unable to load exchange data.'}</span></div>
         <span className="exchange-refresh"><RefreshCw size={13} className={loading ? 'spinning' : ''} /> 10 sec refresh</span>
       </div>
 
@@ -253,7 +258,7 @@ export function ExchangesPage() {
         <div className="panel-head"><div><span className="panel-icon"><Activity size={20} /></span><h2>ZKAS exchange markets</h2></div><span className="range-chip">{liveCount} LIVE · {listedMarkets.length} LISTED</span></div>
         <div className="exchange-table-scroll"><table><thead><tr><th>Exchange</th><th>Pair</th><th>Last price</th><th>Best bid</th><th>Best ask</th><th>24h USDT volume</th><th>Status</th><th /></tr></thead><tbody>{exchangeIds.map((exchangeId) => {
           const item = feeds[exchangeId];
-          return <tr key={exchangeId}><td><b>{exchangeNames[exchangeId]}</b></td><td>ZKAS/USDT</td><td>{usd(item?.ticker?.lastPrice)}</td><td className="bid-text">{usd(item?.ticker?.bestBid)}</td><td className="ask-text">{usd(item?.ticker?.bestAsk)}</td><td>{item?.ticker ? usd(item.ticker.quoteVolume24h, 2) : '—'}</td><td>{item ? <span className="exchange-live-chip"><i /> Live</span> : <span className="exchange-retry-chip">Retrying</span>}</td><td><a href={item?.exchange.tradeUrl || (exchangeId === 'noirtrade' ? 'https://noirtrade.com/trade?pair=ZKAS_USDT' : 'https://neoxa.exchange')} target="_blank" rel="noreferrer">Trade <ExternalLink size={13} /></a></td></tr>;
+          return <tr key={exchangeId}><td><b>{exchangeNames[exchangeId]}</b></td><td>ZKAS/USDT</td><td>{usd(item?.ticker?.lastPrice)}</td><td className="bid-text">{usd(item?.ticker?.bestBid)}</td><td className="ask-text">{usd(item?.ticker?.bestAsk)}</td><td>{item?.ticker ? usd(item.ticker.quoteVolume24h, 2) : '—'}</td><td>{item ? <span className="exchange-live-chip"><i /> Live</span> : <span className="exchange-retry-chip">Retrying</span>}</td><td><a href={item?.exchange.tradeUrl || fallbackTradeUrls[exchangeId]} target="_blank" rel="noreferrer">Trade <ExternalLink size={13} /></a></td></tr>;
         })}{listedMarkets.map((market) => <tr key={market.id} className="exchange-listed-row"><td><b>{market.name}</b></td><td>{market.pair}</td><td>—</td><td className="bid-text">—</td><td className="ask-text">—</td><td>—</td><td><span className="exchange-listed-chip">Market listed · activity pending</span></td><td><a href={market.tradeUrl} target="_blank" rel="noreferrer">View market <ExternalLink size={13} /></a></td></tr>)}</tbody></table></div>
         <p className="source-note"><TriangleAlert size={15} /> Live prices are reported separately from completed OTC trades. NonKYC is shown as listed and is not included in live totals until public trading data is available.</p>
       </section>

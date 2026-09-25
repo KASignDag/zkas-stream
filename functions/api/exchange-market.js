@@ -11,6 +11,12 @@ const EXCHANGES = {
     tradeUrl: 'https://noirtrade.com/trade?pair=ZKAS_USDT',
     pairs: ['ZKAS_USDT'],
   },
+  arrrex: {
+    name: 'ARRREX',
+    website: 'https://arrrex.com',
+    tradeUrl: 'https://arrrex.com/app/trade?market=ZKAS-USDT',
+    pairs: ['ZKAS_USDT'],
+  },
 };
 
 const intervals = new Set(['1m', '5m', '15m', '1h', '4h', '1d']);
@@ -149,6 +155,61 @@ async function noirtradeMarket(pair, interval) {
   };
 }
 
+async function arrrexMarket(pair, interval) {
+  const symbol = pair.replace('_', '-');
+  const encodedSymbol = encodeURIComponent(symbol);
+  const baseUrl = 'https://arrrex.com/api/markets';
+  const [ticker, orderbook, tradesPayload, candlesPayload] = await Promise.all([
+    readJson(`${baseUrl}/${encodedSymbol}`),
+    readJson(`${baseUrl}/${encodedSymbol}/orderbook?depth=100`),
+    readJson(`${baseUrl}/${encodedSymbol}/trades?limit=500`),
+    readJson(`${baseUrl}/${encodedSymbol}/candles?interval=${encodeURIComponent(interval)}&limit=500`),
+  ]);
+  const trades = (Array.isArray(tradesPayload) ? tradesPayload : [])
+    .map((trade, index) => {
+      const quantity = numeric(trade.quantity);
+      const price = numeric(trade.price);
+      const executedAt = trade.executed_at || '';
+      return {
+        trade_id: `ARRREX-${executedAt || index}`,
+        side: trade.taker_side === 'sell' ? 'sell' : 'buy',
+        quantity,
+        price,
+        total: price * quantity,
+        executed_at: executedAt,
+      };
+    })
+    .filter((trade) => trade.price > 0 && trade.quantity > 0);
+
+  return {
+    ticker: {
+      lastPrice: numeric(ticker?.last_price),
+      changePercent: numeric(ticker?.change_24h),
+      high24h: numeric(ticker?.high_24h),
+      low24h: numeric(ticker?.low_24h),
+      volume24h: numeric(ticker?.volume_24h),
+      quoteVolume24h: numeric(ticker?.quote_volume_24h),
+      trades24h: trades.filter((trade) => Date.parse(trade.executed_at) >= Date.now() - 24 * 60 * 60 * 1000).length,
+      bestBid: numeric(ticker?.bid),
+      bestAsk: numeric(ticker?.ask),
+    },
+    orderbook: {
+      bids: (orderbook?.bids ?? []).map((level) => ({ price: numeric(level.price), quantity: numeric(level.quantity), orders: 1 })),
+      asks: (orderbook?.asks ?? []).map((level) => ({ price: numeric(level.price), quantity: numeric(level.quantity), orders: 1 })),
+    },
+    candles: (Array.isArray(candlesPayload) ? candlesPayload : []).map((candle) => ({
+      time: Math.floor(Date.parse(candle.time) / 1000),
+      open: numeric(candle.open),
+      high: numeric(candle.high),
+      low: numeric(candle.low),
+      close: numeric(candle.close),
+      volume: numeric(candle.volume),
+    })).filter((candle) => Number.isFinite(candle.time) && candle.time > 0),
+    trades,
+    chartSource: 'ARRREX exchange OHLCV candles',
+  };
+}
+
 export async function onRequestGet(context) {
   const url = new URL(context.request.url);
   const exchangeId = (url.searchParams.get('exchange') || 'neoxex').toLowerCase();
@@ -163,7 +224,9 @@ export async function onRequestGet(context) {
   try {
     const market = exchangeId === 'noirtrade'
       ? await noirtradeMarket(pair, interval)
-      : await neoxexMarket(pair, interval);
+      : exchangeId === 'arrrex'
+        ? await arrrexMarket(pair, interval)
+        : await neoxexMarket(pair, interval);
     return json({ exchange: exchangeInfo(exchangeId), pair, interval, ...market, updatedAt: Date.now() });
   } catch (error) {
     return json({
