@@ -572,13 +572,11 @@ function OtcPriceChart({ trades, range, change, zkasUsd, sourceName, expandedSpa
   const height = 360;
   const values = points.map((point) => point.value);
   const rawMax = Math.max(...values);
-  const focusScale = range === '4H' || range === '6H' || range === '1D';
-  const steppedCeilings = [0.1, 0.15, 0.2, 0.25, 0.3, 0.5, 0.8, 1];
-  const max = focusScale
-    ? 0.1
-    : steppedCeilings.find((ceiling) => ceiling >= rawMax * 1.08)
-      ?? Math.ceil(rawMax * 1.08 * 10) / 10;
-  const min = 0;
+  const rawMin = Math.min(...values);
+  const rawSpan = Math.max(rawMax - rawMin, rawMax * 0.04, 0.000001);
+  const padding = rawSpan * 0.16;
+  const min = Math.max(0, rawMin - padding);
+  const max = rawMax + padding;
   const pointGap = points.length > 1 ? plotWidth / (points.length - 1) : 0;
   const xFor = (_point: typeof points[number], index: number) => left + index * pointGap;
   const yFor = (value: number) => top + ((max - value) / Math.max(max - min, Number.EPSILON)) * (height - top - bottom);
@@ -601,16 +599,7 @@ function OtcPriceChart({ trades, range, change, zkasUsd, sourceName, expandedSpa
     : '';
   const offScaleCount = coordinates.filter((point) => point.offScale).length;
   const latest = coordinates.at(-1)!;
-  const preferredGridValues = focusScale ? [0, 0.05, 0.06, 0.07, 0.08, 0.09, 0.1]
-    : max <= 0.1 ? [0, 0.02, 0.04, 0.06, 0.08, 0.1]
-    : max <= 0.15 ? [0, 0.03, 0.06, 0.09, 0.12, 0.15]
-      : max <= 0.2 ? [0, 0.04, 0.08, 0.12, 0.16, 0.2]
-        : max <= 0.25 ? [0, 0.05, 0.1, 0.15, 0.2, 0.25]
-          : max <= 0.3 ? [0, 0.05, 0.1, 0.15, 0.2, 0.25, 0.3]
-            : max <= 0.5 ? [0, 0.1, 0.2, 0.3, 0.4, 0.5]
-              : max <= 0.8 ? [0, 0.2, 0.4, 0.6, 0.8]
-                : max <= 1 ? [0, 0.2, 0.4, 0.6, 0.8, 1]
-                  : Array.from({ length: 6 }, (_, index) => (max / 5) * index);
+  const preferredGridValues = Array.from({ length: 6 }, (_, index) => min + ((max - min) / 5) * index);
   const grid = [...preferredGridValues].reverse().map((value) => ({ y: yFor(value), value }));
   const xLabelCount = range === 'ALL' || range === '7D' ? 6 : range === '1D' ? 5 : 4;
   const xLabels = Array.from({ length: Math.min(xLabelCount, coordinates.length) }, (_, index) => {
