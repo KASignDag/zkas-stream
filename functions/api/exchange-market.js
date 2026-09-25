@@ -17,6 +17,12 @@ const EXCHANGES = {
     tradeUrl: 'https://arrrex.com/app/trade?market=ZKAS-USDT',
     pairs: ['ZKAS_USDT'],
   },
+  nonkyc: {
+    name: 'NonKYC',
+    website: 'https://nonkyc.io',
+    tradeUrl: 'https://nonkyc.io/market/ZKAS_USDT',
+    pairs: ['ZKAS_USDT'],
+  },
 };
 
 const intervals = new Set(['1m', '5m', '15m', '1h', '4h', '1d']);
@@ -210,6 +216,53 @@ async function arrrexMarket(pair, interval) {
   };
 }
 
+async function nonkycMarket(pair, interval) {
+  const encodedPair = encodeURIComponent(pair);
+  const [ticker, orderbook, tradesPayload] = await Promise.all([
+    readJson(`https://api.nonkyc.io/api/v2/market/getbysymbol/${encodedPair}`),
+    readJson(`https://api.nonkyc.io/api/v2/market/getorderbookbysymbol/${encodedPair}`),
+    readJson(`https://nonkyc.io/api/v2/market/tradehistory?symbol=${encodedPair}&limit=500`),
+  ]);
+  const trades = (Array.isArray(tradesPayload) ? tradesPayload : [])
+    .map((trade, index) => {
+      const timestampMs = numeric(trade.createdAt);
+      const quantity = numeric(trade.quantity);
+      const price = numeric(trade.price);
+      return {
+        trade_id: `NONKYC-${timestampMs || index}-${index}`,
+        side: trade.triggeredby === 'sell' ? 'sell' : 'buy',
+        quantity,
+        price,
+        total: numeric(trade.total, price * quantity),
+        timestampMs,
+        executed_at: timestampMs > 0 ? new Date(timestampMs).toISOString() : '',
+      };
+    })
+    .filter((trade) => trade.timestampMs > 0 && trade.price > 0 && trade.quantity > 0);
+  const cutoff = Date.now() - 24 * 60 * 60 * 1000;
+
+  return {
+    ticker: {
+      lastPrice: numeric(ticker?.lastPriceNumber ?? ticker?.lastPrice),
+      changePercent: numeric(ticker?.changePercentNumber ?? ticker?.changePercent),
+      high24h: numeric(ticker?.highPriceNumber ?? ticker?.highPrice),
+      low24h: numeric(ticker?.lowPriceNumber ?? ticker?.lowPrice),
+      volume24h: numeric(ticker?.volumeNumber ?? ticker?.volume),
+      quoteVolume24h: numeric(ticker?.volumeSecondaryNumber ?? ticker?.volumeSecondary),
+      trades24h: trades.filter((trade) => trade.timestampMs >= cutoff).length,
+      bestBid: numeric(ticker?.bestBidNumber ?? ticker?.bestBid),
+      bestAsk: numeric(ticker?.bestAskNumber ?? ticker?.bestAsk),
+    },
+    orderbook: {
+      bids: (orderbook?.bids ?? []).map((level) => ({ price: numeric(level.numberprice ?? level.price), quantity: numeric(level.quantity), orders: 1 })),
+      asks: (orderbook?.asks ?? []).map((level) => ({ price: numeric(level.numberprice ?? level.price), quantity: numeric(level.quantity), orders: 1 })),
+    },
+    candles: tradesToCandles([...trades].sort((a, b) => a.timestampMs - b.timestampMs), interval),
+    trades: trades.map(({ timestampMs, ...trade }) => trade),
+    chartSource: 'Candles calculated from NonKYC completed trades',
+  };
+}
+
 export async function onRequestGet(context) {
   const url = new URL(context.request.url);
   const exchangeId = (url.searchParams.get('exchange') || 'neoxex').toLowerCase();
@@ -226,7 +279,9 @@ export async function onRequestGet(context) {
       ? await noirtradeMarket(pair, interval)
       : exchangeId === 'arrrex'
         ? await arrrexMarket(pair, interval)
-        : await neoxexMarket(pair, interval);
+        : exchangeId === 'nonkyc'
+          ? await nonkycMarket(pair, interval)
+          : await neoxexMarket(pair, interval);
     return json({ exchange: exchangeInfo(exchangeId), pair, interval, ...market, updatedAt: Date.now() });
   } catch (error) {
     return json({
