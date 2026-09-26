@@ -36,6 +36,7 @@ export function BufferAdminPage() {
   const [day,setDay]=useState(tomorrowLocalDate);
   const [dailyPosts,setDailyPosts]=useState<DailyPost[]>(DAILY_POSTS);
   const [scheduled,setScheduled]=useState<number[]>([]);
+  const [packBusy,setPackBusy]=useState(false);
   const channels=useMemo(()=>status?.organizations?.flatMap(org=>org.channels.map(channel=>({...channel,orgName:org.name})))??[],[status]);
 
   async function connect() {
@@ -78,6 +79,32 @@ export function BufferAdminPage() {
     finally{setBusy(false);}
   }
 
+  async function uploadVisualPack(file:File){
+    if(!file.type.startsWith('image/')){setMessage('Choose an image file for the visual pack.');return;}
+    setPackBusy(true);setMessage('Preparing and matching the 10-image visual pack…');
+    try{
+      const bitmap=await createImageBitmap(file);
+      const next=[...dailyPosts];
+      for(let index=0;index<10;index++){
+        const col=index%5,row=Math.floor(index/5);
+        const sx=Math.round(col*bitmap.width/5),sy=Math.round(row*bitmap.height/2);
+        const sw=Math.round((col+1)*bitmap.width/5)-sx,sh=Math.round((row+1)*bitmap.height/2)-sy;
+        const canvas=document.createElement('canvas');canvas.width=768;canvas.height=1280;
+        const ctx=canvas.getContext('2d');if(!ctx) throw new Error('Could not prepare image.');
+        ctx.drawImage(bitmap,sx,sy,sw,sh,0,0,canvas.width,canvas.height);
+        const blob=await new Promise<Blob>((resolve,reject)=>canvas.toBlob(value=>value?resolve(value):reject(new Error('Could not encode image.')),'image/jpeg',0.9));
+        const response=await fetch('/api/buffer-image',{method:'POST',headers:{'Content-Type':'image/jpeg','X-ZKAS-Admin-Token':token},body:blob});
+        const body=await response.json().catch(()=>({}));
+        if(!response.ok) throw new Error(body.message||'Could not host visual '+(index+1)+'.');
+        next[index]={...next[index],imageUrl:body.url};
+        setDailyPosts([...next]);
+      }
+      bitmap.close();
+      setMessage('Visual pack matched: all 10 posts now have their corresponding custom image.');
+    }catch(error){setMessage(error instanceof Error?error.message:'Visual-pack upload failed.');}
+    finally{setPackBusy(false);}
+  }
+
   async function scheduleDay(){
     if(!channelId||!day) return;
     setBusy(true);setMessage('Scheduling daily posts…');
@@ -117,6 +144,14 @@ export function BufferAdminPage() {
           {channels.map(channel=><option key={channel.id} value={channel.id}>{channel.displayName||channel.name||channel.id} · {channel.service} · {channel.orgName}</option>)}
         </select>
       </label>
+      <div style={{padding:16,border:'1px dashed #9ec8bb',borderRadius:14,background:'#f5fbf9'}}>
+        <b>10-image visual pack</b>
+        <p style={{margin:'5px 0 10px',color:'#687a75',fontWeight:650}}>Choose the 2×5 ZKAS visual-pack image. ZKAS.stream will split it into ten individual images and match panels 1–10 to posts 1–10 automatically.</p>
+        <label style={{display:'inline-block',padding:'11px 15px',borderRadius:999,background:'#159a7e',color:'#fff',fontWeight:900,cursor:'pointer'}}>
+          {packBusy?'Preparing visual pack…':'Choose visual pack'}
+          <input type="file" accept="image/*" disabled={packBusy||busy} onChange={e=>{const file=e.target.files?.[0];if(file) void uploadVisualPack(file);e.currentTarget.value='';}} style={{display:'none'}} />
+        </label>
+      </div>
       <div style={{display:'grid',gap:12}}>
         {dailyPosts.map((post,index)=><div key={index} style={{display:'grid',gridTemplateColumns:'92px 1fr',gap:12,padding:14,border:'1px solid #d8e7e2',borderRadius:14,background:scheduled.includes(index)?'#eaf8f3':'#fbfdfc'}}>
           <input type="time" value={post.time} onChange={e=>setDailyPosts(rows=>rows.map((row,i)=>i===index?{...row,time:e.target.value}:row))} disabled={scheduled.includes(index)} style={{padding:10,border:'1px solid #b9cec7',borderRadius:10,fontWeight:800}} />
