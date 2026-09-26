@@ -5,14 +5,14 @@ const MAX_UPLOAD_BYTES = 2_000_000;
 const UPLOAD_TOKEN_SHA256 = 'ade7baad8fb683f5eb9e575f881d2ca54c1058bf428012a45d8c3066ba6e4aa3';
 const SOMPI_PER_ZKAS = 100_000_000n;
 const PAYOUT_TIERS = [
-  { key: 'plankton', name: 'Plankton', range: 'Under 1 ZKAS', min: 0n, max: SOMPI_PER_ZKAS },
-  { key: 'shrimp', name: 'Shrimp', range: '1–10 ZKAS', min: SOMPI_PER_ZKAS, max: 10n * SOMPI_PER_ZKAS },
+  { key: 'shrimp', name: 'Shrimp', range: 'Under 10 ZKAS', min: 0n, max: 10n * SOMPI_PER_ZKAS },
   { key: 'crab', name: 'Crab', range: '10–100 ZKAS', min: 10n * SOMPI_PER_ZKAS, max: 100n * SOMPI_PER_ZKAS },
   { key: 'octopus', name: 'Octopus', range: '100–1,000 ZKAS', min: 100n * SOMPI_PER_ZKAS, max: 1_000n * SOMPI_PER_ZKAS },
   { key: 'fish', name: 'Fish', range: '1,000–10,000 ZKAS', min: 1_000n * SOMPI_PER_ZKAS, max: 10_000n * SOMPI_PER_ZKAS },
   { key: 'dolphin', name: 'Dolphin', range: '10,000–100,000 ZKAS', min: 10_000n * SOMPI_PER_ZKAS, max: 100_000n * SOMPI_PER_ZKAS },
   { key: 'shark', name: 'Shark', range: '100,000–1M ZKAS', min: 100_000n * SOMPI_PER_ZKAS, max: 1_000_000n * SOMPI_PER_ZKAS },
-  { key: 'blue-whale', name: 'Blue Whale', range: '1M+ ZKAS', min: 1_000_000n * SOMPI_PER_ZKAS, max: null },
+  { key: 'blue-whale', name: 'Blue Whale', range: '1M–10M ZKAS', min: 1_000_000n * SOMPI_PER_ZKAS, max: 10_000_000n * SOMPI_PER_ZKAS },
+  { key: 'humpback', name: 'Humpback', range: '10M+ ZKAS', min: 10_000_000n * SOMPI_PER_ZKAS, max: null },
 ];
 
 function numberish(value) {
