@@ -556,12 +556,16 @@ footer { width: min(1320px, calc(100% - 40px)); margin: 0 auto; padding: 22px 0 
 .exchange-list-panel th:first-child, .exchange-list-panel td:first-child, .exchange-list-panel th:nth-child(2), .exchange-list-panel td:nth-child(2) { text-align: left; }
 .exchange-list-panel th { color: var(--muted); background: var(--surface-2); font-size: 9px; letter-spacing: .65px; text-transform: uppercase; }
 .exchange-list-panel td a { display: inline-flex; align-items: center; gap: 5px; color: var(--accent); font-weight: 800; text-decoration: none; }
+.exchange-actions { display: flex; flex-direction: column; align-items: flex-end; gap: 5px; }
+.exchange-list-panel td a.exchange-referral-link { color: var(--muted); font-size: 9px; font-weight: 750; }
+.exchange-list-panel td a:hover { text-decoration: underline; }
 .exchange-live-chip { display: inline-flex; align-items: center; gap: 6px; color: var(--accent); font-size: 10px; font-weight: 850; text-transform: uppercase; }
 .exchange-live-chip i { width: 7px; height: 7px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 12%, transparent); }
 .exchange-retry-chip { color: var(--muted); font-size: 10px; font-weight: 800; text-transform: uppercase; }
 .exchange-listed-row { background: color-mix(in srgb, var(--accent) 4%, transparent); }
 .exchange-listed-chip { color: var(--muted); font-size: 10px; font-weight: 800; letter-spacing: .2px; text-transform: uppercase; }
 .exchange-list-panel .source-note { padding: 0 19px 18px; }
+.exchange-list-panel .exchange-referral-disclosure { margin-top: -7px; }
 
 @media (max-width: 1050px) {
   .exchange-combined-summary { grid-template-columns: repeat(2, minmax(0, 1fr)); }
