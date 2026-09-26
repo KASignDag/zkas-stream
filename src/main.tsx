@@ -1,9 +1,11 @@
 import ReactDOM from 'react-dom/client';
 import App from './App';
 import { CommunityMiningPage } from './components/CommunityMiningPage';
+import { BufferAdminPage } from './components/BufferAdminPage';
 import './styles.css';
 
 function Root() {
+  if (window.location.pathname.replace(/\/+$/, '').toLowerCase() === '/buffer') return <BufferAdminPage />;
   const route = window.location.hash.replace(/^#\/?/, '').toLowerCase();
   if (route === 'community-mining') {
     return (
