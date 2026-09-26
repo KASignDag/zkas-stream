@@ -17,6 +17,7 @@ import {
   History,
   Link2,
   LockKeyhole,
+  Mail,
   Menu,
   MessageCircle,
   Moon,
@@ -781,7 +782,7 @@ function App() {
           {nav.map(([id, label]) => (
             <button key={id} className={tab === id ? 'active' : ''} onClick={() => { navigateToTab(id); setMenuOpen(false); }}>{label}</button>
           ))}
-          <a className="discord-nav-link" href="https://discord.gg/kJCYVtGEe" target="_blank" rel="noreferrer" onClick={() => setMenuOpen(false)}><MessageCircle size={17} /> Join Discord</a>
+          <a className="discord-nav-link" href="https://discord.gg/jysMS4XNFT" target="_blank" rel="noreferrer" onClick={() => setMenuOpen(false)}><MessageCircle size={17} /> Join Discord</a>
           <a className="telegram-nav-link" href="https://t.me/zkasofficial" target="_blank" rel="noreferrer" onClick={() => setMenuOpen(false)}><Send size={17} /> Join Telegram</a>
           <a className="x-nav-link" href="https://x.com/zkas_x" target="_blank" rel="noreferrer" onClick={() => setMenuOpen(false)}><span className="x-mark" aria-hidden="true">X</span> Follow @zkas_x</a>
         </nav>
@@ -789,7 +790,7 @@ function App() {
         <div className="header-actions">
           <span className="public-pill"><Globe2 size={14} /> PUBLIC ONLY</span>
           <span className={`live-pill ${status}`}><i />{status === 'live' ? 'MAINNET LIVE' : status === 'stale' ? 'LIVE · RETRYING' : 'CONNECTING'}</span>
-          <a className="icon-btn header-discord" href="https://discord.gg/kJCYVtGEe" target="_blank" rel="noreferrer" aria-label="Join ZKAS Discord" title="Join ZKAS Discord"><MessageCircle size={19} /></a>
+          <a className="icon-btn header-discord" href="https://discord.gg/jysMS4XNFT" target="_blank" rel="noreferrer" aria-label="Join ZKAS Discord" title="Join ZKAS Discord"><MessageCircle size={19} /></a>
           <a className="icon-btn header-telegram" href="https://t.me/zkasofficial" target="_blank" rel="noreferrer" aria-label="Join ZKAS Telegram" title="Join ZKAS Telegram"><Send size={18} /></a>
           <a className="icon-btn header-x" href="https://x.com/zkas_x" target="_blank" rel="noreferrer" aria-label="Follow ZKAS on X" title="Follow @zkas_x on X"><span className="x-mark" aria-hidden="true">X</span></a>
           <button className="icon-btn" onClick={() => setDark((v) => !v)} aria-label="Toggle theme">{dark ? <Sun size={18} /> : <Moon size={18} />}</button>
@@ -806,7 +807,7 @@ function App() {
           </div>
           <div className="hero-tools">
             <div className="desktop-social-links" aria-label="ZKAS social media links">
-              <a href="https://discord.gg/kJCYVtGEe" target="_blank" rel="noreferrer" aria-label="Join ZKAS Discord"><MessageCircle size={17} /><span>Discord</span></a>
+              <a href="https://discord.gg/jysMS4XNFT" target="_blank" rel="noreferrer" aria-label="Join ZKAS Discord"><MessageCircle size={17} /><span>Discord</span></a>
               <a href="https://t.me/zkasofficial" target="_blank" rel="noreferrer" aria-label="Join ZKAS Telegram"><Send size={17} /><span>Telegram</span></a>
               <a href="https://x.com/zkas_x" target="_blank" rel="noreferrer" aria-label="Follow ZKAS on X"><span className="x-mark" aria-hidden="true">X</span><span>@zkas_x</span></a>
               <details className="desktop-resources">
@@ -864,10 +865,12 @@ function App() {
         <div className="footer-brand"><ShieldCheck size={17} /> ZKAS Stream <span>v0.8.0</span></div>
         <div>Merged-mining, network & OTC intelligence • Public display • Private API credentials remain server-side</div>
         <VisitorCounter />
-        <div className="footer-socials">
-          <a className="footer-social" href="https://x.com/zkas_x" target="_blank" rel="noreferrer"><span className="x-mark" aria-hidden="true">X</span> Follow @zkas_x</a>
-          <a className="footer-social" href="https://discord.gg/kJCYVtGEe" target="_blank" rel="noreferrer"><MessageCircle size={15} /> Join ZKAS Discord</a>
-          <a className="footer-social" href="https://t.me/zkasofficial" target="_blank" rel="noreferrer"><Send size={15} /> Join ZKAS Telegram</a>
+        <div className="footer-socials" aria-label="Official ZKAS contacts">
+          <a className="footer-social" href="https://zkas.info" target="_blank" rel="noreferrer"><Globe2 size={15} /> Official site</a>
+          <a className="footer-social" href="mailto:support@zkas.info"><Mail size={15} /> support@zkas.info</a>
+          <a className="footer-social" href="https://x.com/ZKas_X" target="_blank" rel="noreferrer"><span className="x-mark" aria-hidden="true">X</span> @ZKas_X</a>
+          <a className="footer-social" href="https://discord.gg/jysMS4XNFT" target="_blank" rel="noreferrer"><MessageCircle size={15} /> Discord</a>
+          <a className="footer-social" href="https://t.me/zkasofficial" target="_blank" rel="noreferrer"><Send size={15} /> Telegram</a>
         </div>
       </footer>
 
