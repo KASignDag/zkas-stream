@@ -867,8 +867,10 @@ function App() {
         <VisitorCounter />
         <div className="footer-socials" aria-label="Official ZKAS contacts">
           <a className="footer-social" href="https://zkas.info" target="_blank" rel="noreferrer"><Globe2 size={15} /> Official site</a>
+          <a className="footer-social" href="https://zkas.io" target="_blank" rel="noreferrer"><Globe2 size={15} /> ZKAS.io</a>
           <a className="footer-social" href="mailto:support@zkas.info"><Mail size={15} /> support@zkas.info</a>
           <a className="footer-social" href="https://x.com/ZKas_X" target="_blank" rel="noreferrer"><span className="x-mark" aria-hidden="true">X</span> @ZKas_X</a>
+          <a className="footer-social" href="https://x.com/ZKas_Stream" target="_blank" rel="noreferrer"><span className="x-mark" aria-hidden="true">X</span> @ZKas_Stream</a>
           <a className="footer-social" href="https://discord.gg/jysMS4XNFT" target="_blank" rel="noreferrer"><MessageCircle size={15} /> Discord</a>
           <a className="footer-social" href="https://t.me/zkasofficial" target="_blank" rel="noreferrer"><Send size={15} /> Telegram</a>
         </div>
