@@ -70,10 +70,17 @@ export async function onRequest(context) {
       const channelId = clean(body.channelId, 200);
       const mode = body.mode === 'addToQueue' ? 'addToQueue' : 'customScheduled';
       const dueAt = clean(body.dueAt, 80);
+      const imageUrl = clean(body.imageUrl, 2000);
       if (!text || !channelId) return json({ message: 'Post text and Buffer channel are required.' }, 400);
       if (mode === 'customScheduled' && (!dueAt || Number.isNaN(Date.parse(dueAt)))) return json({ message: 'A valid scheduled date/time is required.' }, 400);
+      if (imageUrl) {
+        let media;
+        try { media = new URL(imageUrl); } catch { return json({ message: 'Image URL must be a valid public HTTPS URL.' }, 400); }
+        if (media.protocol !== 'https:') return json({ message: 'Image URL must use HTTPS.' }, 400);
+      }
 
       const due = mode === 'customScheduled' ? `, dueAt: ${gqlString(new Date(dueAt).toISOString())}` : '';
+      const assets = imageUrl ? `[{ image: { url: ${gqlString(imageUrl)} } }]` : '[]';
       const data = await bufferRequest(env.BUFFER_API_KEY, `mutation CreatePost {
         createPost(input: {
           text: ${gqlString(text)}
@@ -81,7 +88,7 @@ export async function onRequest(context) {
           schedulingType: automatic
           mode: ${mode}
           aiAssisted: true
-          assets: []
+          assets: ${assets}
           needsApproval: false
           ${due}
         }) {
