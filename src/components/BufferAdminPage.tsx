@@ -7,16 +7,16 @@ type DailyPost = { time: string; text: string; imageUrl: string };
 
 const DAILY_POSTS: DailyPost[] = [
 
-  {time:'08:01',imageUrl:'https://zkas.stream/videos/zkas-built-from-kaspa-poster.jpg',text:'⚡ Good morning, ZKAS.\n\nThe network does not sleep.\n\nFollow live ZKAS network activity — hashrate, block flow, nodes and blocks — on ZKAS.stream.\n\n#ZKAS #Kaspa'},
-  {time:'09:17',imageUrl:'https://zkas.stream/videos/zkas-private-speed-comparison-poster.jpg',text:'🔐 Should financial privacy be something you turn ON — or something you turn OFF?\n\nZKAS starts with privacy by default.\n\nWhat would you rather have for everyday digital money?\n\n#ZKAS #Privacy'},
-  {time:'10:43',imageUrl:'https://zkas.stream/videos/zkas-built-from-kaspa-poster.jpg',text:'⚡ Kaspa 🤝 ZKAS\n\nOne of the most interesting parts of ZKAS is merged mining: the same mining work can participate in securing Kaspa and ZKAS.\n\nIt is not Kaspa vs. ZKAS. It is another example of what can be built around the ecosystem.\n\n#Kaspa #ZKAS'},
-  {time:'12:15',imageUrl:'https://zkas.stream/zkas-logo.jpg',text:'⛏️ MINERS — quick question:\n\nIf you were mining ZKAS today, which setup would you choose?\n\n🟢 Pool mining\n🔵 Solo mining\n⚡ Merge mining\n🟣 ZKAS.stream Community Mining\n\nReply with your setup 👇\n\n#ZKAS #Mining'},
-  {time:'13:37',imageUrl:'https://zkas.stream/zkas-logo.jpg',text:'📊 ZKAS MARKET CHECK\n\nPrice is only one number.\n\nZKAS.stream tracks 24H average market cap, total trading volume, total ZKAS traded, exchange markets and OTC activity.\n\nSee the complete picture:\nhttps://zkas.stream/#exchanges\n\n#ZKAS #Crypto'},
-  {time:'14:04',imageUrl:'https://zkas.stream/videos/zkas-private-speed-comparison-poster.jpg',text:'Privacy is not suspicious.\n\nYour bank balance is not public.\nYour paycheck is not public.\nYour purchases are not everyone’s business.\n\nWhy should digital money automatically expose everything?\n\n🔐 Privacy by default.\n\n#ZKAS #Privacy'},
-  {time:'15:26',imageUrl:'https://zkas.stream/zkas-logo.jpg',text:'⛏️ Want to help secure ZKAS?\n\nZKAS.stream Community Mining gives miners a simple place to connect and see live community mining activity.\n\nYour miner. Your work. The community growing together. ⚡\n\nhttps://zkas.stream/community-mining\n\n#ZKAS #Mining'},
-  {time:'17:11',imageUrl:'https://zkas.stream/zkas-logo.jpg',text:'💚 ZKAS COMMUNITY CHECK\n\nIf you are following ZKAS this early, you are part of the story being built right now.\n\n🔁 Repost\n❤️ Like\n💬 Reply with ZKAS\n\nLet’s take this far. ⚡\n\n#ZKAS #Kaspa'},
-  {time:'18:43',imageUrl:'https://zkas.stream/videos/zkas-built-from-kaspa-poster.jpg',text:'🌐 What exactly is ZKAS.stream?\n\n⚡ Network intelligence\n⛏️ Mining data\n🤝 Community mining\n📊 Exchange markets\n💱 OTC activity\n🔐 Supply & privacy\n🔎 Explorer tools\n\nExplore ZKAS in one place:\nhttps://zkas.stream/\n\n#ZKAS #Kaspa'},
-  {time:'20:02',imageUrl:'https://zkas.stream/zkas-logo.jpg',text:'🌙 ZKAS is still early.\n\nThe network is running.\nMiners are securing it.\nMarkets are developing.\nTools are being built.\nThe community is growing.\n\nAnd we are documenting it as it happens.\n\nTomorrow, we keep building. ⚡\n\n@ZKas_X @ZKas_Stream\n#ZKAS #Kaspa'},
+  {time:'08:01',imageUrl:'',text:'⚡ Good morning, ZKAS.\n\nThe network does not sleep.\n\nFollow live ZKAS network activity — hashrate, block flow, nodes and blocks — on ZKAS.stream.\n\n#ZKAS #Kaspa'},
+  {time:'09:17',imageUrl:'',text:'🔐 Should financial privacy be something you turn ON — or something you turn OFF?\n\nZKAS starts with privacy by default.\n\nWhat would you rather have for everyday digital money?\n\n#ZKAS #Privacy'},
+  {time:'10:43',imageUrl:'',text:'⚡ Kaspa 🤝 ZKAS\n\nOne of the most interesting parts of ZKAS is merged mining: the same mining work can participate in securing Kaspa and ZKAS.\n\nIt is not Kaspa vs. ZKAS. It is another example of what can be built around the ecosystem.\n\n#Kaspa #ZKAS'},
+  {time:'12:15',imageUrl:'',text:'⛏️ MINERS — quick question:\n\nIf you were mining ZKAS today, which setup would you choose?\n\n🟢 Pool mining\n🔵 Solo mining\n⚡ Merge mining\n🟣 ZKAS.stream Community Mining\n\nReply with your setup 👇\n\n#ZKAS #Mining'},
+  {time:'13:37',imageUrl:'',text:'📊 ZKAS MARKET CHECK\n\nPrice is only one number.\n\nZKAS.stream tracks 24H average market cap, total trading volume, total ZKAS traded, exchange markets and OTC activity.\n\nSee the complete picture:\nhttps://zkas.stream/#exchanges\n\n#ZKAS #Crypto'},
+  {time:'14:04',imageUrl:'',text:'Privacy is not suspicious.\n\nYour bank balance is not public.\nYour paycheck is not public.\nYour purchases are not everyone’s business.\n\nWhy should digital money automatically expose everything?\n\n🔐 Privacy by default.\n\n#ZKAS #Privacy'},
+  {time:'15:26',imageUrl:'',text:'⛏️ Want to help secure ZKAS?\n\nZKAS.stream Community Mining gives miners a simple place to connect and see live community mining activity.\n\nYour miner. Your work. The community growing together. ⚡\n\nhttps://zkas.stream/community-mining\n\n#ZKAS #Mining'},
+  {time:'17:11',imageUrl:'',text:'💚 ZKAS COMMUNITY CHECK\n\nIf you are following ZKAS this early, you are part of the story being built right now.\n\n🔁 Repost\n❤️ Like\n💬 Reply with ZKAS\n\nLet’s take this far. ⚡\n\n#ZKAS #Kaspa'},
+  {time:'18:43',imageUrl:'',text:'🌐 What exactly is ZKAS.stream?\n\n⚡ Network intelligence\n⛏️ Mining data\n🤝 Community mining\n📊 Exchange markets\n💱 OTC activity\n🔐 Supply & privacy\n🔎 Explorer tools\n\nExplore ZKAS in one place:\nhttps://zkas.stream/\n\n#ZKAS #Kaspa'},
+  {time:'20:02',imageUrl:'',text:'🌙 ZKAS is still early.\n\nThe network is running.\nMiners are securing it.\nMarkets are developing.\nTools are being built.\nThe community is growing.\n\nAnd we are documenting it as it happens.\n\nTomorrow, we keep building. ⚡\n\n@ZKas_X @ZKas_Stream\n#ZKAS #Kaspa'},
 ];
 
 function tomorrowLocalDate(){
@@ -37,6 +37,7 @@ export function BufferAdminPage() {
   const [dailyPosts,setDailyPosts]=useState<DailyPost[]>(DAILY_POSTS);
   const [scheduled,setScheduled]=useState<number[]>([]);
   const [packBusy,setPackBusy]=useState(false);
+  const [visualDay,setVisualDay]=useState('');
   const channels=useMemo(()=>status?.organizations?.flatMap(org=>org.channels.map(channel=>({...channel,orgName:org.name})))??[],[status]);
 
   async function connect() {
@@ -55,6 +56,17 @@ export function BufferAdminPage() {
   }
 
   useEffect(()=>{if(token) void connect();},[]);
+  useEffect(()=>{
+    if(!status||!token||visualDay===day) return;
+    const cached=sessionStorage.getItem('zkas-buffer-visuals-'+day);
+    if(cached){
+      try{
+        const urls=JSON.parse(cached) as string[];
+        if(urls.length===10){setDailyPosts(rows=>rows.map((row,i)=>({...row,imageUrl:urls[i]})));setVisualDay(day);setMessage('Today’s 10 matching visuals are loaded automatically.');return;}
+      }catch{}
+    }
+    void generateAutomaticVisuals();
+  },[status,day]);
 
   async function createBufferPost(postText:string, iso?:string, imageUrl='') {
     const response=await fetch('/api/buffer',{
@@ -77,6 +89,61 @@ export function BufferAdminPage() {
       setText('');
     } catch(error){setMessage(error instanceof Error?error.message:'Scheduling failed.');}
     finally{setBusy(false);}
+  }
+
+  function drawAutomaticVisual(index:number,dateLabel:string){
+    const canvas=document.createElement('canvas');canvas.width=1200;canvas.height=675;
+    const ctx=canvas.getContext('2d');if(!ctx) throw new Error('Could not create visual.');
+    const titles=['ZKAS NETWORK','PRIVACY BY DEFAULT','KASPA + ZKAS','HOW DO YOU MINE?','ZKAS MARKET CHECK','PRIVACY IS NORMAL','COMMUNITY MINING','ZKAS COMMUNITY','EXPLORE ZKAS.stream','ZKAS IS STILL EARLY'];
+    const subs=['THE NETWORK NEVER SLEEPS','YOUR MONEY. YOUR CHOICE.','ONE MINING EFFORT · TWO NETWORKS','POOL · SOLO · MERGED · COMMUNITY','REAL DATA · CLEAR INSIGHTS','YOUR MONEY IS YOUR BUSINESS','CONNECT · MINE · GROW','PEOPLE POWER PRIVACY','NETWORK · MINING · MARKETS · OTC','BUILD · MINE · LEARN · GROW'];
+    const g=ctx.createLinearGradient(0,0,1200,675);g.addColorStop(0,'#031814');g.addColorStop(.55,'#061e24');g.addColorStop(1,index===9?'#352414':'#07383a');ctx.fillStyle=g;ctx.fillRect(0,0,1200,675);
+    ctx.globalAlpha=.22;ctx.strokeStyle='#2ee8ca';ctx.lineWidth=2;
+    for(let x=-200;x<1400;x+=90){ctx.beginPath();ctx.moveTo(600,340);ctx.lineTo(x,675);ctx.stroke();}
+    for(let y=390;y<675;y+=55){ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(1200,y);ctx.stroke();}
+    ctx.globalAlpha=1;
+    ctx.fillStyle='#eafffb';ctx.font='800 66px system-ui';ctx.fillText(titles[index],70,115);
+    ctx.fillStyle='#45e3cd';ctx.font='700 25px system-ui';ctx.fillText(subs[index],74,158);
+    ctx.fillStyle='#8ba9a3';ctx.font='600 18px system-ui';ctx.fillText('ZKAS · '+dateLabel,75,620);
+    ctx.fillStyle='#45e3cd';ctx.font='800 24px system-ui';ctx.fillText('ZKAS.stream',965,620);
+
+    const glow=(x:number,y:number,r:number)=>{const q=ctx.createRadialGradient(x,y,0,x,y,r);q.addColorStop(0,'rgba(42,235,207,.65)');q.addColorStop(1,'rgba(42,235,207,0)');ctx.fillStyle=q;ctx.beginPath();ctx.arc(x,y,r,0,Math.PI*2);ctx.fill();};
+    glow(790,350,240);
+    ctx.strokeStyle='#43e7d1';ctx.fillStyle='#071f23';ctx.lineWidth=5;
+
+    if(index===0){const pts=[[330,310],[500,260],[650,365],[810,245],[970,350],[430,470],[760,490],[1010,475]];pts.forEach((p,i)=>{pts.slice(i+1).forEach(q=>{if(Math.hypot(p[0]-q[0],p[1]-q[1])<330){ctx.globalAlpha=.35;ctx.beginPath();ctx.moveTo(p[0],p[1]);ctx.lineTo(q[0],q[1]);ctx.stroke();}});ctx.globalAlpha=1;ctx.fillStyle='#43e7d1';ctx.beginPath();ctx.arc(p[0],p[1],10,0,7);ctx.fill();});}
+    else if(index===1||index===5){ctx.beginPath();ctx.moveTo(720,225);ctx.lineTo(875,280);ctx.lineTo(850,455);ctx.quadraticCurveTo(795,525,720,555);ctx.quadraticCurveTo(645,525,590,455);ctx.lineTo(565,280);ctx.closePath();ctx.fill();ctx.stroke();ctx.fillStyle='#43e7d1';ctx.font='900 86px system-ui';ctx.fillText('ZK',652,410);['BALANCE','PAYCHECK','PURCHASES'].forEach((t,i)=>{ctx.fillStyle='#d8f7f1';ctx.font='700 22px system-ui';ctx.fillText('✓ '+t,285,300+i*70);});}
+    else if(index===2){[['KASPA',470],['ZKAS',850]].forEach(([t,x])=>{ctx.beginPath();ctx.arc(Number(x),360,115,0,7);ctx.fill();ctx.stroke();ctx.fillStyle='#eafffb';ctx.font='900 38px system-ui';ctx.textAlign='center';ctx.fillText(String(t),Number(x),373);});ctx.textAlign='left';ctx.strokeStyle='#43e7d1';ctx.lineWidth=12;ctx.beginPath();ctx.moveTo(585,360);ctx.bezierCurveTo(650,280,680,440,735,360);ctx.stroke();}
+    else if(index===3){['POOL','SOLO','MERGED','COMMUNITY'].forEach((t,i)=>{const x=300+(i%2)*330,y=250+Math.floor(i/2)*150;ctx.fillStyle='rgba(5,35,39,.92)';ctx.strokeStyle='#43e7d1';ctx.lineWidth=3;ctx.fillRect(x,y,285,115);ctx.strokeRect(x,y,285,115);ctx.fillStyle='#eafffb';ctx.font='800 25px system-ui';ctx.fillText(t,x+28,y+48);ctx.fillStyle='#45e3cd';ctx.font='600 17px system-ui';ctx.fillText(i===0?'STEADY':i===1?'YOUR BLOCKS':i===2?'KAS + ZKAS':'TOGETHER',x+28,y+80);});}
+    else if(index===4){ctx.strokeStyle='#45e3cd';ctx.lineWidth=7;ctx.beginPath();[[280,500],[390,450],[500,475],[610,360],[720,390],[830,275],[950,215]].forEach((p,i)=>i?ctx.lineTo(p[0],p[1]):ctx.moveTo(p[0],p[1]));ctx.stroke();for(let i=0;i<7;i++){ctx.fillStyle=i%2?'#2b9cc8':'#45e3cd';ctx.fillRect(300+i*100,530-(i%4)*25,42,70+(i%4)*25);}}
+    else if(index===6){const pts=[[600,355],[390,260],[820,250],[330,455],[865,455],[600,520]];pts.slice(1).forEach(p=>{ctx.globalAlpha=.55;ctx.beginPath();ctx.moveTo(600,355);ctx.lineTo(p[0],p[1]);ctx.stroke();});ctx.globalAlpha=1;pts.forEach((p,i)=>{ctx.fillStyle=i?'#0a3033':'#43e7d1';ctx.beginPath();ctx.arc(p[0],p[1],i?38:72,0,7);ctx.fill();ctx.stroke();});ctx.fillStyle='#06211f';ctx.font='900 48px system-ui';ctx.fillText('ZK',558,372);}
+    else if(index===7){for(let i=0;i<11;i++){const a=i/11*Math.PI*2,x=710+Math.cos(a)*220,y=380+Math.sin(a)*155;ctx.beginPath();ctx.arc(x,y,30,0,7);ctx.fill();ctx.stroke();ctx.beginPath();ctx.moveTo(710,380);ctx.lineTo(x,y);ctx.stroke();}ctx.fillStyle='#43e7d1';ctx.beginPath();ctx.arc(710,380,85,0,7);ctx.fill();ctx.fillStyle='#06211f';ctx.font='900 52px system-ui';ctx.fillText('ZK',662,398);}
+    else if(index===8){['NETWORK','MINING','MARKETS','OTC','EXPLORER','COMMUNITY'].forEach((t,i)=>{const x=275+(i%3)*270,y=250+Math.floor(i/3)*145;ctx.fillStyle='rgba(5,35,39,.95)';ctx.strokeStyle='#43e7d1';ctx.lineWidth=3;ctx.fillRect(x,y,235,105);ctx.strokeRect(x,y,235,105);ctx.fillStyle='#eafffb';ctx.font='800 20px system-ui';ctx.textAlign='center';ctx.fillText(t,x+117,y+62);});ctx.textAlign='left';}
+    else {const mountain=[[230,535],[430,330],[535,440],[705,235],[1010,535]];ctx.fillStyle='#102b2e';ctx.strokeStyle='#45e3cd';ctx.lineWidth=4;ctx.beginPath();mountain.forEach((p,i)=>i?ctx.lineTo(p[0],p[1]):ctx.moveTo(p[0],p[1]));ctx.lineTo(230,535);ctx.fill();ctx.stroke();for(let i=0;i<8;i++){ctx.fillStyle='#43e7d1';ctx.fillRect(340+i*70,500-i*28,18,18);}}
+    return canvas;
+  }
+
+  async function hostCanvas(canvas:HTMLCanvasElement){
+    const blob=await new Promise<Blob>((resolve,reject)=>canvas.toBlob(value=>value?resolve(value):reject(new Error('Could not encode visual.')),'image/jpeg',0.91));
+    const response=await fetch('/api/buffer-image',{method:'POST',headers:{'Content-Type':'image/jpeg','X-ZKAS-Admin-Token':token},body:blob});
+    const body=await response.json().catch(()=>({}));
+    if(!response.ok) throw new Error(body.message||'Could not host automatic visual.');
+    return body.url as string;
+  }
+
+  async function generateAutomaticVisuals(){
+    if(packBusy||!token) return;
+    setVisualDay(day);setPackBusy(true);setMessage('Generating and matching 10 original ZKAS visuals automatically…');
+    try{
+      const urls:string[]=[];
+      for(let index=0;index<10;index++){
+        const canvas=drawAutomaticVisual(index,new Date(day+'T12:00:00').toLocaleDateString(undefined,{month:'short',day:'numeric'}));
+        const url=await hostCanvas(canvas);urls.push(url);
+        setDailyPosts(rows=>rows.map((row,i)=>i===index?{...row,imageUrl:url}:row));
+      }
+      sessionStorage.setItem('zkas-buffer-visuals-'+day,JSON.stringify(urls));
+      setMessage('Ready: 10 posts are automatically matched with 10 original ZKAS visuals. Review them, then schedule when ready.');
+    }catch(error){setVisualDay('');setMessage(error instanceof Error?error.message:'Automatic visual generation failed.');}
+    finally{setPackBusy(false);}
   }
 
   async function uploadVisualPack(file:File){
@@ -145,12 +212,15 @@ export function BufferAdminPage() {
         </select>
       </label>
       <div style={{padding:16,border:'1px dashed #9ec8bb',borderRadius:14,background:'#f5fbf9'}}>
-        <b>10-image visual pack</b>
-        <p style={{margin:'5px 0 10px',color:'#687a75',fontWeight:650}}>Choose the 2×5 ZKAS visual-pack image. ZKAS.stream will split it into ten individual images and match panels 1–10 to posts 1–10 automatically.</p>
-        <label style={{display:'inline-block',padding:'11px 15px',borderRadius:999,background:'#159a7e',color:'#fff',fontWeight:900,cursor:'pointer'}}>
-          {packBusy?'Preparing visual pack…':'Choose visual pack'}
-          <input type="file" accept="image/*" disabled={packBusy||busy} onChange={e=>{const file=e.target.files?.[0];if(file) void uploadVisualPack(file);e.currentTarget.value='';}} style={{display:'none'}} />
-        </label>
+        <b>Automatic daily visual pack</b>
+        <p style={{margin:'5px 0 10px',color:'#687a75',fontWeight:650}}>{packBusy?'Generating and matching 10 original graphics…':'The 10 matching graphics load automatically for the selected day. No download or upload is required.'}</p>
+        <div style={{display:'flex',gap:10,flexWrap:'wrap'}}>
+          <button type="button" onClick={()=>{setVisualDay('');sessionStorage.removeItem('zkas-buffer-visuals-'+day);void generateAutomaticVisuals();}} disabled={packBusy||busy} style={{padding:'11px 15px',border:0,borderRadius:999,background:'#0b2b24',color:'#fff',fontWeight:900,cursor:'pointer'}}>Regenerate visuals</button>
+          <label style={{display:'inline-block',padding:'11px 15px',borderRadius:999,border:'1px solid #159a7e',background:'#fff',color:'#159a7e',fontWeight:900,cursor:'pointer'}}>
+            Choose visual pack (optional)
+            <input type="file" accept="image/*" disabled={packBusy||busy} onChange={e=>{const file=e.target.files?.[0];if(file) void uploadVisualPack(file);e.currentTarget.value='';}} style={{display:'none'}} />
+          </label>
+        </div>
       </div>
       <div style={{display:'grid',gap:12}}>
         {dailyPosts.map((post,index)=><div key={index} style={{display:'grid',gridTemplateColumns:'92px 1fr',gap:12,padding:14,border:'1px solid #d8e7e2',borderRadius:14,background:scheduled.includes(index)?'#eaf8f3':'#fbfdfc'}}>
