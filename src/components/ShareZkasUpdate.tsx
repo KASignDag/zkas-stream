@@ -6,8 +6,8 @@ import './ShareZkasUpdate.css';
 type Mode = 'network' | 'mining' | 'community' | 'market';
 type Metric = { label: string; value: string; tag?: string };
 type Community = { gateway?: string; miners?: Array<{ alias?: string; status: string; hashrateHps: number | null; zkasBlocks: number | null; kasBlocks: number | null }>; lifetimeZkasBlocks?: number | null; lifetimeKasBlocks?: number | null };
-type ExchangeFeed = { ticker?: { lastPrice?: number | null; volume24h?: number | null } | null; updatedAt?: number | null };
-type OtcFeed = { trades?: Array<{ timestamp?: number | null; zkasAmount?: number | null }> };
+type ExchangeFeed = { ticker?: { lastPrice?: number | null; volume24h?: number | null; quoteVolume24h?: number | null } | null; updatedAt?: number | null };
+type OtcFeed = { trades?: Array<{ timestamp?: number | null; zkasAmount?: number | null; totalKas?: number | null }> };\ntype KasFeed = { priceUsd?: number | null };
 
 const titles: Record<Mode, string> = {
   network: 'ZKAS NETWORK TODAY',
@@ -80,40 +80,57 @@ export function ShareZkasUpdate({ data }: { data: DashboardData }) {
   useEffect(()=>{
     if(!open) return;
     const ctl=new AbortController();
-    const exchangeRequests=['neoxex','noirtrade'].map(async exchange=>{
+    const exchangeRequests=['neoxex','nonkyc'].map(async exchange=>{
       const response=await fetch(`/api/exchange-market?exchange=${exchange}&pair=ZKAS_USDT&interval=15m`,{signal:ctl.signal,cache:'no-store'});
       if(!response.ok) throw new Error('Exchange feed unavailable');
       return await response.json() as ExchangeFeed;
     });
     const otcRequest=fetch('/api/otc-shared-trades',{signal:ctl.signal,cache:'no-store'})
       .then(response=>response.ok?response.json() as Promise<OtcFeed>:Promise.reject(new Error('OTC feed unavailable')));
-    Promise.allSettled([...exchangeRequests,otcRequest]).then(results=>{
+    const kasRequest=fetch('/api/kas-price',{signal:ctl.signal,cache:'no-store'})
+      .then(response=>response.ok?response.json() as Promise<KasFeed>:Promise.reject(new Error('KAS price unavailable')));
+    Promise.allSettled([...exchangeRequests,otcRequest,kasRequest]).then(results=>{
       const exchangeResults=results.slice(0,2)
         .filter((result): result is PromiseFulfilledResult<ExchangeFeed>=>result.status==='fulfilled')
         .map(result=>result.value);
-      const prices=exchangeResults
-        .map(result=>result.ticker?.lastPrice)
-        .filter((price): price is number=>typeof price==='number'&&Number.isFinite(price)&&price>0);
-      if(prices.length)setExchangePrice(prices[0]);
-
-      const exchangeVolume=exchangeResults.reduce((sum,result)=>{
-        const volume=result.ticker?.volume24h;
-        return sum+(typeof volume==='number'&&Number.isFinite(volume)&&volume>0?volume:0);
-      },0);
+      const exchangeMarkets=exchangeResults.flatMap(result=>{
+        const ticker=result.ticker;
+        if(!ticker) return [];
+        const price=ticker.lastPrice,quote=ticker.quoteVolume24h,zkas=ticker.volume24h;
+        if(typeof price!=='number'||!Number.isFinite(price)||price<=0||typeof quote!=='number'||!Number.isFinite(quote)||quote<=0) return [];
+        return [{price,quote,zkas:typeof zkas==='number'&&Number.isFinite(zkas)&&zkas>0?zkas:0}];
+      });
+      const exchangeQuote=exchangeMarkets.reduce((sum,m)=>sum+m.quote,0);
+      const exchangeWeightedPrice=exchangeQuote>0?exchangeMarkets.reduce((sum,m)=>sum+m.price*m.quote,0)/exchangeQuote:null;
+      const exchangeZkas=exchangeMarkets.reduce((sum,m)=>sum+m.zkas,0);
+      const cutoff=Date.now()-86_400_000;
       const otcResult=results[2];
-      let otcVolume=0;
+      let otcZkas=0,otcKas=0;
       if(otcResult?.status==='fulfilled'){
-        const cutoff=Date.now()-86_400_000;
-        otcVolume=(otcResult.value as OtcFeed).trades?.reduce((sum,trade)=>{
-          const timestamp=trade.timestamp;
-          const amount=trade.zkasAmount;
-          return sum+(typeof timestamp==='number'&&timestamp>=cutoff&&typeof amount==='number'&&Number.isFinite(amount)&&amount>0?amount:0);
-        },0)??0;
+        for(const trade of (otcResult.value as OtcFeed).trades??[]){
+          if(typeof trade.timestamp!=='number'||trade.timestamp<cutoff) continue;
+          if(typeof trade.zkasAmount!=='number'||!Number.isFinite(trade.zkasAmount)||trade.zkasAmount<=0) continue;
+          if(typeof trade.totalKas!=='number'||!Number.isFinite(trade.totalKas)||trade.totalKas<=0) continue;
+          otcZkas+=trade.zkasAmount;otcKas+=trade.totalKas;
+        }
       }
-      if(exchangeResults.length||(otcResult&&otcResult.status==='fulfilled'))setCombinedVolume24h(exchangeVolume+otcVolume);
+      const kasResult=results[3];
+      const kasUsd=kasResult?.status==='fulfilled'&&typeof (kasResult.value as KasFeed).priceUsd==='number'?(kasResult.value as KasFeed).priceUsd as number:null;
+      const otcAverageKas=otcZkas>0?otcKas/otcZkas:null;
+      const otcAverageUsd=otcAverageKas!==null&&kasUsd!==null?otcAverageKas*kasUsd:null;
+      const otcValueUsd=kasUsd!==null?otcKas*kasUsd:0;
+      const weightedMarkets=[
+        ...(exchangeWeightedPrice!==null&&exchangeQuote>0?[{price:exchangeWeightedPrice,quote:exchangeQuote}]:[]),
+        ...(otcAverageUsd!==null&&otcValueUsd>0?[{price:otcAverageUsd,quote:otcValueUsd}]:[]),
+      ];
+      const totalQuote=weightedMarkets.reduce((sum,m)=>sum+m.quote,0);
+      const weightedPrice=totalQuote>0?weightedMarkets.reduce((sum,m)=>sum+m.price*m.quote,0)/totalQuote:null;
+      setMarketAverageCap(weightedPrice!==null&&data.supply!==null?weightedPrice*data.supply:null);
+      setMarketVolumeUsd(totalQuote>0?totalQuote:null);
+      setMarketZkas24h(exchangeZkas+otcZkas>0?exchangeZkas+otcZkas:null);
     }).catch(()=>undefined);
     return ()=>ctl.abort();
-  },[open]);
+  },[open,data.supply]);
 
   const totals=useMemo(()=>{
     const miners=communities.flatMap(snapshot=>snapshot.miners??[]);
@@ -145,12 +162,12 @@ export function ShareZkasUpdate({ data }: { data: DashboardData }) {
       {label:'KAS BLOCKS',value:communities.length?compact(totals.kas):'Loading…'},
     ],
     market:[
-      {label:'ZKAS EXCHANGE PRICE',value:usd(exchangePrice??data.priceUsd),tag:'EXCHANGES'},
-      {label:'MARKET CAP',value:usd((exchangePrice??data.priceUsd)!==null&&data.supply!==null?(exchangePrice??data.priceUsd)!*data.supply:data.marketCapUsd)},
-      {label:'CIRCULATING SUPPLY',value:compact(data.supply)},
-      {label:'24H VOLUME',value:combinedVolume24h===null?'—':`${compact(combinedVolume24h)} ZKAS`,tag:'OTC + EXCHANGES'},
+      {label:'AVERAGE MARKET CAP (24H)',value:usd(marketAverageCap),tag:'NOIRTRADE + ARRREX EXCLUDED'},
+      {label:'TOTAL 24H VOLUME',value:marketVolumeUsd===null?'—':`${usd(marketVolumeUsd)} USDT`,tag:'NEOXEX + NONKYC + OTC'},
+      {label:'TOTAL ZKAS TRADED (24H)',value:marketZkas24h===null?'—':`${compact(marketZkas24h)} ZKAS`,tag:'NEOXEX + NONKYC + OTC'},
+      {label:'CIRCULATING SUPPLY',value:compact(data.supply),tag:'ZKAS MAINNET'},
     ],
-  }),[data,communities,totals,exchangePrice,combinedVolume24h]);
+  }),[data,communities,totals,marketAverageCap,marketVolumeUsd,marketZkas24h]);
 
   const caption=useMemo(()=>[
     mode==='community'?'⛏️ ZKAS Community Mining update':mode==='mining'?'⛏️ ZKAS mining update':mode==='market'?'📊 ZKAS market snapshot':'⚡ ZKAS network update',
