@@ -29,6 +29,7 @@ type MarketFeed = {
 };
 
 const exchangeIds: ExchangeId[] = ['neoxex', 'noirtrade', 'arrrex', 'nonkyc'];
+const combinedMarketExchangeIds: ExchangeId[] = ['neoxex', 'nonkyc'];
 const exchangeNames: Record<ExchangeId, string> = { neoxex: 'NeoxEX', noirtrade: 'NoirTrade', arrrex: 'ARRREX', nonkyc: 'NonKYC' };
 const fallbackTradeUrls: Record<ExchangeId, string> = {
   neoxex: 'https://neoxa.exchange/trade/ZKAS_USDT',
@@ -212,7 +213,7 @@ export function ExchangesPage({ circulatingSupply }: { circulatingSupply: number
   const lowLiquidity = bidBelowAsk !== null && bidBelowAsk >= 10;
   const liveCount = exchangeIds.filter((exchangeId) => feeds[exchangeId]).length;
   const combinedMarket = useMemo(() => {
-    const markets = exchangeIds.flatMap((exchangeId) => {
+    const markets = combinedMarketExchangeIds.flatMap((exchangeId) => {
       const ticker = feeds[exchangeId]?.ticker;
       if (!ticker || !Number.isFinite(ticker.lastPrice) || ticker.lastPrice <= 0 || !Number.isFinite(ticker.quoteVolume24h) || ticker.quoteVolume24h <= 0) return [];
       return [{ price: ticker.lastPrice, quoteVolume: ticker.quoteVolume24h }];
@@ -241,7 +242,7 @@ export function ExchangesPage({ circulatingSupply }: { circulatingSupply: number
         <div className="exchange-combined-copy">
           <span>Combined exchange market cap</span>
           <strong>{usd(combinedMarket.marketCap, 0)}</strong>
-          <p>Based on the 24-hour volume-weighted price across all listed exchanges × live circulating supply.</p>
+          <p>Based on the 24-hour volume-weighted price across NeoxEX and NonKYC × live circulating supply. NoirTrade and ARRREX are excluded due to low reported volume.</p>
         </div>
         <div className="exchange-combined-stat">
           <span>Combined weighted price</span>
