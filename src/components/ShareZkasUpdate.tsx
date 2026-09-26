@@ -7,7 +7,8 @@ type Mode = 'network' | 'mining' | 'community' | 'market';
 type Metric = { label: string; value: string; tag?: string };
 type Community = { gateway?: string; miners?: Array<{ alias?: string; status: string; hashrateHps: number | null; zkasBlocks: number | null; kasBlocks: number | null }>; lifetimeZkasBlocks?: number | null; lifetimeKasBlocks?: number | null };
 type ExchangeFeed = { ticker?: { lastPrice?: number | null; volume24h?: number | null; quoteVolume24h?: number | null } | null; updatedAt?: number | null };
-type OtcFeed = { trades?: Array<{ timestamp?: number | null; zkasAmount?: number | null; totalKas?: number | null }> };\ntype KasFeed = { priceUsd?: number | null };
+type OtcFeed = { trades?: Array<{ timestamp?: number | null; zkasAmount?: number | null; totalKas?: number | null }> };
+type KasFeed = { priceUsd?: number | null };
 
 const titles: Record<Mode, string> = {
   network: 'ZKAS NETWORK TODAY',
@@ -41,8 +42,9 @@ export function ShareZkasUpdate({ data }: { data: DashboardData }) {
   const android=typeof navigator!=='undefined'&&/Android/i.test(navigator.userAgent);
   const [mode,setMode]=useState<Mode>('network');
   const [communities,setCommunities]=useState<Community[]>([]);
-  const [exchangePrice,setExchangePrice]=useState<number|null>(null);
-  const [combinedVolume24h,setCombinedVolume24h]=useState<number|null>(null);
+  const [marketAverageCap,setMarketAverageCap]=useState<number|null>(null);
+  const [marketVolumeUsd,setMarketVolumeUsd]=useState<number|null>(null);
+  const [marketZkas24h,setMarketZkas24h]=useState<number|null>(null);
   const [copied,setCopied]=useState(false);
   const [imageCopied,setImageCopied]=useState(false);
   const [imageCopyFailed,setImageCopyFailed]=useState(false);
