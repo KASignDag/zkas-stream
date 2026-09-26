@@ -216,7 +216,7 @@ export function ExchangesPage({ circulatingSupply }: { circulatingSupply: number
     const markets = combinedMarketExchangeIds.flatMap((exchangeId) => {
       const ticker = feeds[exchangeId]?.ticker;
       if (!ticker || !Number.isFinite(ticker.lastPrice) || ticker.lastPrice <= 0 || !Number.isFinite(ticker.quoteVolume24h) || ticker.quoteVolume24h <= 0) return [];
-      return [{ price: ticker.lastPrice, quoteVolume: ticker.quoteVolume24h }];
+      return [{ price: ticker.lastPrice, quoteVolume: ticker.quoteVolume24h, zkasVolume: ticker.volume24h }];
     });
     const quoteVolume = markets.reduce((sum, market) => sum + market.quoteVolume, 0);
     const weightedPrice = quoteVolume > 0
@@ -227,6 +227,7 @@ export function ExchangesPage({ circulatingSupply }: { circulatingSupply: number
       markets: markets.length,
       quoteVolume,
       weightedPrice,
+      zkasVolume: markets.reduce((sum, market) => sum + (Number.isFinite(market.zkasVolume) && market.zkasVolume > 0 ? market.zkasVolume : 0), 0),
     };
   }, [circulatingSupply, feeds]);
 
@@ -253,6 +254,11 @@ export function ExchangesPage({ circulatingSupply }: { circulatingSupply: number
           <span>Total 24h volume</span>
           <b>{combinedMarket.quoteVolume > 0 ? `${usd(combinedMarket.quoteVolume, 2)} USDT` : '—'}</b>
           <small>Reported volume across included markets</small>
+        </div>
+        <div className="exchange-combined-stat">
+          <span>Total ZKAS traded (24h)</span>
+          <b>{combinedMarket.zkasVolume > 0 ? `${amount(combinedMarket.zkasVolume)} ZKAS` : '—'}</b>
+          <small>NeoxEX and NonKYC combined</small>
         </div>
       </section>
 
