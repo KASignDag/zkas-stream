@@ -181,7 +181,6 @@ export function ExchangesPage({ circulatingSupply }: { circulatingSupply: number
   const [errors, setErrors] = useState<Partial<Record<ExchangeId, string>>>({});
   const [otcFeed, setOtcFeed] = useState<OtcTradeFeed | null>(null);
   const [otcKasUsd, setOtcKasUsd] = useState<number | null>(null);
-  const [otcError, setOtcError] = useState<string | null>(null);
 
   useEffect(() => {
     let stopped = false;
@@ -227,9 +226,6 @@ export function ExchangesPage({ circulatingSupply }: { circulatingSupply: number
       if (stopped || controller.signal.aborted) return;
       if (tradesResult.status === 'fulfilled') {
         setOtcFeed(tradesResult.value);
-        setOtcError(null);
-      } else {
-        setOtcError(tradesResult.reason instanceof Error ? tradesResult.reason.message : 'OTC feed temporarily unavailable.');
       }
       if (kasResult.status === 'fulfilled') setOtcKasUsd(kasResult.value.priceUsd);
     }
@@ -281,7 +277,6 @@ export function ExchangesPage({ circulatingSupply }: { circulatingSupply: number
       averagePriceKas,
       averagePriceUsd: averagePriceKas !== null && otcKasUsd !== null ? averagePriceKas * otcKasUsd : null,
       kasVolume,
-      tradeCount: trades.length,
       valueUsd: otcKasUsd !== null ? kasVolume * otcKasUsd : null,
       zkasVolume,
     };
@@ -300,9 +295,8 @@ export function ExchangesPage({ circulatingSupply }: { circulatingSupply: number
 
       <section className="exchange-combined-summary" aria-live="polite">
         <div className="exchange-combined-copy">
-          <span>Combined exchange market cap</span>
+          <span>Combined exchange market cap <small>NoirTrade and ARRREX are excluded</small></span>
           <strong>{usd(combinedMarket.marketCap, 0)}</strong>
-          <p>Based on the 24-hour volume-weighted price across NeoxEX and NonKYC × live circulating supply. NoirTrade and ARRREX are excluded due to low reported volume.</p>
         </div>
         <div className="exchange-combined-stat">
           <span>Combined weighted price</span>
@@ -323,9 +317,8 @@ export function ExchangesPage({ circulatingSupply }: { circulatingSupply: number
 
       <section className="exchange-combined-summary exchange-otc-market-summary" aria-live="polite">
         <div className="exchange-combined-copy">
-          <span>OTC market (24h)</span>
+          <span>OTC market (24h) <small>OTC kept separate from exchange MC calculation</small></span>
           <strong>{kas(otcMarket.averagePriceKas)}</strong>
-          <p>{otcFeed ? `Volume-weighted average from ${otcMarket.tradeCount} completed ${otcMarket.tradeCount === 1 ? 'trade' : 'trades'} in the shared Discord and Telegram order book. Kept separate from the exchange market-cap calculation.` : otcError || 'Loading completed OTC trades…'}</p>
         </div>
         <div className="exchange-combined-stat">
           <span>Average OTC price (USD)</span>
