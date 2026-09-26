@@ -36,6 +36,21 @@ function reward(v: number | null | undefined) {
 function rr(c: CanvasRenderingContext2D,x:number,y:number,w:number,h:number,r:number) {
   c.beginPath(); c.roundRect(x,y,w,h,r);
 }
+function fitCanvasText(c: CanvasRenderingContext2D,text:string,maxWidth:number,weight:number,startSize:number,minSize:number) {
+  let size=startSize;
+  do { c.font=`${weight} ${size}px system-ui`; if(c.measureText(text).width<=maxWidth) break; size-=1; } while(size>minSize);
+  return size;
+}
+function drawWrappedCanvasText(c: CanvasRenderingContext2D,text:string,x:number,y:number,maxWidth:number,lineHeight:number,maxLines=2) {
+  const words=text.split(' '); const lines:string[]=[]; let line='';
+  for(const word of words){
+    const next=line?`${line} ${word}`:word;
+    if(c.measureText(next).width<=maxWidth) line=next;
+    else { if(line) lines.push(line); line=word; if(lines.length===maxLines-1) break; }
+  }
+  if(lines.length<maxLines&&line) lines.push(line);
+  lines.slice(0,maxLines).forEach((value,index)=>c.fillText(value,x,y+index*lineHeight));
+}
 
 export function ShareZkasUpdate({ data }: { data: DashboardData }) {
   const [open,setOpen]=useState(false);
@@ -194,9 +209,11 @@ export function ShareZkasUpdate({ data }: { data: DashboardData }) {
     const cardW=(1072-cardGap*(cardCount-1))/cardCount;
     all[mode].forEach((m,i)=>{
       const x=64+i*(cardW+cardGap),y=290,w=cardW,h=190;rr(c,x,y,w,h,22);c.fillStyle='rgba(3,17,21,.9)';c.fill();c.strokeStyle=i%2?'rgba(105,166,255,.55)':'rgba(53,234,216,.7)';c.lineWidth=2;c.stroke();
-      c.fillStyle='#86a7a8';c.font=`700 ${cardCount>4?12:14}px system-ui`;c.fillText(m.label,x+18,y+42);
-      c.fillStyle='#fff';c.font=`800 ${cardCount>4?24:29}px system-ui`;c.fillText(m.value.slice(0,18),x+18,y+98);
-      c.fillStyle='#3cebd9';c.font=`700 ${cardCount>4?11:13}px system-ui`;c.fillText(m.tag??'ZKAS MAINNET',x+18,y+152);
+      const innerW=w-36;
+      c.fillStyle='#86a7a8';fitCanvasText(c,m.label,innerW,700,cardCount>4?12:14,10);c.fillText(m.label,x+18,y+42);
+      c.fillStyle='#fff';fitCanvasText(c,m.value,innerW,800,cardCount>4?24:29,19);c.fillText(m.value,x+18,y+98);
+      c.fillStyle='#3cebd9';c.font=`700 ${cardCount>4?11:12}px system-ui`;
+      drawWrappedCanvasText(c,m.tag??'ZKAS MAINNET',x+18,y+148,innerW,17,2);
     });
 
     rr(c,64,586,1072,54,27);c.fillStyle='rgba(44,221,205,.14)';c.fill();c.strokeStyle='rgba(64,240,223,.5)';c.stroke();
