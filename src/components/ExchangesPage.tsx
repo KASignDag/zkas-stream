@@ -273,14 +273,16 @@ export function ExchangesPage({ circulatingSupply }: { circulatingSupply: number
     const zkasVolume = trades.reduce((sum, trade) => sum + (trade.zkasAmount ?? 0), 0);
     const kasVolume = trades.reduce((sum, trade) => sum + (trade.totalKas ?? 0), 0);
     const averagePriceKas = zkasVolume > 0 ? kasVolume / zkasVolume : null;
+    const averagePriceUsd = averagePriceKas !== null && otcKasUsd !== null ? averagePriceKas * otcKasUsd : null;
     return {
       averagePriceKas,
-      averagePriceUsd: averagePriceKas !== null && otcKasUsd !== null ? averagePriceKas * otcKasUsd : null,
+      averagePriceUsd,
       kasVolume,
+      marketCap: impliedMarketCap(averagePriceUsd, circulatingSupply),
       valueUsd: otcKasUsd !== null ? kasVolume * otcKasUsd : null,
       zkasVolume,
     };
-  }, [otcFeed, otcKasUsd]);
+  }, [circulatingSupply, otcFeed, otcKasUsd]);
   const combinedPriceKas = combinedMarket.weightedPrice !== null && otcKasUsd !== null && otcKasUsd > 0
     ? combinedMarket.weightedPrice / otcKasUsd
     : null;
@@ -317,8 +319,8 @@ export function ExchangesPage({ circulatingSupply }: { circulatingSupply: number
       <section className="exchange-combined-summary exchange-otc-market-summary" aria-live="polite">
         <div className="exchange-combined-copy">
           <span>OTC market (24h) <small>OTC kept separate from exchange MC calculation</small></span>
-          <strong>{usd(otcMarket.averagePriceUsd)}</strong>
-          <em>{kas(otcMarket.averagePriceKas)} per ZKAS</em>
+          <strong>{usd(otcMarket.marketCap, 0)}</strong>
+          <em>{usd(otcMarket.averagePriceUsd)} · {kas(otcMarket.averagePriceKas)} per ZKAS</em>
         </div>
         <div className="exchange-combined-stat">
           <span>OTC ZKAS traded (24h)</span>
