@@ -88,6 +88,8 @@ ZKAS_OTC_API_PREFIX=Bearer
 OTC_IMPORT_SECRET=
 ZKAS_MINING_RANKINGS_API_URL=
 ZKAS_MINING_RANKINGS_API_KEY=
+BUFFER_API_KEY=
+BUFFER_ADMIN_TOKEN=
 ```
 
 The API URL and access key are read only by `functions/api/otc-trades.js`. They are never included in the browser bundle or returned to visitors. Live responses are held in a short shared edge cache so website traffic does not create one request to Ronnie's service per visitor. Until the endpoint is configured, the OTC page displays a ready-to-connect state without fabricated trades.
@@ -105,6 +107,10 @@ npm run build
 ```
 
 The generated site is written to `dist/`. Production deploys to Cloudflare from the repository's `main` branch.
+
+### Private Buffer publisher
+
+The unlisted `/buffer` workspace connects ZKAS.stream to Buffer through the server-side `/api/buffer` Cloudflare Function. `BUFFER_API_KEY` must be the personal API key created in Buffer Settings → API. `BUFFER_ADMIN_TOKEN` is a separate long random password you create for access to the private publisher page. Store both as encrypted Cloudflare environment secrets; never commit either value to GitHub or expose the Buffer key in browser code. The page can discover connected Buffer channels and add a text post to the next queue slot or schedule it for an exact time.
 
 ## Data boundaries
 
