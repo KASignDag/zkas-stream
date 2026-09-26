@@ -850,7 +850,7 @@ function App() {
         {tab === 'explorer' && <ExplorerPage data={data} txs={txs} onSelect={(value) => void doSearch(value)} />}
         {tab === 'otc' && <OtcMarketPage circulatingSupply={data.supply} mode="shared-preview" />}
         {tab === 'otcPreview' && <OtcMarketPage circulatingSupply={data.supply} mode="shared-preview" previewNotice />}
-        {tab === 'exchanges' && <ExchangesPage />}
+        {tab === 'exchanges' && <ExchangesPage circulatingSupply={data.supply} />}
         {tab === 'importer' && <OtcScreenshotImporter />}
         {tab === 'history' && <HistoryPage data={data} history={history} range={historyRange} onRange={setHistoryRange} />}
         {tab === 'supply' && <SupplyPrivacyPage data={data} history={history} range={historyRange} onRange={setHistoryRange} />}

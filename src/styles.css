@@ -478,7 +478,7 @@ footer { width: min(1320px, calc(100% - 40px)); margin: 0 auto; padding: 22px 0 
 .exchange-price-dock em { font-size: 11px; font-style: normal; font-weight: 850; }
 .exchange-price-dock em.positive { color: #5ce1b8; }
 .exchange-price-dock em.negative { color: #f1827b; }
-.exchange-metrics { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 12px; }
+.exchange-metrics { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 12px; }
 .exchange-metric { min-width: 0; min-height: 124px; padding: 17px; border: 1px solid var(--border); border-radius: 14px; background: var(--surface); box-shadow: 0 3px 12px rgba(16, 35, 29, .025); }
 .exchange-metric > span { display: block; color: var(--accent); font-size: 11px; font-weight: 850; }
 .exchange-metric b { display: block; margin-top: 20px; overflow: hidden; font-size: clamp(18px, 1.7vw, 24px); letter-spacing: -.65px; text-overflow: ellipsis; white-space: nowrap; font-variant-numeric: tabular-nums; }
@@ -573,7 +573,6 @@ footer { width: min(1320px, calc(100% - 40px)); margin: 0 auto; padding: 22px 0 
   .exchange-metrics { grid-template-columns: 1fr 1fr; gap: 9px; }
   .exchange-metric { min-height: 116px; padding: 14px; }
   .exchange-metric b { margin-top: 17px; font-size: 18px; }
-  .exchange-metrics .exchange-metric:last-child { grid-column: 1 / -1; }
 }
 .page-tools { display: flex; justify-content: space-between; gap: 14px; align-items: center; padding: 13px 14px; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; }
 .page-tools span { color: var(--muted); font-size: 12px; }

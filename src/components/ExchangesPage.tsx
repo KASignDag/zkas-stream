@@ -49,6 +49,12 @@ function amount(value: number | null | undefined) {
   return number.format(value);
 }
 
+function impliedMarketCap(price: number | null | undefined, circulatingSupply: number | null) {
+  if (price === null || price === undefined || !Number.isFinite(price) || price <= 0) return null;
+  if (circulatingSupply === null || !Number.isFinite(circulatingSupply) || circulatingSupply <= 0) return null;
+  return price * circulatingSupply;
+}
+
 function PriceChart({ candles, lastPrice }: { candles: Candle[]; lastPrice: number | null }) {
   const chart = useMemo(() => {
     const rows = candles.filter((c) => [c.open, c.high, c.low, c.close, c.volume].every(Number.isFinite));
@@ -159,7 +165,7 @@ function OrderBook({ feed }: { feed: MarketFeed | null }) {
   );
 }
 
-export function ExchangesPage() {
+export function ExchangesPage({ circulatingSupply }: { circulatingSupply: number | null }) {
   const [feeds, setFeeds] = useState<Partial<Record<ExchangeId, MarketFeed>>>({});
   const [selected, setSelected] = useState<ExchangeId>('neoxex');
   const [interval, setInterval] = useState<Interval>('15m');
@@ -199,6 +205,7 @@ export function ExchangesPage() {
 
   const feed = feeds[selected] ?? null;
   const ticker = feed?.ticker ?? null;
+  const selectedMarketCap = impliedMarketCap(ticker?.lastPrice, circulatingSupply);
   const bidBelowAsk = ticker?.bestAsk && ticker.bestBid > 0
     ? ((ticker.bestAsk - ticker.bestBid) / ticker.bestAsk) * 100
     : null;
@@ -216,7 +223,8 @@ export function ExchangesPage() {
       <div className="exchange-selector" aria-label="Select chart exchange">
         {exchangeIds.map((exchangeId) => {
           const item = feeds[exchangeId];
-          return <button key={exchangeId} className={selected === exchangeId ? 'active' : ''} onClick={() => setSelected(exchangeId)}><span>{exchangeNames[exchangeId]} <i className={item ? 'online' : ''} /></span><b>{usd(item?.ticker?.lastPrice)}</b><small>{errors[exchangeId] || 'ZKAS / USDT'}</small></button>;
+          const marketCap = impliedMarketCap(item?.ticker?.lastPrice, circulatingSupply);
+          return <button key={exchangeId} className={selected === exchangeId ? 'active' : ''} onClick={() => setSelected(exchangeId)}><span>{exchangeNames[exchangeId]} <i className={item ? 'online' : ''} /></span><b>{usd(item?.ticker?.lastPrice)}</b><small>{errors[exchangeId] || `ZKAS / USDT · Implied MC ${usd(marketCap, 0)}`}</small></button>;
         })}
       </div>
 
@@ -233,6 +241,7 @@ export function ExchangesPage() {
         <MarketMetric label="Best ask" value={usd(ticker?.bestAsk)} detail="Lowest live selling offer" tone="ask" />
         <MarketMetric label="Actual 24h volume" value={ticker ? `${usd(ticker.quoteVolume24h, 2)} USDT` : '—'} detail={`${amount(ticker?.volume24h)} ZKAS traded`} />
         <MarketMetric label="24h trades" value={amount(ticker?.trades24h)} detail={bidBelowAsk === null ? 'Spread unavailable' : `Bid ${bidBelowAsk.toFixed(2)}% below ask`} />
+        <MarketMetric label="Implied market cap" value={usd(selectedMarketCap, 0)} detail="Last price × live circulating supply" />
       </section>
 
       <div className="exchange-market-grid">
@@ -251,11 +260,12 @@ export function ExchangesPage() {
 
       <section className="panel exchange-list-panel">
         <div className="panel-head"><div><span className="panel-icon"><Activity size={20} /></span><h2>ZKAS exchange markets</h2></div><span className="range-chip">{liveCount} LIVE</span></div>
-        <div className="exchange-table-scroll"><table><thead><tr><th>Exchange</th><th>Pair</th><th>Last price</th><th>Best bid</th><th>Best ask</th><th>24h USDT volume</th><th>Status</th><th /></tr></thead><tbody>{exchangeIds.map((exchangeId) => {
+        <div className="exchange-table-scroll"><table><thead><tr><th>Exchange</th><th>Pair</th><th>Last price</th><th>Implied market cap</th><th>Best bid</th><th>Best ask</th><th>24h USDT volume</th><th>Status</th><th /></tr></thead><tbody>{exchangeIds.map((exchangeId) => {
           const item = feeds[exchangeId];
-          return <tr key={exchangeId}><td><b>{exchangeNames[exchangeId]}</b></td><td>ZKAS/USDT</td><td>{usd(item?.ticker?.lastPrice)}</td><td className="bid-text">{usd(item?.ticker?.bestBid)}</td><td className="ask-text">{usd(item?.ticker?.bestAsk)}</td><td>{item?.ticker ? usd(item.ticker.quoteVolume24h, 2) : '—'}</td><td>{item ? <span className="exchange-live-chip"><i /> Live</span> : <span className="exchange-retry-chip">Retrying</span>}</td><td><a href={item?.exchange.tradeUrl || fallbackTradeUrls[exchangeId]} target="_blank" rel="noreferrer">Trade <ExternalLink size={13} /></a></td></tr>;
+          const marketCap = impliedMarketCap(item?.ticker?.lastPrice, circulatingSupply);
+          return <tr key={exchangeId}><td><b>{exchangeNames[exchangeId]}</b></td><td>ZKAS/USDT</td><td>{usd(item?.ticker?.lastPrice)}</td><td>{usd(marketCap, 0)}</td><td className="bid-text">{usd(item?.ticker?.bestBid)}</td><td className="ask-text">{usd(item?.ticker?.bestAsk)}</td><td>{item?.ticker ? usd(item.ticker.quoteVolume24h, 2) : '—'}</td><td>{item ? <span className="exchange-live-chip"><i /> Live</span> : <span className="exchange-retry-chip">Retrying</span>}</td><td><a href={item?.exchange.tradeUrl || fallbackTradeUrls[exchangeId]} target="_blank" rel="noreferrer">Trade <ExternalLink size={13} /></a></td></tr>;
         })}</tbody></table></div>
-        <p className="source-note"><TriangleAlert size={15} /> Live exchange prices and order books are reported separately from completed OTC trades.</p>
+        <p className="source-note"><TriangleAlert size={15} /> Implied market cap uses each exchange's last trade price × the same live circulating ZKAS supply. Low-liquidity trades can move the estimate substantially. Exchange data remains separate from completed OTC trades.</p>
       </section>
     </div>
   );
