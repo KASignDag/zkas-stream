@@ -27,10 +27,16 @@ async function bufferRequest(apiKey, query) {
 async function authorized(request, env) {
   if (!env.BUFFER_ADMIN_TOKEN) return false;
   const supplied = request.headers.get('X-ZKAS-Admin-Token') || '';
-  if (!supplied || supplied.length !== env.BUFFER_ADMIN_TOKEN.length) return false;
-  const a = new TextEncoder().encode(supplied);
-  const b = new TextEncoder().encode(env.BUFFER_ADMIN_TOKEN);
-  return crypto.subtle.timingSafeEqual ? crypto.subtle.timingSafeEqual(a, b) : supplied === env.BUFFER_ADMIN_TOKEN;
+  if (!supplied) return false;
+  const encoder = new TextEncoder();
+  const [left, right] = await Promise.all([
+    crypto.subtle.digest('SHA-256', encoder.encode(supplied)),
+    crypto.subtle.digest('SHA-256', encoder.encode(env.BUFFER_ADMIN_TOKEN)),
+  ]);
+  const a = new Uint8Array(left), b = new Uint8Array(right);
+  let mismatch = 0;
+  for (let i = 0; i < a.length; i++) mismatch |= a[i] ^ b[i];
+  return mismatch === 0;
 }
 
 export async function onRequest(context) {
