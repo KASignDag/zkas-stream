@@ -319,7 +319,7 @@ export function ExchangesPage({ circulatingSupply }: { circulatingSupply: number
         </div>
         <div className="exchange-combined-stat">
           <span>Total 24h volume</span>
-          <b>{otcFeed ? usd(otcMarket.valueUsd, 2) : '—'}</b>
+          <b>{otcFeed ? `${usd(otcMarket.valueUsd, 2)} USDT` : '—'}</b>
           <small>{otcFeed ? `${kas(otcMarket.kasVolume)} across completed OTC trades` : 'Waiting for the shared OTC feed'}</small>
         </div>
         <div className="exchange-combined-stat">
