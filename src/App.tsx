@@ -1,6 +1,3 @@
-Warning: truncated output (original token count: 45224)
-Total output lines: 3069
-
 import { FormEvent, type ReactNode, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Activity,
@@ -1271,7 +1268,806 @@ function MiningDistributionPanel({ data }: { data: DashboardData }) {
   return (
     <section className="panel mining-distribution-panel">
       <div className="panel-head mining-distribution-head">
-        <div><span className="panel-icon"><Network size={20} /></span><h2…15224 tokens truncated…b>6 ZKAS / block</b><small>First tail-emission floor begins</small></div>
+        <div><span className="panel-icon"><Network size={20} /></span><h2>Mining producer & hashrate distribution</h2></div>
+        <div className="distribution-range-tabs" role="group" aria-label="Hashrate distribution range">
+          {(['1h', '6h', '12h'] as MiningDistributionWindow[]).map((range) => (
+            <button key={range} type="button" className={windowRange === range ? 'active' : ''} onClick={() => setWindowRange(range)}>{range}</button>
+          ))}
+        </div>
+      </div>
+      <p className="distribution-intro">Observed block-producer share from public coinbase attribution. Named pools remain named; unidentified payout addresses remain unidentified.</p>
+
+      {official ? <>
+        <div className="distribution-summary-grid">
+          <div><span>Blocks measured</span><b>{displayNumber(distribution.blocksMeasured, true)}</b><small>whole DAG, not just the chain</small></div>
+          <div><span>Producers</span><b>{displayNumber(distribution.producerCount)}</b><small>{distribution.distinctAddresses ?? distribution.producerCount} payout addresses</small></div>
+          <div><span>Largest</span><b>{displayMiningPercent(distribution.largestSharePercent)}</b><small>{producerLabel(distribution.producers[0])}</small></div>
+          <div><span>Network hashrate</span><b>{displayHashrate(networkHashrate)}</b><small>consensus work estimate</small></div>
+          <div><span>Window</span><b>{windowText}</b><small>{distribution.majorityCount === null ? 'majority unavailable' : `${distribution.majorityCount} producer${distribution.majorityCount === 1 ? '' : 's'} to majority`}</small></div>
+        </div>
+        <div className="distribution-bars">
+          {rows.map((row, index) => {
+            const share = row.sharePercent ?? 0;
+            return <div className="distribution-row" key={row.key}>
+              <div className="distribution-row-label">
+                <span className="distribution-rank">{index + 1}</span>
+                <div><b>{producerLabel(row)}</b><small>{row.source === 'tag' ? 'named itself in its coinbase' : row.source === 'known' ? 'published payout address' : row.source === 'derived' ? 'linked via merge-mining proof' : 'no self-declared name'}{row.addresses && row.addresses > 1 ? ` · ${row.addresses} addresses` : ''}</small></div>
+              </div>
+              <div className="distribution-row-value"><b>{displayMiningPercent(row.sharePercent)}</b><small>{row.blocks === null ? 'block count unavailable' : `${displayNumber(row.blocks, true)} blocks`}</small></div>
+              <i className="distribution-track"><span style={{ width: `${Math.max(1.5, Math.min(100, share))}%` }} /></i>
+            </div>;
+          })}
+          {distribution.producers.length > rows.length && <div className="distribution-tail">+ {distribution.producers.length - rows.length} additional observed producers</div>}
+        </div>
+        <p className="source-note"><ShieldCheck size={15} /> Distribution is inferred from the producer/payout identity each observed block publicly names in its coinbase. This measures block-production share over the selected window; it does not enumerate individual ASICs or prove how many people operate behind a pool.</p>
+      </> : <div className="distribution-unavailable">
+        <Network size={24} />
+        <div><b>{loading ? 'Loading public producer distribution…' : 'Official miner-distribution feed is temporarily unavailable'}</b><span>ZKAS.stream keeps the rest of the merged-mining and solo intelligence live while the explorer feed retries.</span></div>
+      </div>}
+    </section>
+  );
+}
+
+function SoloMiningIntelligence({ data }: { data: DashboardData }) {
+  const [minerHashrate, setMinerHashrate] = useState('1');
+  const [hashUnit, setHashUnit] = useState<SoloHashUnit>('TH/s');
+  const [zkasFallbackPrice, setZkasFallbackPrice] = useState<number | null>(null);
+  const [kaspa, setKaspa] = useState<KaspaMiningSnapshot>({
+    hashrateHps: null,
+    blockRewardKas: null,
+    priceUsd: null,
+    status: 'loading',
+    source: null,
+  });
+
+  useEffect(() => {
+    const controller = new AbortController();
+
+    const readJson = async (path: string) => {
+      const response = await fetch(path, { signal: controller.signal });
+      if (!response.ok) throw new Error(`${path} returned ${response.status}`);
+      return await response.json() as Record<string, unknown>;
+    };
+
+    Promise.all([
+      readJson('/api/kas-mining'),
+      readJson('/api/kas-price').catch(() => null),
+      readJson('/api/zkas-price').catch(() => null),
+    ])
+      .then(([mining, quote, zkasQuote]) => {
+        const hashrateHps = Number(mining.hashrateHps);
+        const blockRewardKas = Number(mining.blockRewardKas);
+        const priceUsd = Number(quote?.priceUsd);
+        const zkasPriceUsd = Number(zkasQuote?.priceUsd);
+        if (Number.isFinite(zkasPriceUsd) && zkasPriceUsd > 0) setZkasFallbackPrice(zkasPriceUsd);
+        const hasMiningInputs = Number.isFinite(hashrateHps) && hashrateHps > 0
+          && Number.isFinite(blockRewardKas) && blockRewardKas > 0;
+        setKaspa({
+          hashrateHps: hasMiningInputs ? hashrateHps : null,
+          blockRewardKas: hasMiningInputs ? blockRewardKas : null,
+          priceUsd: Number.isFinite(priceUsd) && priceUsd > 0 ? priceUsd : null,
+          status: hasMiningInputs ? 'live' : 'unavailable',
+          source: typeof mining.source === 'string' ? mining.source : null,
+        });
+      })
+      .catch((error: unknown) => {
+        if (error instanceof DOMException && error.name === 'AbortError') return;
+        setKaspa((current) => ({ ...current, status: 'unavailable' }));
+      });
+
+    return () => controller.abort();
+  }, []);
+
+  const entered = Number(minerHashrate);
+  const minerHps = Number.isFinite(entered) && entered > 0 ? entered * SOLO_HASH_SCALES[hashUnit] : null;
+  const networkHps = data.hashrate !== null && data.hashrate > 0 ? data.hashrate : null;
+  const liveBps = data.bps !== null && data.bps > 0 ? data.bps : null;
+  const grossReward = validNumber(data.reward);
+  const payout = minerPayout(grossReward);
+  const nextPayout = minerPayout(validNumber(data.nextReward));
+
+  const shareFraction = minerHps !== null && networkHps !== null ? Math.min(1, minerHps / networkHps) : null;
+  const sharePct = shareFraction === null ? null : shareFraction * 100;
+  const expectedBlocksDay = shareFraction !== null && liveBps !== null ? shareFraction * liveBps * 86400 : null;
+  const expectedSeconds = expectedBlocksDay !== null && expectedBlocksDay > 0 ? 86400 / expectedBlocksDay : null;
+  const chance24h = expectedBlocksDay === null ? null : (1 - Math.exp(-expectedBlocksDay)) * 100;
+  const chance7d = expectedBlocksDay === null ? null : (1 - Math.exp(-expectedBlocksDay * 7)) * 100;
+  const expectedPayoutDay = expectedBlocksDay !== null && payout !== null ? expectedBlocksDay * payout : null;
+  const zkasPriceUsd = data.priceUsd ?? zkasFallbackPrice;
+  const expectedZkasUsdDay = expectedPayoutDay !== null && zkasPriceUsd !== null ? expectedPayoutDay * zkasPriceUsd : null;
+
+  const kaspaShareFraction = minerHps !== null && kaspa.hashrateHps !== null && kaspa.hashrateHps > 0
+    ? Math.min(1, minerHps / kaspa.hashrateHps)
+    : null;
+  const kaspaBlocksDay = kaspaShareFraction === null ? null : kaspaShareFraction * KASPA_BLOCKS_PER_SECOND * 86400;
+  const expectedKasDay = kaspaBlocksDay !== null && kaspa.blockRewardKas !== null
+    ? kaspaBlocksDay * kaspa.blockRewardKas
+    : null;
+  const expectedKasUsdDay = expectedKasDay !== null && kaspa.priceUsd !== null ? expectedKasDay * kaspa.priceUsd : null;
+  const combinedUsdDay = expectedZkasUsdDay !== null && expectedKasUsdDay !== null
+    ? expectedZkasUsdDay + expectedKasUsdDay
+    : null;
+
+  return (
+    <section className="solo-mining-section">
+      <section className="panel solo-mining-panel">
+        <div className="panel-head">
+          <div><span className="panel-icon"><Gauge size={20} /></span><h2>Solo mining intelligence</h2></div>
+          <span className="range-chip">LOCAL CALCULATOR</span>
+        </div>
+        <p className="solo-intro">Estimate ZKAS solo-mining odds and potential merge-mined KAS rewards from live public network conditions. The calculator runs in this browser and does not connect to a wallet, worker or miner.</p>
+
+        <label className="solo-hashrate-control">
+          <span>Your hashrate</span>
+          <div className="solo-input-wrap">
+            <input inputMode="decimal" type="number" min="0" step="any" value={minerHashrate} onChange={(e) => setMinerHashrate(e.target.value)} aria-label="Your mining hashrate" />
+            <select value={hashUnit} onChange={(e) => setHashUnit(e.target.value as SoloHashUnit)} aria-label="Hashrate unit">
+              <option>GH/s</option><option>TH/s</option><option>PH/s</option>
+            </select>
+          </div>
+        </label>
+
+        <div className="solo-section-label">Estimated daily rewards</div>
+        <div className="solo-earnings-grid">
+          <div className="solo-earnings-card zkas">
+            <span><i /> ZKAS · NATIVE</span>
+            <b>{displayMiningEstimate(expectedPayoutDay, ' ZKAS')}</b>
+            <strong>{displayUsd(expectedZkasUsdDay)} / day</strong>
+            <small>Probability-weighted solo estimate, not a guaranteed daily payout.</small>
+          </div>
+          <div className="solo-earnings-card kas">
+            <span><i /> KAS · THEORETICAL MERGE-MINED</span>
+            <b>{kaspa.status === 'loading' ? 'Loading…' : displayMiningEstimate(expectedKasDay, ' KAS')}</b>
+            <strong>{kaspa.status === 'loading' ? 'Live Kaspa inputs' : `${displayUsd(expectedKasUsdDay)} / day`}</strong>
+            <small>Theoretical potential gross reward. Requires active KAS mining and a configured Kaspa payout address; pool fees may apply.</small>
+          </div>
+          <div className="solo-combined-value">
+            <span>Estimated combined value</span>
+            <b>{displayUsd(combinedUsdDay)} / day</b>
+            <small>Statistical ZKAS + theoretical KAS value at currently reported USD prices—not guaranteed income.</small>
+          </div>
+        </div>
+
+        <div className="solo-section-label">ZKAS block odds</div>
+        <div className="solo-result-grid">
+          <div><span>Average time to a block</span><b>{expectedSeconds === null ? '—' : duration(expectedSeconds)}</b><small>statistical average, not a countdown</small></div>
+          <div><span>Chance ≥1 block in 24h</span><b>{displayMiningPercent(chance24h)}</b><small>Poisson estimate</small></div>
+          <div><span>Expected blocks / day</span><b>{displayMiningEstimate(expectedBlocksDay)}</b><small>long-run expectation</small></div>
+          <div><span>Estimated network share</span><b>{displayMiningPercent(sharePct)}</b><small>chosen hashrate ÷ ZKAS network estimate</small></div>
+          <div><span>Chance ≥1 block in 7d</span><b>{displayMiningPercent(chance7d)}</b><small>Poisson estimate</small></div>
+        </div>
+
+        <div className="solo-section-label solo-supporting-label">Live calculation inputs</div>
+        <div className="solo-controls solo-live-inputs">
+          <div className="solo-live-condition"><span>ZKAS network hashrate</span><b>{displayHashrate(networkHps)}</b><small>public consensus work estimate</small></div>
+          <div className="solo-live-condition"><span>ZKAS block flow</span><b>{liveBps === null ? '—' : `${fmt.format(liveBps)} BPS`}</b><small>observed public rate</small></div>
+          <div className="solo-live-condition"><span>ZKAS difficulty</span><b>{displayNumber(data.difficulty, true)}</b><small>current consensus target difficulty</small></div>
+          <div className="solo-live-condition"><span>ZKAS miner payout</span><b>{payout === null ? '—' : `${fmt.format(payout)} ZKAS`}</b><small>95% of gross block emission</small></div>
+          <div className="solo-live-condition"><span>Kaspa network hashrate</span><b>{displayHashrate(kaspa.hashrateHps)}</b><small>{kaspa.status === 'unavailable' ? 'live Kaspa input unavailable' : (kaspa.source ?? 'public Kaspa network estimate')}</small></div>
+          <div className="solo-live-condition"><span>Kaspa block reward</span><b>{kaspa.blockRewardKas === null ? '—' : `${displayMiningEstimate(kaspa.blockRewardKas)} KAS`}</b><small>current public reward per block</small></div>
+          <div className="solo-live-condition"><span>Kaspa price</span><b>{displayUsd(kaspa.priceUsd)}</b><small>current public USD price</small></div>
+        </div>
+
+        <div className="solo-reward-strip">
+          <div><span>ZKAS gross block emission</span><b>{grossReward === null ? '—' : `${fmt.format(grossReward)} ZKAS`}</b></div>
+          <div><span>Miner payout (95%)</span><b>{payout === null ? '—' : `${fmt.format(payout)} ZKAS`}</b></div>
+          <div><span>Development allocation (5%)</span><b>{grossReward === null ? '—' : `${fmt.format(developmentAllocation(grossReward) ?? 0)} ZKAS`}</b></div>
+          <div><span>Next miner payout</span><b>{nextPayout === null ? '—' : `${fmt.format(nextPayout)} ZKAS`}</b><small>{data.nextReductionSeconds === null ? 'schedule unavailable' : `in ${countdown(data.nextReductionSeconds)}`}</small></div>
+        </div>
+
+        <p className="source-note"><ShieldCheck size={15} /> Estimates use live public ZKAS and Kaspa network inputs. Solo and merge-mining rewards remain statistical estimates: luck, uptime, rejected shares, pool rules and fees can change actual payouts.</p>
+      </section>
+
+      <section className="two-col solo-info-row">
+        <section className="panel solo-mode-panel">
+          <div className="panel-head"><div><span className="panel-icon"><GitMerge size={20} /></span><h2>Solo, solo-merged and pool mining</h2></div></div>
+          <div className="solo-mode-grid">
+            <div><b>Solo ZKas</b><span>Your own node/Stratum stack submits work. You receive the miner payout only when your own hashrate finds a valid ZKas block.</span></div>
+            <div><b>Solo merged mining</b><span>Your own stack also uses Kaspa parent proof-of-work for ZKas AuxPoW. The same hashing work can participate in both chains while each chain still has its own validity target and reward event.</span></div>
+            <div><b>Pool mining</b><span>A pool aggregates many miners and usually pays smaller, smoother rewards according to its payout method, fees and thresholds.</span></div>
+          </div>
+          <p className="source-note"><ShieldCheck size={15} /> Public payout attribution does not reliably identify whether a source is a solo miner, private group or public pool unless that identity is independently known.</p>
+        </section>
+
+        <section className="panel solo-checklist-panel">
+          <div className="panel-head"><div><span className="panel-icon"><Server size={20} /></span><h2>Solo-mining readiness</h2></div><span className="range-chip">CHECKLIST</span></div>
+          <div className="solo-checklist">
+            <div><i>1</i><span><b>Synced ZKas node</b><small>Consensus and RPC must stay current before work is served or blocks are submitted.</small></span></div>
+            <div><i>2</i><span><b>Kaspa parent-work source</b><small>Required when you want the merged-mining / AuxPoW path rather than ZKas-only work.</small></span></div>
+            <div><i>3</i><span><b>Stratum bridge or solo gateway</b><small>ASICs need a mining endpoint that converts node work into the protocol the miner understands.</small></span></div>
+            <div><i>4</i><span><b>Payout addresses configured</b><small>Verify both ZKas and Kaspa destinations before leaving a solo stack unattended.</small></span></div>
+            <div><i>5</i><span><b>Healthy share flow</b><small>Accepted shares should continue increasing; invalid and stale shares should stay low.</small></span></div>
+            <div><i>6</i><span><b>Block submission + uptime monitoring</b><small>Watch submission errors, node sync, bridge health and miner connectivity—not just displayed hashrate.</small></span></div>
+          </div>
+        </section>
+      </section>
+    </section>
+  );
+}
+function MergedIntelligencePage({ data }: { data: DashboardData }) {
+  const genesis = useGenesisArchive();
+  const groups = attributionGroups(data);
+  const ratio = pct(data.merged.found, data.merged.checked);
+  const weightedConfidence = weightedAttributionConfidence(groups);
+  const topShare = fractionPercent(groups[0]?.share ?? null);
+  const matched = data.merged.attributionMatched ?? (groups.reduce((sum, g) => sum + g.blocks, 0) || null);
+  const mergedNodes = data.merged.nodes.filter((n) => n.kaspaDetected);
+  return (
+    <section className="page-stack">
+      <div className="privacy-callout"><GitMerge size={21} /><div><b>Merged-mining evidence + solo estimates, kept separate</b><span>Block attribution links observed merge-mined blocks to Kaspa payout attribution; the peer co-location probe is supporting evidence. The solo calculator is probability math based on the hashrate you enter and live public network estimates—it does not identify or monitor any specific miner.</span></div></div>
+      <div className="metric-grid mining-metrics attribution-metrics">
+        <MetricCard icon={<Boxes size={19} />} label="Attributed blocks" value={displayNumber(matched, true)} sub="Deduplicated public pipeline" accent />
+        <MetricCard icon={<GitMerge size={19} />} label="Attribution groups" value={displayNumber(groups.length || null)} sub="Unique payout groupings" />
+        <MetricCard icon={<ShieldCheck size={19} />} label="Weighted confidence" value={weightedConfidence === null ? '—' : `${fmt.format(fractionPercent(weightedConfidence) ?? 0)}%`} sub="Block-weighted API confidence" />
+        <MetricCard icon={<Zap size={19} />} label="Largest observed share" value={topShare === null ? '—' : `${fmt.format(topShare)}%`} sub="Of attributed blocks" />
+      </div>
+      <NativeMergedVisibility matched={matched} />
+      <section className="panel genesis-context-panel">
+        <div className="panel-head">
+          <div><span className="panel-icon"><Database size={20} /></span><h2>Network-wide payout history</h2></div>
+          <span className={`range-chip ${genesis?.source.historyComplete ? 'genesis-verified' : ''}`}>{genesis?.source.historyComplete ? 'GENESIS VERIFIED' : 'LOADING'}</span>
+        </div>
+        <div className="merge-stats node-stats">
+          <div><span>Selected-chain blocks</span><b>{displayNumber(genesis?.totals.blocks ?? null, true)}</b></div>
+          <div><span>Payout destinations</span><b>{displayNumber(genesis?.totals.addresses ?? null, true)}</b></div>
+          <div><span>Public mining payouts</span><b>{genesis ? `${displayNumber(genesis.totals.zkasMined, true)} ZKAS` : '—'}</b></div>
+          <div><span>Historical coverage</span><b>{genesis?.source.historyComplete && genesis.source.historyFromDaaScore === 0 ? '100%' : '—'}</b></div>
+        </div>
+        <p className="source-note"><ShieldCheck size={15} /> These are all-time public coinbase payout destinations, not unique people or current wallet balances. The archive cannot classify every historical block as native or AuxPoW, so it is kept separate from observed merged-mining attribution.</p>
+      </section>
+      <MiningDistributionPanel data={data} />
+      <SoloMiningIntelligence data={data} />
+      <AttributionBreakdown data={data} />
+      <MergedPanel data={data} />
+      <div className="metric-grid mining-metrics co-location-metrics">
+        <MetricCard icon={<GitMerge size={19} />} label="Co-located peers" value={displayNumber(data.merged.found)} sub="Kaspa node detected in last probe" />
+        <MetricCard icon={<Network size={19} />} label="Peers checked" value={displayNumber(data.merged.checked)} sub={`of ${displayNumber(data.merged.peers)} visible peers`} />
+        <MetricCard icon={<Zap size={19} />} label="Observable co-location" value={ratio === null ? '—' : `${fmt.format(ratio)}%`} sub="Probe signal, not block share" />
+        <MetricCard icon={<Clock3 size={19} />} label="Last completed probe" value={scanAge(data.merged.scannedAt)} sub="Public scanner cadence" />
+      </div>
+      <section className="two-col"><MergedCountryBreakdown data={data} /><MergedClientSummary nodes={mergedNodes} /></section>
+      <MergedPeersTable nodes={data.merged.nodes} ports={data.merged.ports} />
+    </section>
+  );
+}
+
+function MergedClientSummary({ nodes }: { nodes: DashboardData['merged']['nodes'] }) {
+  const groups = new Map<string, number>();
+  nodes.forEach((n) => groups.set(n.userAgent || 'Unknown client', (groups.get(n.userAgent || 'Unknown client') || 0) + 1));
+  const rows = [...groups.entries()].sort((a, b) => b[1] - a[1]);
+  return (
+    <section className="panel table-panel">
+      <div className="panel-head"><div><span className="panel-icon"><Server size={20} /></span><h2>Co-located peer clients</h2></div><span className="range-chip">PUBLIC</span></div>
+      <div className="table-scroll"><table><thead><tr><th>Client</th><th>Detected peers</th></tr></thead><tbody>
+        {rows.map(([client, count]) => <tr key={client}><td><code className="soft-code">{client}</code></td><td>{count}</td></tr>)}
+        {!rows.length && <tr><td colSpan={2} className="empty-cell">No client attribution available yet.</td></tr>}
+      </tbody></table></div>
+    </section>
+  );
+}
+
+function MergedPeersTable({ nodes, ports }: { nodes: DashboardData['merged']['nodes']; ports: number[] }) {
+  return (
+    <section className="panel table-panel expanded">
+      <div className="panel-head"><div><span className="panel-icon"><GitMerge size={20} /></span><h2>Visible co-location signals</h2></div><span className="privacy-chip"><ShieldCheck size={14} /> MASKED</span></div>
+      <div className="table-scroll"><table><thead><tr><th>Peer</th><th>Country</th><th>Masked net</th><th>Probe</th><th>Kaspa co-location</th><th>Attributed blocks</th><th>Share</th><th>Confidence</th><th>Payout attribution</th></tr></thead><tbody>
+        {nodes.map((n, i) => {
+          const share = fractionPercent(n.attributionShare);
+          const confidence = fractionPercent(n.attributionConfidence);
+          const payout = (n.attributionAddresses ?? [])[0]?.address;
+          return <tr key={`${n.id}-${i}`}><td><code className="soft-code">{short(n.id, 6)}</code></td><td>{n.countryName || n.countryCode || 'Unknown'}</td><td><code className="soft-code">{n.network || '—'}</code></td><td><span className="pill">{n.checked === null ? 'Waiting' : n.checked ? 'Checked' : 'Pending'}</span></td><td><span className={`pill ${n.kaspaDetected ? 'positive-pill' : ''}`}>{n.kaspaDetected ? 'Observed' : '—'}</span></td><td>{displayNumber(n.attributedBlocks, true)}</td><td>{share === null ? '—' : `${fmt.format(share)}%`}</td><td>{confidence === null ? '—' : `${fmt.format(confidence)}%`}</td><td><code className="soft-code">{payout ? short(payout, 8) : '—'}</code></td></tr>;
+        })}
+        {!nodes.length && <tr><td colSpan={9} className="empty-cell">Waiting for public merged-mining data.</td></tr>}
+      </tbody></table></div>
+      <p className="table-footnote">Kaspa ports scanned by the peer-probe backend: {ports.length ? ports.join(', ') : 'not reported'}. Attribution values come from the separate public block-observation pipeline; identical payout attributions can appear on multiple peer rows and are deduplicated in the share charts above.</p>
+    </section>
+  );
+}
+
+function NetworkHealthPage({ data, diffValues, txValues, pulseTimes, onOpenNodes }: { data: DashboardData; diffValues: Array<number | null>; txValues: Array<number | null>; pulseTimes: number[]; onOpenNodes: () => void }) {
+  return (
+    <section className="page-stack">
+      <div className="privacy-callout"><Activity size={21} /><div><b>Observed health signals, not an authoritative global score</b><span>These metrics come from the public explorer vantage point and consensus data. They are intended to show changes and anomalies without claiming to see every node on the network.</span></div></div>
+      <NetworkMap data={data.publicNodes} onOpenNodes={onOpenNodes} />
+      <div className="metric-grid nodes-metrics">
+        <MetricCard icon={<Activity size={19} />} label="BPS" value={displayNumber(data.bps)} sub="15m block flow" accent />
+        <MetricCard icon={<Gauge size={19} />} label="Hashrate" value={displayHashrate(data.hashrate)} sub="Consensus work estimate" />
+        <MetricCard icon={<Gauge size={19} />} label="Difficulty" value={displayNumber(data.difficulty, true)} sub="Current difficulty" />
+        <MetricCard icon={<Server size={19} />} label="Explorer-connected peers" value={displayNumber(data.relay.activePeers ?? data.nodes)} sub="Connected to the explorer node" />
+        <MetricCard icon={<Boxes size={19} />} label="Tip hashes" value={displayNumber(data.relay.tipHashes)} sub="Consensus tips" />
+        <MetricCard icon={<Database size={19} />} label="Mempool" value={displayNumber(data.mempool)} sub="Transactions waiting" />
+        <MetricCard icon={<Globe2 size={19} />} label="Countries" value={displayNumber(data.publicNodes.totals.countries)} sub="Visible geography" />
+        <MetricCard icon={<Network size={19} />} label="Visible nodes" value={displayNumber(data.publicNodes.totals.nodes ?? data.nodes)} sub="Explorer vantage point" />
+      </div>
+      <section className="two-col">
+        <div className="panel"><div className="panel-head"><div><span className="panel-icon"><Gauge size={20} /></span><h2>Difficulty signal</h2></div><span className="range-chip">15M</span></div><SparkChart values={diffValues} labels={pulseTimes} height={240} /></div>
+        <div className="panel"><div className="panel-head"><div><span className="panel-icon"><Waves size={20} /></span><h2>Transaction signal</h2></div><span className="range-chip">15M</span></div><SparkChart values={txValues} labels={pulseTimes} height={240} /></div>
+      </section>
+      <PublicNodeSummary data={data} onOpen={onOpenNodes} />
+      <section className="two-col"><CountriesTable data={data} /><NodeClientSummary nodes={data.publicNodes.nodes} /></section>
+    </section>
+  );
+}
+
+
+type NetworkEvent = {
+  key: string;
+  title: string;
+  detail: string;
+  tone: 'info' | 'positive' | 'watch';
+};
+
+function percentMove(current: number | null, baseline: number | null) {
+  if (current === null || baseline === null || baseline === 0) return null;
+  return ((current - baseline) / baseline) * 100;
+}
+
+function signedPercent(value: number | null) {
+  if (value === null) return '—';
+  return `${value >= 0 ? '+' : ''}${fmt.format(value)}%`;
+}
+
+function buildNetworkEvents(data: DashboardData, history: HistorySnapshot[]): NetworkEvent[] {
+  const now = Date.now();
+  const lastHour = history.filter((row) => row.t >= now - 60 * 60 * 1000).sort((a, b) => a.t - b.t);
+  const baseline = lastHour[0] ?? null;
+  const groups = attributionGroups(data);
+  const attributedNow = data.merged.attributionMatched ?? (groups.reduce((sum, row) => sum + row.blocks, 0) || null);
+  const topShareNow = fractionPercent(groups[0]?.share ?? null);
+  const currentNodes = validNumber(data.publicNodes.totals.nodes ?? data.nodes);
+  const hashrateMove = percentMove(validNumber(data.hashrate), baseline?.hashrate ?? null);
+  const nodeMove = baseline?.visibleNodes !== null && baseline?.visibleNodes !== undefined && currentNodes !== null
+    ? currentNodes - baseline.visibleNodes
+    : null;
+  const attributedMove = baseline?.attributedBlocks !== null && baseline?.attributedBlocks !== undefined && attributedNow !== null
+    ? attributedNow - baseline.attributedBlocks
+    : null;
+  const shareMove = baseline?.largestSharePct !== null && baseline?.largestSharePct !== undefined && topShareNow !== null
+    ? topShareNow - baseline.largestSharePct
+    : null;
+  const events: NetworkEvent[] = [];
+
+  if (data.nextReductionSeconds !== null && data.nextReductionSeconds <= 48 * 60 * 60) {
+    const nextMiner = minerPayout(data.nextReward);
+    events.push({
+      key: 'reward-step',
+      title: 'Emission step approaching',
+      detail: `${countdown(data.nextReductionSeconds)} until the next gross reward of ${data.nextReward === null ? '—' : `${fmt.format(data.nextReward)} ZKAS`}${nextMiner === null ? '' : ` (${fmt.format(nextMiner)} ZKAS miner payout)`}.`,
+      tone: data.nextReductionSeconds <= 6 * 60 * 60 ? 'watch' : 'info',
+    });
+  }
+
+  if (hashrateMove !== null) {
+    events.push({
+      key: 'hashrate',
+      title: `Network work ${Math.abs(hashrateMove) < 1 ? 'holding steady' : hashrateMove > 0 ? 'increased' : 'decreased'}`,
+      detail: `${signedPercent(hashrateMove)} versus the earliest ZKAS.stream observer snapshot available in the last hour. Current estimate: ${displayHashrate(data.hashrate)}.`,
+      tone: Math.abs(hashrateMove) >= 10 ? 'watch' : Math.abs(hashrateMove) < 1 ? 'positive' : 'info',
+    });
+  }
+
+  if (nodeMove !== null) {
+    events.push({
+      key: 'nodes',
+      title: nodeMove === 0 ? 'Visible peer set unchanged' : `Visible nodes ${nodeMove > 0 ? 'increased' : 'decreased'}`,
+      detail: `${nodeMove > 0 ? '+' : ''}${nodeMove} from the earliest observer snapshot in the last hour; ${displayNumber(currentNodes)} visible now from the explorer vantage point.`,
+      tone: Math.abs(nodeMove) >= 6 ? 'watch' : nodeMove === 0 ? 'positive' : 'info',
+    });
+  }
+
+  if (attributedMove !== null) {
+    events.push({
+      key: 'attribution',
+      title: attributedMove > 0 ? 'New merge-mining attribution observed' : 'Attribution total unchanged',
+      detail: `${attributedMove > 0 ? '+' : ''}${displayNumber(attributedMove, true)} attributed blocks since the earliest observer snapshot in the last hour; ${displayNumber(attributedNow, true)} currently matched.`,
+      tone: attributedMove > 0 ? 'positive' : 'info',
+    });
+  }
+
+  if (shareMove !== null) {
+    events.push({
+      key: 'share',
+      title: 'Largest observed attribution share moved',
+      detail: `${shareMove >= 0 ? '+' : ''}${fmt.format(shareMove)} percentage points over the available last-hour observer window; largest observed share is ${topShareNow === null ? '—' : `${fmt.format(topShareNow)}%`}.`,
+      tone: Math.abs(shareMove) >= 5 ? 'watch' : 'info',
+    });
+  }
+
+  const scanSeconds = data.merged.scannedAt
+    ? Math.max(0, Math.floor(Date.now() / 1000) - (data.merged.scannedAt > 10_000_000_000 ? Math.floor(data.merged.scannedAt / 1000) : data.merged.scannedAt))
+    : null;
+  if (scanSeconds !== null) {
+    events.push({
+      key: 'co-location',
+      title: scanSeconds > 20 * 60 ? 'Peer co-location scan is aging' : 'Peer co-location scan current',
+      detail: `${scanAge(data.merged.scannedAt)} · ${displayNumber(data.merged.found)} Kaspa co-located peers observed from ${displayNumber(data.merged.checked)} checked.`,
+      tone: scanSeconds > 20 * 60 ? 'watch' : 'positive',
+    });
+  }
+
+  const tipCount = data.relay.tipHashes;
+  if (tipCount !== null) {
+    events.push({
+      key: 'tips',
+      title: `${displayNumber(tipCount)} consensus tip${tipCount === 1 ? '' : 's'} visible`,
+      detail: 'BlockDAG tips are a live consensus metric; multiple tips are normal on a DAG and are not automatically an error.',
+      tone: 'info',
+    });
+  }
+
+  if (data.mempool !== null) {
+    events.push({
+      key: 'mempool',
+      title: data.mempool > 0 ? 'Transactions waiting in mempool' : 'Mempool currently clear',
+      detail: `${displayNumber(data.mempool)} transaction${data.mempool === 1 ? '' : 's'} waiting at the public explorer node.`,
+      tone: data.mempool > 25 ? 'watch' : 'info',
+    });
+  }
+
+  return events.slice(0, 8);
+}
+
+function EventsPage({ data, history }: { data: DashboardData; history: HistorySnapshot[] }) {
+  const events = useMemo(() => buildNetworkEvents(data, history), [data, history]);
+  const recentBlocks = data.blocks.slice(0, 8);
+
+  return (
+    <section className="page-stack">
+      <div className="privacy-callout">
+        <Activity size={21} />
+        <div>
+          <b>Live event intelligence — stable public signals only</b>
+          <span>
+            This page tracks consensus, block flow, peer changes, merged-mining attribution and ZKAS.stream observer events.
+            It intentionally does not reconstruct an animated live BlockDAG from intermittent block-relationship endpoints.
+          </span>
+        </div>
+      </div>
+
+      <section className="panel">
+        <div className="panel-head">
+          <div><span className="panel-icon"><Activity size={20} /></span><h2>Event intelligence</h2></div>
+          <span className="range-chip">LIVE + OBSERVED</span>
+        </div>
+        <p className="source-note" style={{ marginTop: 0 }}>
+          <ShieldCheck size={15} /> Events combine current consensus/public-API data with ZKAS.stream observer snapshots.
+          They describe observed changes, not authoritative network-wide incidents.
+        </p>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 12, marginTop: 16 }}>
+          {events.map((event) => <EventCard key={event.key} event={event} />)}
+          {!events.length && <div className="empty-mini">Collecting enough observer data to describe network changes.</div>}
+        </div>
+      </section>
+
+      <div className="metric-grid nodes-metrics">
+        <MetricCard icon={<Boxes size={19} />} label="Recent public blocks" value={displayNumber(data.blocks.length)} sub="Latest explorer snapshot" accent />
+        <MetricCard icon={<Network size={19} />} label="Consensus tips" value={displayNumber(data.relay.tipHashes)} sub="Current public node metric" />
+        <MetricCard icon={<Activity size={19} />} label="BPS" value={displayNumber(data.bps)} sub="15m observed block flow" />
+        <MetricCard icon={<Database size={19} />} label="Mempool" value={displayNumber(data.mempool)} sub="Transactions waiting" />
+      </div>
+
+      <section className="panel table-panel">
+        <div className="panel-head">
+          <div><span className="panel-icon"><Boxes size={20} /></span><h2>Recent public block activity</h2></div>
+          <span className="live-mini"><i /> LIVE SNAPSHOT</span>
+        </div>
+        <div className="table-scroll">
+          <table>
+            <thead><tr><th>Hash</th><th>Age</th><th>DAA</th><th>Blue score</th><th>Txs</th><th>Difficulty</th></tr></thead>
+            <tbody>
+              {recentBlocks.map((block, index) => (
+                <tr key={`${block.hash}-${index}`}>
+                  <td><code className="soft-code">{short(block.hash, 8)}</code></td>
+                  <td>{age(block.timestamp)}</td>
+                  <td>{displayNumber(block.daaScore, true)}</td>
+                  <td>{displayNumber(block.blueScore, true)}</td>
+                  <td><span className="pill">{block.txCount}</span></td>
+                  <td>{displayNumber(block.difficulty, true)}</td>
+                </tr>
+              ))}
+              {!recentBlocks.length && <tr><td colSpan={6} className="empty-cell">Waiting for recent public block data.</td></tr>}
+            </tbody>
+          </table>
+        </div>
+        <p className="table-footnote">
+          This is a stable recent-block snapshot, not a reconstructed live DAG. Parent relationships are intentionally omitted.
+        </p>
+      </section>
+    </section>
+  );
+}
+
+function EventCard({ event }: { event: NetworkEvent }) {
+  const tone = event.tone === 'watch'
+    ? { border: 'rgba(202, 139, 20, .35)', bg: 'rgba(202, 139, 20, .07)', dot: '#c58b18' }
+    : event.tone === 'positive'
+      ? { border: 'rgba(11, 158, 130, .35)', bg: 'rgba(11, 158, 130, .07)', dot: '#0b9e82' }
+      : { border: 'rgba(105, 92, 255, .28)', bg: 'rgba(105, 92, 255, .05)', dot: '#6d5dfc' };
+  return (
+    <div style={{ border: `1px solid ${tone.border}`, background: tone.bg, borderRadius: 16, padding: '15px 16px', minHeight: 112 }}>
+      <div style={{ display: 'flex', gap: 9, alignItems: 'center', marginBottom: 8 }}><i style={{ width: 8, height: 8, borderRadius: 999, background: tone.dot, display: 'block' }} /><b>{event.title}</b></div>
+      <span style={{ display: 'block', opacity: .72, lineHeight: 1.45, fontSize: 13 }}>{event.detail}</span>
+    </div>
+  );
+}
+
+function HistoryPage({ data, history, range, onRange }: { data: DashboardData; history: HistorySnapshot[]; range: HistoryRange; onRange: (range: HistoryRange) => void }) {
+  const genesis = useGenesisArchive();
+  const genesisDays = genesis?.history?.daily ?? [];
+  const cutoff = Date.now() - rangeMs(range);
+  const rows = history.filter((row) => row.t >= cutoff);
+  const first = rows[0] ?? null;
+  const last = rows.at(-1) ?? null;
+  const oldest = history[0]?.t ?? null;
+  const sampleSpan = first && last ? Math.max(0, last.t - first.t) : 0;
+  const pointsExpected = Math.max(1, Math.floor(rangeMs(range) / HISTORY_SAMPLE_MS));
+  const coverage = Math.min(100, (rows.length / pointsExpected) * 100);
+  const ranges: HistoryRange[] = ['1h', '24h', '7d', '30d'];
+
+  const chainWork = (data.chainWorkHistory ?? []).filter((point) => point.time >= cutoff);
+  const hashrateSeries = combinedChainSeries(
+    rows.map((row) => ({ time: row.t, value: row.hashrate })),
+    chainWork.map((point) => ({ time: point.time, value: point.hashrate })),
+    cutoff,
+  );
+  const difficultySeries = combinedChainSeries(
+    rows.map((row) => ({ time: row.t, value: row.difficulty })),
+    chainWork.map((point) => ({ time: point.time, value: point.difficulty })),
+    cutoff,
+  );
+
+  const hashrateDelta = seriesDelta(hashrateSeries);
+  const difficultyDelta = seriesDelta(difficultySeries);
+  const nodesDelta = deltaAbsolute(first?.visibleNodes ?? null, last?.visibleNodes ?? null);
+  const attributedDelta = deltaAbsolute(first?.attributedBlocks ?? null, last?.attributedBlocks ?? null);
+  const shareDelta = deltaAbsolute(first?.largestSharePct ?? null, last?.largestSharePct ?? null);
+  const coLocationDelta = deltaAbsolute(first?.coLocationPct ?? null, last?.coLocationPct ?? null);
+  const chainSpan = Math.max(seriesSpan(hashrateSeries), seriesSpan(difficultySeries));
+  const chainSamples = Math.max(hashrateSeries.length, difficultySeries.length);
+  const latestHashrate = hashrateSeries.at(-1)?.value ?? last?.hashrate ?? null;
+  const latestDifficulty = difficultySeries.at(-1)?.value ?? last?.difficulty ?? null;
+  const observerStarted = oldest ? dateStamp(oldest) : 'Not started';
+
+  return (
+    <section className="page-stack history-page">
+      <div className="privacy-callout"><History size={21} /><div><b>Historical intelligence, with source boundaries</b><span>Chain-reconstructable work data and observer-only network data are kept separate. ZKAS.stream never invents peer, geography, attribution or co-location history from before it was actually observed.</span></div></div>
+
+      <section className="two-col">
+        <div className="privacy-callout">
+          <TrendingUp size={21} />
+          <div><b>CHAIN-WORK BACKFILL · HASHRATE + DIFFICULTY</b><span>The public explorer provides roughly 24 hours of selected-parent work data. The verified node archive separately covers public mining payouts and shielded activity from genesis; it does not contain historical difficulty or hashrate.</span></div>
+        </div>
+        <div className="privacy-callout">
+          <Network size={21} />
+          <div><b>OBSERVER HISTORY · TRACKING BEGAN {observerStarted.toUpperCase()}</b><span>Visible nodes, countries, mining attribution, confidence and Kaspa co-location are observations from an explorer vantage point. Their history begins when ZKAS.stream recorded them and is not retroactively fabricated.</span></div>
+        </div>
+      </section>
+
+      <section className="panel genesis-archive-panel">
+        <div className="panel-head">
+          <div><span className="panel-icon"><Database size={20} /></span><h2>Verified genesis archive</h2></div>
+          <span className={`range-chip ${genesis?.source.historyComplete ? 'genesis-verified' : ''}`}>{genesis?.source.historyComplete ? '100% COVERAGE' : 'AWAITING DATA'}</span>
+        </div>
+        <div className="merge-stats node-stats">
+          <div><span>Selected-chain blocks</span><b>{displayNumber(genesis?.totals.blocks ?? null, true)}</b></div>
+          <div><span>Payout destinations</span><b>{displayNumber(genesis?.totals.addresses ?? null, true)}</b></div>
+          <div><span>Public mining payouts</span><b>{genesis ? `${displayNumber(genesis.totals.zkasMined, true)} ZKAS` : '—'}</b></div>
+          <div><span>Indexed through DAA</span><b>{displayNumber(genesis?.indexedThroughDaaScore ?? null, true)}</b></div>
+        </div>
+        {genesisDays.length > 0 ? <section className="two-col history-charts genesis-charts">
+          <HistoryChart title="Selected-chain blocks · daily" chip="GENESIS ARCHIVE" values={genesisDays.map((day) => day.blocks)} labels={genesisDays.map((day) => day.time)} />
+          <HistoryChart title="Public coinbase issuance · cumulative" chip="GENESIS ARCHIVE" values={genesisDays.map((day) => day.cumulativeCoinbaseZkas)} labels={genesisDays.map((day) => day.time)} />
+        </section> : <p className="genesis-awaiting">The current ranking remains available. Genesis charts will appear after the upgraded Windows indexer completes its next verified upload.</p>}
+        <p className="source-note"><ShieldCheck size={15} /> Reconstructed from the node’s verified selected-chain shielded scan archive from DAA 0 through a frozen checkpoint. Only aggregate public consensus data is uploaded; the node RPC remains private.</p>
+      </section>
+
+      <MiningPayoutRanking />
+
+      <section className="panel history-toolbar">
+        <div>
+          <span className="eyebrow">TIME RANGE</span>
+          <h2>{range.toUpperCase()} intelligence</h2>
+          <p>
+            {rows.length >= 2 ? `${rows.length} observer snapshots · ${duration(sampleSpan / 1000)} observed span` : 'Observer history is still collecting.'}
+            {chainSamples >= 2 ? ` · ${chainSamples} chain-work samples · ${duration(chainSpan / 1000)} chain span` : ''}
+          </p>
+        </div>
+        <div className="history-range-tabs">
+          {ranges.map((value) => <button key={value} className={range === value ? 'active' : ''} onClick={() => onRange(value)}>{value.toUpperCase()}</button>)}
+        </div>
+      </section>
+
+      <div className="metric-grid history-metrics">
+        <HistoryMetric icon={<Gauge size={19} />} label="Hashrate" value={displayHashrate(latestHashrate)} delta={hashrateDelta === null ? 'Chain history loading' : `${signed(hashrateDelta)} · chain-derived`} />
+        <HistoryMetric icon={<Gauge size={19} />} label="Difficulty" value={displayNumber(latestDifficulty, true)} delta={difficultyDelta === null ? 'Chain history loading' : `${signed(difficultyDelta)} · chain-derived`} />
+        <HistoryMetric icon={<Network size={19} />} label="Visible nodes" value={displayNumber(last?.visibleNodes ?? null)} delta={signed(nodesDelta, '')} />
+        <HistoryMetric icon={<GitMerge size={19} />} label="Attributed blocks" value={displayNumber(last?.attributedBlocks ?? null, true)} delta={signed(attributedDelta, '')} />
+        <HistoryMetric icon={<TrendingUp size={19} />} label="Largest observed share" value={last?.largestSharePct === null || last?.largestSharePct === undefined ? '—' : `${fmt.format(last.largestSharePct)}%`} delta={shareDelta === null ? 'Collecting observer history' : `${signed(shareDelta, '')} pts`} />
+        <HistoryMetric icon={<ShieldCheck size={19} />} label="Weighted confidence" value={last?.weightedConfidencePct === null || last?.weightedConfidencePct === undefined ? '—' : `${fmt.format(last.weightedConfidencePct)}%`} delta="Observer-tracked attribution confidence" />
+        <HistoryMetric icon={<Zap size={19} />} label="Observable co-location" value={last?.coLocationPct === null || last?.coLocationPct === undefined ? '—' : `${fmt.format(last.coLocationPct)}%`} delta={coLocationDelta === null ? 'Collecting observer history' : `${signed(coLocationDelta, '')} pts`} />
+        <HistoryMetric icon={<Server size={19} />} label="Co-located peers" value={displayNumber(last?.coLocatedPeers ?? null)} delta={last?.peersChecked ? `${displayNumber(last.coLocatedPeers)} of ${displayNumber(last.peersChecked)} checked · observer history` : 'Observer history'} />
+      </div>
+
+      <section className="two-col history-charts">
+        <HistoryChart title="Network hashrate · chain backfill" chip={range.toUpperCase()} values={hashrateSeries.map((point) => point.value)} labels={hashrateSeries.map((point) => point.time)} />
+        <HistoryChart title="Difficulty · chain backfill" chip={range.toUpperCase()} values={difficultySeries.map((point) => point.value)} labels={difficultySeries.map((point) => point.time)} />
+        <HistoryChart title="Visible nodes · observer history" chip={range.toUpperCase()} values={rows.map((row) => row.visibleNodes)} labels={rows.map((row) => row.t)} />
+        <HistoryChart title="Largest attributed share · observer history" chip={range.toUpperCase()} values={rows.map((row) => row.largestSharePct)} labels={rows.map((row) => row.t)} />
+        <HistoryChart title="Observable co-location · observer history" chip={range.toUpperCase()} values={rows.map((row) => row.coLocationPct)} labels={rows.map((row) => row.t)} />
+        <HistoryChart title="Attributed blocks · observer history" chip={range.toUpperCase()} values={rows.map((row) => row.attributedBlocks)} labels={rows.map((row) => row.t)} />
+      </section>
+
+      <section className="panel history-storage">
+        <div className="panel-head"><div><span className="panel-icon"><Database size={20} /></span><h2>History source status</h2></div><span className="range-chip">HYBRID</span></div>
+        <div className="merge-stats node-stats">
+          <div><span>Observer snapshots</span><b>{displayNumber(history.length)}</b></div>
+          <div><span>Observer tracking since</span><b>{oldest ? dateStamp(oldest) : 'Just started'}</b></div>
+          <div><span>Chain-work samples</span><b>{displayNumber((data.chainWorkHistory ?? []).length)}</b></div>
+          <div><span>Chain backfill span</span><b>{chainSpan > 0 ? duration(chainSpan / 1000) : 'Loading'}</b></div>
+          <div><span>Genesis archive</span><b>{genesis?.source.historyComplete ? 'Verified' : 'Awaiting upload'}</b></div>
+          <div><span>Genesis archive blocks</span><b>{displayNumber(genesis?.totals.blocks ?? null, true)}</b></div>
+          <div><span>Observer coverage</span><b>{rows.length ? `${fmt.format(coverage)}%` : '0%'}</b></div>
+          <div><span>Local retention</span><b>30 days</b></div>
+        </div>
+        <p className="source-note"><ShieldCheck size={15} /> Coverage differs by source: payout and aggregate shielded history can be verified from genesis; difficulty and hashrate backfill currently cover roughly 24 hours; observer-only peer, geography and attribution metrics begin when ZKAS.stream recorded them.</p>
+      </section>
+    </section>
+  );
+}
+
+function HistoryMetric({ icon, label, value, delta }: { icon: ReactNode; label: string; value: string; delta: string }) {
+  return (
+    <section className="panel history-metric">
+      <div className="history-metric-label"><span>{icon}</span><b>{label}</b></div>
+      <strong>{value}</strong>
+      <small>{delta}</small>
+    </section>
+  );
+}
+
+function HistoryChart({ title, chip, values, labels }: { title: string; chip: string; values: Array<number | null>; labels: number[] }) {
+  return (
+    <section className="panel">
+      <div className="panel-head"><div><span className="panel-icon"><TrendingUp size={20} /></span><h2>{title}</h2></div><span className="range-chip">{chip}</span></div>
+      <SparkChart values={values} labels={labels} height={230} />
+    </section>
+  );
+}
+
+function SupplyPrivacyPage({ data, history, range, onRange }: { data: DashboardData; history: HistorySnapshot[]; range: HistoryRange; onRange: (range: HistoryRange) => void }) {
+  const genesis = useGenesisArchive();
+  const genesisDays = genesis?.history?.daily ?? [];
+  const genesisTotals = genesis?.history?.totals ?? null;
+  const cutoff = Date.now() - rangeMs(range);
+  const rows = history.filter((row) => row.t >= cutoff);
+  const first = rows[0];
+  const last = rows.at(-1);
+  const ranges: HistoryRange[] = ['1h', '24h', '7d', '30d'];
+
+  const supplyDelta = first?.supply != null && last?.supply != null ? last.supply - first.supply : null;
+  const notesDelta = first?.shieldedNotes != null && last?.shieldedNotes != null && last.shieldedNotes >= first.shieldedNotes ? last.shieldedNotes - first.shieldedNotes : null;
+  const nullifierReset = first?.nullifiers != null && last?.nullifiers != null && last.nullifiers < first.nullifiers;
+  const nullifierDelta = first?.nullifiers != null && last?.nullifiers != null && !nullifierReset ? last.nullifiers - first.nullifiers : null;
+
+  return (
+    <section className="page-stack">
+      <div className="privacy-callout"><ShieldCheck size={21} /><div><b>Supply intelligence without a rich list</b><span>ZKas is shielded by design. This page reports public consensus supply, reward schedule and aggregate shielded-pool activity without claiming to identify holders, balances, senders, recipients or transfer amounts.</span></div></div>
+
+      <div className="history-range-tabs">
+        {ranges.map((item) => <button key={item} className={range === item ? 'on' : ''} onClick={() => onRange(item)}>{item.toUpperCase()}</button>)}
+      </div>
+
+      <div className="metric-grid nodes-metrics">
+        <MetricCard icon={<Coins size={19} />} label="Circulating supply" value={displayNumber(data.supply, true)} sub={supplyDelta === null ? 'Consensus-derived issued supply' : `${signed(supplyDelta, ' ZKAS')} in selected observer window`} />
+        <MetricCard icon={<CircleDollarSign size={19} />} label="Gross block emission" value={data.reward === null ? '—' : `${displayNumber(data.reward)} ZKAS`} sub="Consensus emission per block" />
+        <MetricCard icon={<Coins size={19} />} label="Miner payout (95%)" value={minerPayout(data.reward) === null ? '—' : `${displayNumber(minerPayout(data.reward))} ZKAS`} sub="Expected accepted-block miner credit" />
+        <MetricCard icon={<CircleDollarSign size={19} />} label="Development allocation (5%)" value={developmentAllocation(data.reward) === null ? '—' : `${displayNumber(developmentAllocation(data.reward))} ZKAS`} sub="Per accepted block" />
+        <MetricCard icon={<TimerReset size={19} />} label="Next reduction" value={countdown(data.nextReductionSeconds)} sub={data.nextReward === null ? 'Consensus schedule' : `Next gross ${displayNumber(data.nextReward)} · miner ${displayNumber(minerPayout(data.nextReward))} ZKAS`} />
+        <MetricCard icon={<LockKeyhole size={19} />} label="Shielded notes" value={displayNumber(data.shieldedNotes, true)} sub={notesDelta === null ? 'Backend-observed aggregate' : `+${displayNumber(notesDelta, true)} in selected window`} />
+        <MetricCard icon={<LockKeyhole size={19} />} label="Nullifiers / spends" value={displayNumber(data.nullifiers, true)} sub={nullifierReset ? 'Backend counter reset observed' : nullifierDelta === null ? 'Backend-observed aggregate' : `+${displayNumber(nullifierDelta, true)} in selected window`} />
+        <MetricCard icon={<Database size={19} />} label="Cumulative shielded issuance" value={displayNumber(data.shieldedValue ?? data.supply, true)} sub="Consensus-derived aggregate · not wallet balances" />
+      </div>
+
+      <section className="panel genesis-archive-panel">
+        <div className="panel-head">
+          <div><span className="panel-icon"><Database size={20} /></span><h2>All-time aggregate shielded history</h2></div>
+          <span className={`range-chip ${genesis?.source.historyComplete ? 'genesis-verified' : ''}`}>{genesis?.source.historyComplete ? 'GENESIS VERIFIED' : 'AWAITING DATA'}</span>
+        </div>
+        <div className="merge-stats node-stats">
+          <div><span>Public coinbase issuance</span><b>{genesisTotals ? `${displayNumber(genesisTotals.coinbaseZkas, true)} ZKAS` : '—'}</b></div>
+          <div><span>Note commitments</span><b>{displayNumber(genesisTotals?.noteCommitments ?? null, true)}</b></div>
+          <div><span>Nullifiers</span><b>{displayNumber(genesisTotals?.nullifiers ?? null, true)}</b></div>
+          <div><span>Shielded transactions</span><b>{displayNumber(genesisTotals?.shieldedTransactions ?? null, true)}</b></div>
+        </div>
+        {genesisDays.length > 0 ? <section className="two-col history-charts genesis-charts">
+          <HistoryChart title="Public coinbase issuance · cumulative" chip="ALL TIME" values={genesisDays.map((day) => day.cumulativeCoinbaseZkas)} labels={genesisDays.map((day) => day.time)} />
+          <HistoryChart title="Shielded actions · daily" chip="ALL TIME" values={genesisDays.map((day) => day.shieldedActions)} labels={genesisDays.map((day) => day.time)} />
+          <HistoryChart title="Note commitments · daily" chip="ALL TIME" values={genesisDays.map((day) => day.noteCommitments)} labels={genesisDays.map((day) => day.time)} />
+          <HistoryChart title="Payout destinations · cumulative" chip="ALL TIME" values={genesisDays.map((day) => day.payoutAddresses)} labels={genesisDays.map((day) => day.time)} />
+        </section> : <p className="genesis-awaiting">All-time charts will appear after the upgraded Windows indexer completes its first schema-v2 upload.</p>}
+        <p className="source-note"><ShieldCheck size={15} /> These are network aggregates reconstructed from public compact history. They do not reveal senders, recipients, transfer amounts, wallet balances, or current holders.</p>
+      </section>
+
+      <section className="two-col">
+        <div className="panel">
+          <div className="panel-head"><div><span className="panel-icon"><TrendingUp size={20} /></span><h2>Supply growth · observer history</h2></div><span className="range-chip">{range.toUpperCase()}</span></div>
+          <HistoryChart title="Circulating ZKAS" chip="CONSENSUS SUPPLY" values={rows.map((row) => row.supply ?? null)} labels={rows.map((row) => row.t)} />
+        </div>
+        <div className="panel">
+          <div className="panel-head"><div><span className="panel-icon"><LockKeyhole size={20} /></span><h2>Shielded activity · observer history</h2></div><span className="range-chip">{range.toUpperCase()}</span></div>
+          <HistoryChart title="Shielded notes" chip="AGGREGATE" values={rows.map((row) => row.shieldedNotes ?? null)} labels={rows.map((row) => row.t)} />
+          <HistoryChart title="Nullifiers / spends" chip="AGGREGATE" values={rows.map((row) => row.nullifiers ?? null)} labels={rows.map((row) => row.t)} />
+        </div>
+      </section>
+
+      <section className="panel">
+        <div className="panel-head"><div><span className="panel-icon"><TimerReset size={20} /></span><h2>Emission schedule</h2></div><span className="range-chip">CONSENSUS</span></div>
+        <div className="merge-stats node-stats">
+          <div><span>Gross block emission</span><b>{data.reward === null ? '—' : `${displayNumber(data.reward)} ZKAS`}</b></div>
+          <div><span>Miner payout (95%)</span><b>{minerPayout(data.reward) === null ? '—' : `${displayNumber(minerPayout(data.reward))} ZKAS`}</b></div>
+          <div><span>Development allocation (5%)</span><b>{developmentAllocation(data.reward) === null ? '—' : `${displayNumber(developmentAllocation(data.reward))} ZKAS`}</b></div>
+          <div><span>Next gross emission</span><b>{data.nextReward === null ? '—' : `${displayNumber(data.nextReward)} ZKAS`}</b></div>
+          <div><span>Next miner payout</span><b>{minerPayout(data.nextReward) === null ? '—' : `${displayNumber(minerPayout(data.nextReward))} ZKAS`}</b></div>
+          <div><span>Next reduction</span><b>{countdown(data.nextReductionSeconds)}</b></div>
+          <div><span>DAA score</span><b>{displayNumber(data.daaScore, true)}</b></div>
+          <div><span>Archive coverage</span><b>{genesis?.source.historyComplete && genesis.source.historyFromDaaScore === 0 ? 'Genesis → checkpoint' : 'Awaiting verified upload'}</b></div>
+        </div>
+        <p className="source-note"><ShieldCheck size={15} /> No annualized inflation estimate is shown. Reward and reduction values come from the public ZKas consensus/explorer API.</p>
+      </section>
+
+      <section className="panel feature-panel">
+        <div className="panel-head">
+          <div><span className="panel-icon"><LockKeyhole size={20} /></span><h2>Selective disclosure</h2></div>
+          <a className="secondary-link" href="https://zkas.info/whitepaper.html" target="_blank" rel="noreferrer">Privacy design ↗</a>
+        </div>
+        <p className="feature-intro">ZKAS keeps payments private by default while viewing keys allow an owner to reveal only the access needed for accounting, auditing or compliance.</p>
+        <div className="key-grid">
+          <div><span>Spending key</span><b>Controls funds</b><small>Keep private. This is the authority that can spend.</small></div>
+          <div><span>Full viewing key</span><b>Broad wallet visibility</b><small>Can disclose wallet activity without granting spend authority.</small></div>
+          <div><span>Incoming viewing key</span><b>Incoming visibility</b><small>Provides narrower access to received-payment information.</small></div>
+          <div><span>Outgoing viewing key</span><b>Outgoing visibility</b><small>Provides narrower access to sent-payment information.</small></div>
+        </div>
+        <p className="source-note"><ShieldCheck size={15} /> Viewing keys do not authorize spending, but they can reveal private financial information. Share them only intentionally.</p>
+      </section>
+
+      <div className="reference-callout">
+        <div><span className="eyebrow">PRIVACY BOUNDARY</span><h2>What this page intentionally cannot show</h2><p>Top holders, richest wallets, wallet concentration and individual address balances are not inferred. The public explorer backend does not expose a transparent rich-list dataset for the shielded-by-default chain.</p></div>
+      </div>
+    </section>
+  );
+}
+
+function ReferencePage({ data, txs, onSelect }: { data: DashboardData; txs: Array<TxRow & { blockHash: string; timestamp: number }>; onSelect: (value: string) => void }) {
+  const hasShielded = data.shieldedNotes !== null || data.nullifiers !== null || data.stateRoot !== null;
+  return (
+    <section className="page-stack">
+      <div className="reference-callout">
+        <div><span className="eyebrow">SUPPORTING REFERENCE</span><h2>Chain information in one place</h2><p>Useful ZKas chain facts stay here for convenience. ZKAS.stream does not try to duplicate every explorer feature.</p></div>
+        <a className="secondary-link" href="https://explorer.zkas.info" target="_blank" rel="noreferrer">Open official ZKas Explorer ↗</a>
+      </div>
+
+      <section className="panel feature-panel">
+        <div className="panel-head">
+          <div><span className="panel-icon"><ShieldCheck size={20} /></span><h2>Fair-launch proof</h2></div>
+          <a className="secondary-link" href="https://zkas.info/whitepaper.html" target="_blank" rel="noreferrer">Verify in whitepaper ↗</a>
+        </div>
+        <div className="proof-grid">
+          <div><span>NO PREMINE</span><b>Genesis coinbase is provably unspendable</b><small>The nominal 1 ZKAS genesis output was sent to a one-byte <code>OP_FALSE</code> script, so it cannot be spent.</small></div>
+          <div><span>PUBLIC ANCHOR</span><b>Genesis anchored to Bitcoin</b><small>The genesis construction commits to Bitcoin block 959,713, providing a public timestamp reference.</small></div>
+        </div>
+      </section>
+
+      <section className="panel feature-panel">
+        <div className="panel-head">
+          <div><span className="panel-icon"><TimerReset size={20} /></span><h2>ZKAS tokenomics timeline</h2></div>
+          <a className="secondary-link" href="https://zkas.info/whitepaper.html" target="_blank" rel="noreferrer">Verify in whitepaper ↗</a>
+        </div>
+        <p className="feature-intro">ZKAS launched with a front-loaded proof-of-work schedule. The block reward halves every three months until it reaches a two-step permanent tail.</p>
+        <div className="tokenomics-timeline">
+          <div><span>Launch</span><b>60 ZKAS / block</b><small>57 to the miner · 3 to development</small></div>
+          <div><span>Month 3</span><b>30 ZKAS / block</b><small>First three-month halving</small></div>
+          <div><span>Month 6</span><b>15 ZKAS / block</b><small>Second three-month halving</small></div>
+          <div><span>About month 10</span><b>6 ZKAS / block</b><small>First tail-emission floor begins</small></div>
           <div><span>Month 24 onward</span><b>0.6 ZKAS / block</b><small>Permanent tail · about 18.9M ZKAS yearly</small></div>
         </div>
         <p className="source-note"><ShieldCheck size={15} /> ZKAS has no fixed maximum supply. The permanent tail emission is designed to continue funding proof-of-work security.</p>
