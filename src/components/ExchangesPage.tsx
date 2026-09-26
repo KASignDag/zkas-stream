@@ -38,6 +38,10 @@ const fallbackTradeUrls: Record<ExchangeId, string> = {
   arrrex: 'https://arrrex.com/app/trade?market=ZKAS-USDT',
   nonkyc: 'https://nonkyc.io/market/ZKAS_USDT',
 };
+const referralUrls: Partial<Record<ExchangeId, string>> = {
+  neoxex: 'https://neoxa.exchange/register?ref=NEXDF11FC75',
+  nonkyc: 'https://nonkyc.io?ref=6aa147b8bced0db41698e572',
+};
 const intervals: Interval[] = ['5m', '15m', '1h', '4h', '1d'];
 const number = new Intl.NumberFormat('en-US', { maximumFractionDigits: 2 });
 
@@ -374,9 +378,11 @@ export function ExchangesPage({ circulatingSupply }: { circulatingSupply: number
         <div className="exchange-table-scroll"><table><thead><tr><th>Exchange</th><th>Pair</th><th>Last price</th><th>Implied market cap</th><th>Best bid</th><th>Best ask</th><th>24h USDT volume</th><th>Status</th><th /></tr></thead><tbody>{exchangeIds.map((exchangeId) => {
           const item = feeds[exchangeId];
           const marketCap = impliedMarketCap(item?.ticker?.lastPrice, circulatingSupply);
-          return <tr key={exchangeId}><td><b>{exchangeNames[exchangeId]}</b></td><td>ZKAS/USDT</td><td>{usd(item?.ticker?.lastPrice)}</td><td>{usd(marketCap, 0)}</td><td className="bid-text">{usd(item?.ticker?.bestBid)}</td><td className="ask-text">{usd(item?.ticker?.bestAsk)}</td><td>{item?.ticker ? usd(item.ticker.quoteVolume24h, 2) : '—'}</td><td>{item ? <span className="exchange-live-chip"><i /> Live</span> : <span className="exchange-retry-chip">Retrying</span>}</td><td><a href={item?.exchange.tradeUrl || fallbackTradeUrls[exchangeId]} target="_blank" rel="noreferrer">Trade <ExternalLink size={13} /></a></td></tr>;
+          const referralUrl = referralUrls[exchangeId];
+          return <tr key={exchangeId}><td><b>{exchangeNames[exchangeId]}</b></td><td>ZKAS/USDT</td><td>{usd(item?.ticker?.lastPrice)}</td><td>{usd(marketCap, 0)}</td><td className="bid-text">{usd(item?.ticker?.bestBid)}</td><td className="ask-text">{usd(item?.ticker?.bestAsk)}</td><td>{item?.ticker ? usd(item.ticker.quoteVolume24h, 2) : '—'}</td><td>{item ? <span className="exchange-live-chip"><i /> Live</span> : <span className="exchange-retry-chip">Retrying</span>}</td><td><div className="exchange-actions"><a href={item?.exchange.tradeUrl || fallbackTradeUrls[exchangeId]} target="_blank" rel="noreferrer">Trade <ExternalLink size={13} /></a>{referralUrl && <a className="exchange-referral-link" href={referralUrl} target="_blank" rel="noreferrer sponsored">Sign up with referral <ExternalLink size={11} /></a>}</div></td></tr>;
         })}</tbody></table></div>
         <p className="source-note"><TriangleAlert size={15} /> Implied market cap uses each exchange's last trade price × the same live circulating ZKAS supply. Low-liquidity trades can move the estimate substantially. Exchange data remains separate from completed OTC trades.</p>
+        <p className="source-note exchange-referral-disclosure"><ExternalLink size={15} /> Referral disclosure: ZKAS.stream may earn a portion of trading fees when new users register through eligible referral links, at no extra cost to the user.</p>
       </section>
     </div>
   );
