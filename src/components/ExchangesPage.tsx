@@ -254,7 +254,6 @@ export function ExchangesPage({ circulatingSupply }: { circulatingSupply: number
       : null;
     return {
       marketCap: impliedMarketCap(weightedPrice, circulatingSupply),
-      markets: markets.length,
       quoteVolume,
       weightedPrice,
       zkasVolume: markets.reduce((sum, market) => sum + (Number.isFinite(market.zkasVolume) && market.zkasVolume > 0 ? market.zkasVolume : 0), 0),
@@ -286,10 +285,6 @@ export function ExchangesPage({ circulatingSupply }: { circulatingSupply: number
   const combinedPriceKas = combinedMarket.weightedPrice !== null && otcKasUsd !== null && otcKasUsd > 0
     ? combinedMarket.weightedPrice / otcKasUsd
     : null;
-  const allMarketsZkasVolume = otcFeed && combinedMarket.markets > 0
-    ? combinedMarket.zkasVolume + otcMarket.zkasVolume
-    : null;
-
   return (
     <div className="page-stack exchanges-page">
       <div className={`exchange-status ${liveCount === 0 ? 'error' : 'live'}`}>
@@ -318,19 +313,19 @@ export function ExchangesPage({ circulatingSupply }: { circulatingSupply: number
 
       <section className="exchange-combined-summary exchange-otc-market-summary" aria-live="polite">
         <div className="exchange-combined-copy">
-          <span>OTC market (24h) <small>OTC kept separate from exchange MC calculation</small></span>
+          <span>OTC market cap (24h) <small>OTC kept separate from exchange MC calculation</small></span>
           <strong>{usd(otcMarket.marketCap, 0)}</strong>
           <em>{usd(otcMarket.averagePriceUsd)} · {kas(otcMarket.averagePriceKas)} per ZKAS</em>
         </div>
         <div className="exchange-combined-stat">
-          <span>OTC ZKAS traded (24h)</span>
-          <b>{otcFeed ? `${amount(otcMarket.zkasVolume)} ZKAS` : '—'}</b>
-          <small>{otcFeed ? `${kas(otcMarket.kasVolume)} value${otcMarket.valueUsd === null ? '' : ` · ${usd(otcMarket.valueUsd, 2)}`}` : 'Waiting for the shared OTC feed'}</small>
+          <span>Total 24h volume</span>
+          <b>{otcFeed ? usd(otcMarket.valueUsd, 2) : '—'}</b>
+          <small>{otcFeed ? `${kas(otcMarket.kasVolume)} across completed OTC trades` : 'Waiting for the shared OTC feed'}</small>
         </div>
         <div className="exchange-combined-stat">
           <span>Total ZKAS traded (24h)</span>
-          <b>{allMarketsZkasVolume === null ? '—' : `${amount(allMarketsZkasVolume)} ZKAS`}</b>
-          <small>NeoxEX + NonKYC + completed OTC trades</small>
+          <b>{otcFeed ? `${amount(otcMarket.zkasVolume)} ZKAS` : '—'}</b>
+          <small>Completed OTC trades</small>
         </div>
       </section>
 
