@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Activity, BarChart3, BookOpen, ExternalLink, RefreshCw, TriangleAlert } from 'lucide-react';
+import { fetchKasUsd, fetchSharedOtcTrades, type OtcTradeFeed } from '../otc';
 
 type Interval = '5m' | '15m' | '1h' | '4h' | '1d';
 type ExchangeId = 'neoxex' | 'noirtrade' | 'arrrex' | 'nonkyc';
@@ -48,6 +49,12 @@ function usd(value: number | null | undefined, digits = 6) {
 function amount(value: number | null | undefined) {
   if (value === null || value === undefined || !Number.isFinite(value)) return '—';
   return number.format(value);
+}
+
+function kas(value: number | null | undefined) {
+  if (value === null || value === undefined || !Number.isFinite(value)) return '—';
+  const digits = value < .001 ? 8 : value < 1 ? 6 : 4;
+  return `${value.toLocaleString('en-US', { minimumFractionDigits: digits, maximumFractionDigits: digits })} KAS`;
 }
 
 function impliedMarketCap(price: number | null | undefined, circulatingSupply: number | null) {
@@ -172,6 +179,9 @@ export function ExchangesPage({ circulatingSupply }: { circulatingSupply: number
   const [interval, setInterval] = useState<Interval>('15m');
   const [loading, setLoading] = useState(true);
   const [errors, setErrors] = useState<Partial<Record<ExchangeId, string>>>({});
+  const [otcFeed, setOtcFeed] = useState<OtcTradeFeed | null>(null);
+  const [otcKasUsd, setOtcKasUsd] = useState<number | null>(null);
+  const [otcError, setOtcError] = useState<string | null>(null);
 
   useEffect(() => {
     let stopped = false;
@@ -204,6 +214,30 @@ export function ExchangesPage({ circulatingSupply }: { circulatingSupply: number
     return () => { stopped = true; controller?.abort(); window.clearInterval(timer); };
   }, [interval]);
 
+  useEffect(() => {
+    let stopped = false;
+    let controller: AbortController | null = null;
+    async function refreshOtc() {
+      controller?.abort();
+      controller = new AbortController();
+      const [tradesResult, kasResult] = await Promise.allSettled([
+        fetchSharedOtcTrades(controller.signal),
+        fetchKasUsd(controller.signal),
+      ]);
+      if (stopped || controller.signal.aborted) return;
+      if (tradesResult.status === 'fulfilled') {
+        setOtcFeed(tradesResult.value);
+        setOtcError(null);
+      } else {
+        setOtcError(tradesResult.reason instanceof Error ? tradesResult.reason.message : 'OTC feed temporarily unavailable.');
+      }
+      if (kasResult.status === 'fulfilled') setOtcKasUsd(kasResult.value.priceUsd);
+    }
+    void refreshOtc();
+    const timer = window.setInterval(refreshOtc, 30_000);
+    return () => { stopped = true; controller?.abort(); window.clearInterval(timer); };
+  }, []);
+
   const feed = feeds[selected] ?? null;
   const ticker = feed?.ticker ?? null;
   const selectedMarketCap = impliedMarketCap(ticker?.lastPrice, circulatingSupply);
@@ -230,6 +264,31 @@ export function ExchangesPage({ circulatingSupply }: { circulatingSupply: number
       zkasVolume: markets.reduce((sum, market) => sum + (Number.isFinite(market.zkasVolume) && market.zkasVolume > 0 ? market.zkasVolume : 0), 0),
     };
   }, [circulatingSupply, feeds]);
+  const otcMarket = useMemo(() => {
+    const cutoff = Date.now() - 24 * 60 * 60 * 1000;
+    const trades = (otcFeed?.trades ?? []).filter((trade) => trade.timestamp !== null
+      && trade.timestamp >= cutoff
+      && trade.zkasAmount !== null
+      && Number.isFinite(trade.zkasAmount)
+      && trade.zkasAmount > 0
+      && trade.totalKas !== null
+      && Number.isFinite(trade.totalKas)
+      && trade.totalKas > 0);
+    const zkasVolume = trades.reduce((sum, trade) => sum + (trade.zkasAmount ?? 0), 0);
+    const kasVolume = trades.reduce((sum, trade) => sum + (trade.totalKas ?? 0), 0);
+    const averagePriceKas = zkasVolume > 0 ? kasVolume / zkasVolume : null;
+    return {
+      averagePriceKas,
+      averagePriceUsd: averagePriceKas !== null && otcKasUsd !== null ? averagePriceKas * otcKasUsd : null,
+      kasVolume,
+      tradeCount: trades.length,
+      valueUsd: otcKasUsd !== null ? kasVolume * otcKasUsd : null,
+      zkasVolume,
+    };
+  }, [otcFeed, otcKasUsd]);
+  const allMarketsZkasVolume = otcFeed && combinedMarket.markets > 0
+    ? combinedMarket.zkasVolume + otcMarket.zkasVolume
+    : null;
 
   return (
     <div className="page-stack exchanges-page">
@@ -259,6 +318,29 @@ export function ExchangesPage({ circulatingSupply }: { circulatingSupply: number
           <span>Total ZKAS traded (24h)</span>
           <b>{combinedMarket.zkasVolume > 0 ? `${amount(combinedMarket.zkasVolume)} ZKAS` : '—'}</b>
           <small>NeoxEX and NonKYC combined</small>
+        </div>
+      </section>
+
+      <section className="exchange-combined-summary exchange-otc-market-summary" aria-live="polite">
+        <div className="exchange-combined-copy">
+          <span>OTC market (24h)</span>
+          <strong>{kas(otcMarket.averagePriceKas)}</strong>
+          <p>{otcFeed ? `Volume-weighted average from ${otcMarket.tradeCount} completed ${otcMarket.tradeCount === 1 ? 'trade' : 'trades'} in the shared Discord and Telegram order book. Kept separate from the exchange market-cap calculation.` : otcError || 'Loading completed OTC trades…'}</p>
+        </div>
+        <div className="exchange-combined-stat">
+          <span>Average OTC price (USD)</span>
+          <b>{usd(otcMarket.averagePriceUsd)}</b>
+          <small>Converted using the live KAS/USD price</small>
+        </div>
+        <div className="exchange-combined-stat">
+          <span>OTC ZKAS traded (24h)</span>
+          <b>{otcFeed ? `${amount(otcMarket.zkasVolume)} ZKAS` : '—'}</b>
+          <small>{otcFeed ? `${kas(otcMarket.kasVolume)} value${otcMarket.valueUsd === null ? '' : ` · ${usd(otcMarket.valueUsd, 2)}`}` : 'Waiting for the shared OTC feed'}</small>
+        </div>
+        <div className="exchange-combined-stat">
+          <span>All markets ZKAS traded (24h)</span>
+          <b>{allMarketsZkasVolume === null ? '—' : `${amount(allMarketsZkasVolume)} ZKAS`}</b>
+          <small>NeoxEX + NonKYC + completed OTC trades</small>
         </div>
       </section>
 
