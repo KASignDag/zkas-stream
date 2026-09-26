@@ -282,8 +282,28 @@ export function ExchangesPage({ circulatingSupply }: { circulatingSupply: number
       zkasVolume,
     };
   }, [circulatingSupply, otcFeed, otcKasUsd]);
-  const combinedPriceKas = combinedMarket.weightedPrice !== null && otcKasUsd !== null && otcKasUsd > 0
-    ? combinedMarket.weightedPrice / otcKasUsd
+  const allMarketsSummary = useMemo(() => {
+    const markets = [
+      ...(combinedMarket.weightedPrice !== null && combinedMarket.quoteVolume > 0
+        ? [{ price: combinedMarket.weightedPrice, quoteVolume: combinedMarket.quoteVolume }]
+        : []),
+      ...(otcMarket.averagePriceUsd !== null && otcMarket.valueUsd !== null && otcMarket.valueUsd > 0
+        ? [{ price: otcMarket.averagePriceUsd, quoteVolume: otcMarket.valueUsd }]
+        : []),
+    ];
+    const quoteVolume = markets.reduce((sum, market) => sum + market.quoteVolume, 0);
+    const weightedPrice = quoteVolume > 0
+      ? markets.reduce((sum, market) => sum + market.price * market.quoteVolume, 0) / quoteVolume
+      : null;
+    return {
+      marketCap: impliedMarketCap(weightedPrice, circulatingSupply),
+      quoteVolume,
+      weightedPrice,
+      zkasVolume: combinedMarket.zkasVolume + otcMarket.zkasVolume,
+    };
+  }, [circulatingSupply, combinedMarket, otcMarket]);
+  const averagePriceKas = allMarketsSummary.weightedPrice !== null && otcKasUsd !== null && otcKasUsd > 0
+    ? allMarketsSummary.weightedPrice / otcKasUsd
     : null;
   return (
     <div className="page-stack exchanges-page">
@@ -295,37 +315,19 @@ export function ExchangesPage({ circulatingSupply }: { circulatingSupply: number
 
       <section className="exchange-combined-summary" aria-live="polite">
         <div className="exchange-combined-copy">
-          <span>Combined exchange market cap <small>NoirTrade and ARRREX are excluded</small></span>
-          <strong>{usd(combinedMarket.marketCap, 0)}</strong>
-          <em>{usd(combinedMarket.weightedPrice)} · {kas(combinedPriceKas)} per ZKAS</em>
+          <span>Average market cap (24h) <small>NoirTrade and ARRREX excluded</small></span>
+          <strong>{usd(allMarketsSummary.marketCap, 0)}</strong>
+          <em>{usd(allMarketsSummary.weightedPrice)} · {kas(averagePriceKas)} per ZKAS</em>
         </div>
         <div className="exchange-combined-stat">
           <span>Total 24h volume</span>
-          <b>{combinedMarket.quoteVolume > 0 ? `${usd(combinedMarket.quoteVolume, 2)} USDT` : '—'}</b>
-          <small>Reported volume across included markets</small>
+          <b>{allMarketsSummary.quoteVolume > 0 ? `${usd(allMarketsSummary.quoteVolume, 2)} USDT` : '—'}</b>
+          <small>NeoxEX, NonKYC and OTC combined</small>
         </div>
         <div className="exchange-combined-stat">
           <span>Total ZKAS traded (24h)</span>
-          <b>{combinedMarket.zkasVolume > 0 ? `${amount(combinedMarket.zkasVolume)} ZKAS` : '—'}</b>
-          <small>NeoxEX and NonKYC combined</small>
-        </div>
-      </section>
-
-      <section className="exchange-combined-summary exchange-otc-market-summary" aria-live="polite">
-        <div className="exchange-combined-copy">
-          <span>OTC market cap (24h) <small>OTC kept separate from exchange MC calculation</small></span>
-          <strong>{usd(otcMarket.marketCap, 0)}</strong>
-          <em>{usd(otcMarket.averagePriceUsd)} · {kas(otcMarket.averagePriceKas)} per ZKAS</em>
-        </div>
-        <div className="exchange-combined-stat">
-          <span>Total 24h volume</span>
-          <b>{otcFeed ? `${usd(otcMarket.valueUsd, 2)} USDT` : '—'}</b>
-          <small>{otcFeed ? `${kas(otcMarket.kasVolume)} across completed OTC trades` : 'Waiting for the shared OTC feed'}</small>
-        </div>
-        <div className="exchange-combined-stat">
-          <span>Total ZKAS traded (24h)</span>
-          <b>{otcFeed ? `${amount(otcMarket.zkasVolume)} ZKAS` : '—'}</b>
-          <small>Completed OTC trades</small>
+          <b>{allMarketsSummary.zkasVolume > 0 ? `${amount(allMarketsSummary.zkasVolume)} ZKAS` : '—'}</b>
+          <small>NeoxEX, NonKYC and OTC combined</small>
         </div>
       </section>
 
