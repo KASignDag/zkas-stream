@@ -211,6 +211,23 @@ export function ExchangesPage({ circulatingSupply }: { circulatingSupply: number
     : null;
   const lowLiquidity = bidBelowAsk !== null && bidBelowAsk >= 10;
   const liveCount = exchangeIds.filter((exchangeId) => feeds[exchangeId]).length;
+  const combinedMarket = useMemo(() => {
+    const markets = exchangeIds.flatMap((exchangeId) => {
+      const ticker = feeds[exchangeId]?.ticker;
+      if (!ticker || !Number.isFinite(ticker.lastPrice) || ticker.lastPrice <= 0 || !Number.isFinite(ticker.quoteVolume24h) || ticker.quoteVolume24h <= 0) return [];
+      return [{ price: ticker.lastPrice, quoteVolume: ticker.quoteVolume24h }];
+    });
+    const quoteVolume = markets.reduce((sum, market) => sum + market.quoteVolume, 0);
+    const weightedPrice = quoteVolume > 0
+      ? markets.reduce((sum, market) => sum + market.price * market.quoteVolume, 0) / quoteVolume
+      : null;
+    return {
+      marketCap: impliedMarketCap(weightedPrice, circulatingSupply),
+      markets: markets.length,
+      quoteVolume,
+      weightedPrice,
+    };
+  }, [circulatingSupply, feeds]);
 
   return (
     <div className="page-stack exchanges-page">
@@ -219,6 +236,24 @@ export function ExchangesPage({ circulatingSupply }: { circulatingSupply: number
         <div><b>{liveCount ? `${liveCount} live exchange ${liveCount === 1 ? 'market' : 'markets'} connected` : 'Exchange feeds retrying'}</b><span>{liveCount ? 'NeoxEX, NoirTrade, ARRREX, and NonKYC public market data refresh every 10 seconds.' : Object.values(errors)[0] || 'Unable to load exchange data.'}</span></div>
         <span className="exchange-refresh"><RefreshCw size={13} className={loading ? 'spinning' : ''} /> 10 sec refresh</span>
       </div>
+
+      <section className="exchange-combined-summary" aria-live="polite">
+        <div className="exchange-combined-copy">
+          <span>Combined exchange market cap</span>
+          <strong>{usd(combinedMarket.marketCap, 0)}</strong>
+          <p>Based on the 24-hour volume-weighted price across all listed exchanges × live circulating supply.</p>
+        </div>
+        <div className="exchange-combined-stat">
+          <span>Combined weighted price</span>
+          <b>{usd(combinedMarket.weightedPrice)}</b>
+          <small>{combinedMarket.markets ? `${combinedMarket.markets} volume-reporting ${combinedMarket.markets === 1 ? 'market' : 'markets'}` : 'Waiting for exchange volume'}</small>
+        </div>
+        <div className="exchange-combined-stat">
+          <span>Total 24h volume</span>
+          <b>{combinedMarket.quoteVolume > 0 ? `${usd(combinedMarket.quoteVolume, 2)} USDT` : '—'}</b>
+          <small>Reported volume across included markets</small>
+        </div>
+      </section>
 
       <div className="exchange-selector" aria-label="Select chart exchange">
         {exchangeIds.map((exchangeId) => {
