@@ -384,6 +384,18 @@ export function ExchangesPage({ circulatingSupply }: { circulatingSupply: number
         <p className="source-note"><TriangleAlert size={15} /> Implied market cap uses each exchange's last trade price × the same live circulating ZKAS supply. Low-liquidity trades can move the estimate substantially. Exchange data remains separate from completed OTC trades.</p>
         <p className="source-note exchange-referral-disclosure"><ExternalLink size={15} /> Referral disclosure: ZKAS.stream may earn a portion of trading fees when new users register through eligible referral links, at no extra cost to the user.</p>
       </section>
+
+      <section className="panel market-trackers-panel" aria-labelledby="market-trackers-title">
+        <div>
+          <span className="panel-icon"><ExternalLink size={19} /></span>
+          <div><h2 id="market-trackers-title">Market Trackers</h2><p>Independent ZKAS market profiles and pricing pages.</p></div>
+        </div>
+        <nav aria-label="ZKAS market tracker links">
+          <a href="https://coincodex.com/crypto/zkas/" target="_blank" rel="noreferrer">CoinCodex <ExternalLink size={12} /></a>
+          <a href="https://coincheckup.com/coins/zkas" target="_blank" rel="noreferrer">CoinCheckup <ExternalLink size={12} /></a>
+          <a href="https://www.coincarp.com/currencies/zkas/" target="_blank" rel="noreferrer">CoinCarp <ExternalLink size={12} /></a>
+        </nav>
+      </section>
     </div>
   );
 }
