@@ -6,16 +6,6 @@ const SOURCES = [
       return Number(payload?.ticker?.lastPrice);
     },
   },
-  {
-    name: 'NoirTrade ZKAS/USDT',
-    url: 'https://noirtrade.com/api/v1/tickers',
-    read(payload) {
-      const row = Array.isArray(payload)
-        ? payload.find((ticker) => ticker?.ticker_id === 'ZKAS_USDT')
-        : null;
-      return Number(row?.last_price);
-    },
-  },
 ];
 
 function json(body, status = 200, cacheControl) {
