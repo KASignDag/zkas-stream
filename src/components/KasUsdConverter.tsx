@@ -4,7 +4,12 @@ import { fetchKasUsd, fetchZkasUsd, type KasUsdQuote } from '../otc';
 
 type EditedCurrency = 'kas' | 'usd';
 
-const preciseNumber = new Intl.NumberFormat('en-US', { maximumFractionDigits: 8 });
+// These values are rendered inside <input type="number"> fields. Thousands
+// separators are not valid there, so keep the formatted value browser-parseable.
+const preciseNumber = new Intl.NumberFormat('en-US', {
+  maximumFractionDigits: 8,
+  useGrouping: false,
+});
 
 function numericValue(value: string) {
   if (!value.trim()) return null;
