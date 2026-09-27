@@ -179,7 +179,7 @@ export function ShareZkasUpdate({ data }: { data: DashboardData }) {
       {label:'KAS BLOCKS',value:communities.length?compact(totals.kas):'Loading…'},
     ],
     market:[
-      {label:'AVERAGE MARKET CAP (24H)',value:usd(marketAverageCap),tag:'NOIRTRADE + ARRREX EXCLUDED'},
+      {label:'AVERAGE MARKET CAP (24H)',value:usd(marketAverageCap),tag:'NEOXEX + NONKYC'},
       {label:'TOTAL 24H VOLUME',value:marketVolumeUsd===null?'—':`${usd(marketVolumeUsd)} USDT`,tag:'NEOXEX + NONKYC + OTC'},
       {label:'TOTAL ZKAS TRADED (24H)',value:marketZkas24h===null?'—':`${compact(marketZkas24h)} ZKAS`,tag:'NEOXEX + NONKYC + OTC'},
       {label:'CIRCULATING SUPPLY',value:compact(data.supply),tag:'ZKAS MAINNET'},
