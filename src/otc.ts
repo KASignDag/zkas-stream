@@ -77,6 +77,12 @@ export type KasUsdQuote = {
   source: string;
 };
 
+export type KasUsdtQuote = {
+  priceUsdt: number;
+  updatedAt: number;
+  source: string;
+};
+
 function isFeed(value: unknown): value is OtcTradeFeed {
   if (!value || typeof value !== 'object') return false;
   const candidate = value as Partial<OtcTradeFeed>;
@@ -140,6 +146,18 @@ export async function fetchOtcOpenOrders(signal?: AbortSignal): Promise<OtcOpenO
   throw new Error('The open ZKAS order feed returned an unexpected format.');
 }
 
+export async function fetchKasUsdt(signal?: AbortSignal): Promise<KasUsdtQuote> {
+  const response = await fetch('/api/kas-usdt-price', {
+    signal,
+    headers: { Accept: 'application/json' },
+  });
+  const payload = await response.json() as Partial<KasUsdtQuote>;
+  if (response.ok && typeof payload.priceUsdt === 'number' && Number.isFinite(payload.priceUsdt) && payload.priceUsdt > 0) {
+    return payload as KasUsdtQuote;
+  }
+  throw new Error('The KAS/USDT quote is temporarily unavailable.');
+}
+
 export async function fetchKasUsd(signal?: AbortSignal): Promise<KasUsdQuote> {
   const response = await fetch('/api/kas-price', {
     signal,
@@ -150,6 +168,19 @@ export async function fetchKasUsd(signal?: AbortSignal): Promise<KasUsdQuote> {
     return payload as KasUsdQuote;
   }
   throw new Error('The KAS/USD quote is temporarily unavailable.');
+}
+
+export async function fetchZkasUsdt(signal?: AbortSignal): Promise<KasUsdtQuote> {
+  const response = await fetch('/api/zkas-price', {
+    signal,
+    headers: { Accept: 'application/json' },
+  });
+  const payload = await response.json() as Partial<KasUsdtQuote> & { priceUsd?: number };
+  const priceUsdt = payload.priceUsdt ?? payload.priceUsd;
+  if (response.ok && typeof priceUsdt === 'number' && Number.isFinite(priceUsdt) && priceUsdt > 0) {
+    return { ...payload, priceUsdt } as KasUsdtQuote;
+  }
+  throw new Error('The ZKAS/USDT quote is temporarily unavailable.');
 }
 
 export async function fetchZkasUsd(signal?: AbortSignal): Promise<KasUsdQuote> {
