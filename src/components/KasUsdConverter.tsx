@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { CircleDollarSign } from 'lucide-react';
-import { fetchKasUsd, fetchZkasUsd, type KasUsdQuote } from '../otc';
+import { fetchKasUsdt, fetchZkasUsdt, type KasUsdtQuote } from '../otc';
 
 type EditedCurrency = 'kas' | 'usd';
 
@@ -21,12 +21,12 @@ function displayValue(value: number | null) {
   return value === null ? '' : preciseNumber.format(value);
 }
 
-function UsdConverter({ symbol, idPrefix, fetchQuote }: {
+function UsdtConverter({ symbol, idPrefix, fetchQuote }: {
   symbol: 'KAS' | 'ZKAS';
   idPrefix: 'kas' | 'zkas';
-  fetchQuote: (signal?: AbortSignal) => Promise<KasUsdQuote>;
+  fetchQuote: (signal?: AbortSignal) => Promise<KasUsdtQuote>;
 }) {
-  const [quote, setQuote] = useState<KasUsdQuote | null>(null);
+  const [quote, setQuote] = useState<KasUsdtQuote | null>(null);
   const [kasInput, setKasInput] = useState('1');
   const [usdInput, setUsdInput] = useState('');
   const [edited, setEdited] = useState<EditedCurrency>('kas');
@@ -63,12 +63,12 @@ function UsdConverter({ symbol, idPrefix, fetchQuote }: {
   const kasValue = edited === 'kas'
     ? numericValue(kasInput)
     : quote && numericValue(usdInput) !== null
-      ? (numericValue(usdInput) as number) / quote.priceUsd
+      ? (numericValue(usdInput) as number) / quote.priceUsdt
       : null;
   const usdValue = edited === 'usd'
     ? numericValue(usdInput)
     : quote && numericValue(kasInput) !== null
-      ? (numericValue(kasInput) as number) * quote.priceUsd
+      ? (numericValue(kasInput) as number) * quote.priceUsdt
       : null;
 
   function changeKas(value: string) {
@@ -86,7 +86,7 @@ function UsdConverter({ symbol, idPrefix, fetchQuote }: {
       <div className="panel-head">
         <div>
           <span className="panel-icon"><CircleDollarSign size={20} /></span>
-          <h2 id={`${idPrefix}-converter-title`}>{symbol} to USD converter</h2>
+          <h2 id={`${idPrefix}-converter-title`}>{symbol} to USDT converter</h2>
         </div>
         <span className={`live-mini ${quote ? '' : 'converter-loading'}`}><i />{quote ? 'LIVE RATE' : 'LOADING RATE'}</span>
       </div>
@@ -106,7 +106,7 @@ function UsdConverter({ symbol, idPrefix, fetchQuote }: {
           />
         </label>
         <label className="kas-converter-field" htmlFor={`${idPrefix}-converter-usd`}>
-          <span>USD</span>
+          <span>USDT</span>
           <input
             id={`${idPrefix}-converter-usd`}
             type="number"
@@ -115,7 +115,7 @@ function UsdConverter({ symbol, idPrefix, fetchQuote }: {
             inputMode="decimal"
             value={edited === 'usd' ? usdInput : displayValue(usdValue)}
             onChange={(event) => changeUsd(event.target.value)}
-            aria-label="Amount in US dollars"
+            aria-label="Amount in Tether USDT"
             placeholder={quote ? '0.00' : 'Loading…'}
           />
         </label>
@@ -123,17 +123,17 @@ function UsdConverter({ symbol, idPrefix, fetchQuote }: {
 
       <p className="kas-converter-note" aria-live="polite">
         {quote
-          ? `1 ${symbol} = $${preciseNumber.format(quote.priceUsd)} USD · ${quote.source} · Updated ${new Date(quote.updatedAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}${error ? ' · Refresh delayed' : ''}`
-          : error ? `The ${symbol}/USD rate is temporarily unavailable.` : `Fetching the latest ${symbol}/USD rate…`}
+          ? `1 ${symbol} = $${preciseNumber.format(quote.priceUsdt)} USDT · ${quote.source} · Updated ${new Date(quote.updatedAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}${error ? ' · Refresh delayed' : ''}`
+          : error ? `The ${symbol}/USDT rate is temporarily unavailable.` : `Fetching the latest ${symbol}/USDT rate…`}
       </p>
     </section>
   );
 }
 
 export function KasUsdConverter() {
-  return <UsdConverter symbol="KAS" idPrefix="kas" fetchQuote={fetchKasUsd} />;
+  return <UsdtConverter symbol="KAS" idPrefix="kas" fetchQuote={fetchKasUsdt} />;
 }
 
 export function ZkasUsdConverter() {
-  return <UsdConverter symbol="ZKAS" idPrefix="zkas" fetchQuote={fetchZkasUsd} />;
+  return <UsdtConverter symbol="ZKAS" idPrefix="zkas" fetchQuote={fetchZkasUsdt} />;
 }
