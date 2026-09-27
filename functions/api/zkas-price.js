@@ -26,9 +26,10 @@ async function fetchQuote(source) {
     cf: { cacheEverything: true, cacheTtl: 30 },
   });
   if (!response.ok) throw new Error(`${source.name}: HTTP ${response.status}`);
-  const priceUsd = source.read(await response.json());
-  if (!Number.isFinite(priceUsd) || priceUsd <= 0) throw new Error(`${source.name}: invalid quote`);
-  return { priceUsd, source: source.name, updatedAt: Date.now() };
+  const priceUsdt = source.read(await response.json());
+  if (!Number.isFinite(priceUsdt) || priceUsdt <= 0) throw new Error(`${source.name}: invalid quote`);
+  // Keep priceUsd for other page sections that still consume this API.
+  return { priceUsdt, priceUsd: priceUsdt, source: source.name, updatedAt: Date.now() };
 }
 
 export async function onRequestGet(context) {
