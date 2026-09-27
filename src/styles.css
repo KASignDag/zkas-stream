@@ -567,6 +567,13 @@ footer { width: min(1320px, calc(100% - 40px)); margin: 0 auto; padding: 22px 0 
 .exchange-listed-chip { color: var(--muted); font-size: 10px; font-weight: 800; letter-spacing: .2px; text-transform: uppercase; }
 .exchange-list-panel .source-note { padding: 0 19px 18px; }
 .exchange-list-panel .exchange-referral-disclosure { margin-top: -7px; }
+.market-trackers-panel { display: flex; align-items: center; justify-content: space-between; gap: 18px; padding: 15px 17px; }
+.market-trackers-panel > div { display: flex; align-items: center; gap: 11px; min-width: 0; }
+.market-trackers-panel h2 { margin: 0; font-size: 16px; }
+.market-trackers-panel p { margin: 3px 0 0; color: var(--muted); font-size: 10px; }
+.market-trackers-panel nav { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; }
+.market-trackers-panel nav a { display: inline-flex; align-items: center; gap: 5px; padding: 8px 11px; border: 1px solid color-mix(in srgb, var(--accent) 25%, var(--border)); border-radius: 999px; background: color-mix(in srgb, var(--accent-soft) 34%, var(--surface)); color: var(--accent); font-size: 10px; font-weight: 850; text-decoration: none; }
+.market-trackers-panel nav a:hover { border-color: color-mix(in srgb, var(--accent) 60%, var(--border)); }
 
 @media (max-width: 1050px) {
   .exchange-combined-summary { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -591,6 +598,8 @@ footer { width: min(1320px, calc(100% - 40px)); margin: 0 auto; padding: 22px 0 
   .exchange-intervals { width: 100%; }
   .exchange-intervals button { flex: 1; min-width: 0; }
   .exchange-chart-summary { padding-inline: 15px; gap: 10px 16px; }
+  .market-trackers-panel { align-items: flex-start; flex-direction: column; }
+  .market-trackers-panel nav { width: 100%; justify-content: flex-start; }
 }
 @media (max-width: 480px) {
   .exchange-selector { grid-template-columns: 1fr; gap: 9px; }
