@@ -54,7 +54,7 @@ import { SparkChart } from './components/SparkChart';
 import { GenesisSupportersPage } from './components/GenesisSupportersPage';
 import { MiningPayoutRanking } from './components/MiningPayoutRanking';
 import { ExchangesPage } from './components/ExchangesPage';
-import { KasUsdConverter } from './components/KasUsdConverter';
+import { KasUsdConverter, ZkasUsdConverter } from './components/KasUsdConverter';
 import { NetworkMap } from './components/NetworkMap';
 import { ShareZkasUpdate } from './components/ShareZkasUpdate';
 import { useGenesisArchive } from './genesisHistory';
@@ -1038,7 +1038,10 @@ function IntelligenceHome({ data, txValues, pulseTimes, onReference }: { data: D
         </section>
       </section>
 
-      <KasUsdConverter />
+      <div className="converter-grid">
+        <KasUsdConverter />
+        <ZkasUsdConverter />
+      </div>
 
       <section className="metric-grid intel-metrics">
         <MetricCard icon={<Gauge size={19} />} label="Hashrate" value={displayHashrate(data.hashrate)} sub="Network work estimate" accent />
