@@ -1798,9 +1798,6 @@ function EventCard({ event }: { event: NetworkEvent }) {
     </div>
   );
 }
-Warning: truncated output (original token count: 6781)
-Total output lines: 300
-
 
 function HistoryPage({ data, history, range, onRange }: { data: DashboardData; history: HistorySnapshot[]; range: HistoryRange; onRange: (range: HistoryRange) => void }) {
   const genesis = useGenesisArchive();
@@ -1949,7 +1946,33 @@ function SupplyPrivacyPage({ data, history, range, onRange }: { data: DashboardD
   const genesis = useGenesisArchive();
   const genesisDays = genesis?.history?.daily ?? [];
   const genesisTotals = genesis?.history?.totals ?? null;
-  const cutoff = Date.n…781 tokens truncated… selected window`} />
+  const cutoff = Date.now() - rangeMs(range);
+  const rows = history.filter((row) => row.t >= cutoff);
+  const first = rows[0];
+  const last = rows.at(-1);
+  const ranges: HistoryRange[] = ['1h', '24h', '7d', '30d'];
+
+  const supplyDelta = first?.supply != null && last?.supply != null ? last.supply - first.supply : null;
+  const notesDelta = first?.shieldedNotes != null && last?.shieldedNotes != null && last.shieldedNotes >= first.shieldedNotes ? last.shieldedNotes - first.shieldedNotes : null;
+  const nullifierReset = first?.nullifiers != null && last?.nullifiers != null && last.nullifiers < first.nullifiers;
+  const nullifierDelta = first?.nullifiers != null && last?.nullifiers != null && !nullifierReset ? last.nullifiers - first.nullifiers : null;
+
+  return (
+    <section className="page-stack">
+      <div className="privacy-callout"><ShieldCheck size={21} /><div><b>Supply intelligence without a rich list</b><span>ZKas is shielded by design. This page reports public consensus supply, reward schedule and aggregate shielded-pool activity without claiming to identify holders, balances, senders, recipients or transfer amounts.</span></div></div>
+
+      <div className="history-range-tabs">
+        {ranges.map((item) => <button key={item} className={range === item ? 'on' : ''} onClick={() => onRange(item)}>{item.toUpperCase()}</button>)}
+      </div>
+
+      <div className="metric-grid nodes-metrics">
+        <MetricCard icon={<Coins size={19} />} label="Circulating supply" value={displayNumber(data.supply, true)} sub={supplyDelta === null ? 'Consensus-derived issued supply' : `${signed(supplyDelta, ' ZKAS')} in selected observer window`} />
+        <MetricCard icon={<CircleDollarSign size={19} />} label="Gross block emission" value={data.reward === null ? '—' : `${displayNumber(data.reward)} ZKAS`} sub="Consensus emission per block" />
+        <MetricCard icon={<Coins size={19} />} label="Miner payout (95%)" value={minerPayout(data.reward) === null ? '—' : `${displayNumber(minerPayout(data.reward))} ZKAS`} sub="Expected accepted-block miner credit" />
+        <MetricCard icon={<CircleDollarSign size={19} />} label="Development allocation (5%)" value={developmentAllocation(data.reward) === null ? '—' : `${displayNumber(developmentAllocation(data.reward))} ZKAS`} sub="Per accepted block" />
+        <MetricCard icon={<TimerReset size={19} />} label="Next reduction" value={countdown(data.nextReductionSeconds)} sub={data.nextReward === null ? 'Consensus schedule' : `Next gross ${displayNumber(data.nextReward)} · miner ${displayNumber(minerPayout(data.nextReward))} ZKAS`} />
+        <MetricCard icon={<LockKeyhole size={19} />} label="Shielded notes" value={displayNumber(data.shieldedNotes, true)} sub={notesDelta === null ? 'Backend-observed aggregate' : `+${displayNumber(notesDelta, true)} in selected window`} />
+        <MetricCard icon={<LockKeyhole size={19} />} label="Nullifiers / spends" value={displayNumber(data.nullifiers, true)} sub={nullifierReset ? 'Backend counter reset observed' : nullifierDelta === null ? 'Backend-observed aggregate' : `+${displayNumber(nullifierDelta, true)} in selected window`} />
         <MetricCard icon={<Database size={19} />} label="Cumulative shielded issuance" value={displayNumber(data.shieldedValue ?? data.supply, true)} sub="Consensus-derived aggregate · not wallet balances" />
       </div>
 
