@@ -444,8 +444,9 @@ footer { width: min(1320px, calc(100% - 40px)); margin: 0 auto; padding: 22px 0 
 .source-note svg { flex: 0 0 auto; color: var(--accent); margin-top: 1px; }
 .page-stack { display: grid; gap: 18px; }
 
-/* Live KAS/USD converter */
-.kas-converter { max-width: 860px; width: 100%; padding: 19px 20px; }
+/* Live KAS/USD and ZKAS/USD converters */
+.converter-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; }
+.kas-converter { min-width: 0; width: 100%; padding: 19px 20px; }
 .kas-converter .panel-head { margin-bottom: 12px; }
 .kas-converter .live-mini { flex: 0 0 auto; }
 .kas-converter .converter-loading { color: var(--muted); }
@@ -456,6 +457,10 @@ footer { width: min(1320px, calc(100% - 40px)); margin: 0 auto; padding: 22px 0 
 .kas-converter-field input { width: 100%; min-width: 0; border: 0; outline: 0; background: transparent; color: var(--text); text-align: right; font-size: clamp(19px, 3vw, 24px); font-weight: 750; font-variant-numeric: tabular-nums; }
 .kas-converter-field input::placeholder { color: var(--muted); }
 .kas-converter-note { margin: 10px 1px 0; color: var(--muted); font-size: 11px; line-height: 1.5; }
+
+@media (max-width: 900px) {
+  .converter-grid { grid-template-columns: 1fr; }
+}
 
 /* Live multi-exchange markets */
 .exchanges-page { gap: 16px; }
