@@ -3,7 +3,7 @@ import { Activity, BarChart3, BookOpen, ExternalLink, RefreshCw, TriangleAlert }
 import { fetchKasUsd, fetchSharedOtcTrades, type OtcTradeFeed } from '../otc';
 
 type Interval = '5m' | '15m' | '1h' | '4h' | '1d';
-type ExchangeId = 'neoxex' | 'noirtrade' | 'nonkyc';
+type ExchangeId = 'neoxex' | 'nonkyc';
 type Candle = { time: number; open: number; high: number; low: number; close: number; volume: number };
 type Level = { price: number; quantity: number; orders: number };
 type Trade = { trade_id: string; side: 'buy' | 'sell'; quantity: number; price: number; total: number; executed_at: string };
@@ -29,12 +29,11 @@ type MarketFeed = {
   updatedAt: number;
 };
 
-const exchangeIds: ExchangeId[] = ['neoxex', 'noirtrade', 'nonkyc'];
+const exchangeIds: ExchangeId[] = ['neoxex', 'nonkyc'];
 const combinedMarketExchangeIds: ExchangeId[] = ['neoxex', 'nonkyc'];
-const exchangeNames: Record<ExchangeId, string> = { neoxex: 'NeoxEX', noirtrade: 'NoirTrade', nonkyc: 'NonKYC' };
+const exchangeNames: Record<ExchangeId, string> = { neoxex: 'NeoxEX', nonkyc: 'NonKYC' };
 const fallbackTradeUrls: Record<ExchangeId, string> = {
   neoxex: 'https://neoxa.exchange/trade/ZKAS_USDT',
-  noirtrade: 'https://noirtrade.com/trade?pair=ZKAS_USDT',
   nonkyc: 'https://nonkyc.io/market/ZKAS_USDT',
 };
 const referralUrls: Partial<Record<ExchangeId, string>> = {
@@ -312,13 +311,13 @@ export function ExchangesPage({ circulatingSupply }: { circulatingSupply: number
     <div className="page-stack exchanges-page">
       <div className={`exchange-status ${liveCount === 0 ? 'error' : 'live'}`}>
         <span className="exchange-status-dot" />
-        <div><b>{liveCount ? `${liveCount} live exchange ${liveCount === 1 ? 'market' : 'markets'} connected` : 'Exchange feeds retrying'}</b><span>{liveCount ? 'NeoxEX, NoirTrade, and NonKYC public market data refresh every 10 seconds.' : Object.values(errors)[0] || 'Unable to load exchange data.'}</span></div>
+        <div><b>{liveCount ? `${liveCount} live exchange ${liveCount === 1 ? 'market' : 'markets'} connected` : 'Exchange feeds retrying'}</b><span>{liveCount ? 'NeoxEX and NonKYC public market data refresh every 10 seconds.' : Object.values(errors)[0] || 'Unable to load exchange data.'}</span></div>
         <span className="exchange-refresh"><RefreshCw size={13} className={loading ? 'spinning' : ''} /> 10 sec refresh</span>
       </div>
 
       <section className="exchange-combined-summary" aria-live="polite">
         <div className="exchange-combined-copy">
-          <span>Average market cap (24h) <small>NoirTrade excluded</small></span>
+          <span>Average market cap (24h) <small>NeoxEX + NonKYC</small></span>
           <strong>{usd(allMarketsSummary.marketCap, 0)}</strong>
           <em>{usd(allMarketsSummary.weightedPrice)} · {kas(averagePriceKas)} per ZKAS</em>
         </div>
