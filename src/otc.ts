@@ -151,3 +151,15 @@ export async function fetchKasUsd(signal?: AbortSignal): Promise<KasUsdQuote> {
   }
   throw new Error('The KAS/USD quote is temporarily unavailable.');
 }
+
+export async function fetchZkasUsd(signal?: AbortSignal): Promise<KasUsdQuote> {
+  const response = await fetch('/api/zkas-price', {
+    signal,
+    headers: { Accept: 'application/json' },
+  });
+  const payload = await response.json() as Partial<KasUsdQuote>;
+  if (response.ok && typeof payload.priceUsd === 'number' && Number.isFinite(payload.priceUsd) && payload.priceUsd > 0) {
+    return payload as KasUsdQuote;
+  }
+  throw new Error('The ZKAS/USD quote is temporarily unavailable.');
+}
