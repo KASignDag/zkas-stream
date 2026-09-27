@@ -15,12 +15,14 @@ export async function onRequest(context){
   const {request,env}=context;
   if(!env.OTC_TRADES) return response('Media storage unavailable',503);
   const url=new URL(request.url);
-  if(request.method==='GET'){
+  if(request.method==='GET'||request.method==='HEAD'){
     const id=(url.searchParams.get('id')||'').replace(/[^a-zA-Z0-9_-]/g,'').slice(0,100);
     if(!id) return response('Not found',404);
     const item=await env.OTC_TRADES.get('buffer-media:'+id,{type:'arrayBuffer'});
     if(!item) return response('Not found',404);
-    return response(item,200,{'Content-Type':'image/jpeg','Cache-Control':'public, max-age=31536000, immutable'});
+    const headers={'Content-Type':'image/jpeg','Cache-Control':'public, max-age=31536000, immutable'};
+    if(request.method==='HEAD') return response(null,200,headers);
+    return response(item,200,headers);
   }
   if(request.method==='POST'){
     const origin=request.headers.get('Origin');
