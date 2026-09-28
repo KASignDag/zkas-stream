@@ -17,6 +17,7 @@ const DAILY_POSTS: DailyPost[] = [
   {time:'18:18',imageUrl:'',text:'🧠 BUILD WITH US\n\nIf ZKAS.stream could add one completely new tool tomorrow, what should it be?\n\nA wallet feature?\nMining tool?\nMarket alert?\nExplorer feature?\nSomething else?\n\nBest idea may become a real feature. 👇\n\n#ZKAS #BuildInPublic'},
   {time:'20:12',imageUrl:'',text:'🌍 ZKAS COMMUNITY CHECK-IN\n\nWhat country are you following ZKAS from?\n\nReply with your flag. No wallet address, no personal info — just the flag. 👇\n\nLet’s see how far the community reaches.\n\n#ZKAS #Community'},
   {time:'22:00',imageUrl:'',text:'🌙 Tonight’s question:\n\nIf someone asked you “Why ZKAS?” and you only had one sentence, what would you say?\n\nKeep it short. Best answers may get reposted from @ZKas_Stream. 👇\n\n#ZKAS #Kaspa'},
+];
 
 function tomorrowLocalDate(){
   const d=new Date(); d.setDate(d.getDate()+1);
