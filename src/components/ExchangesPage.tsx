@@ -392,6 +392,7 @@ export function ExchangesPage({ circulatingSupply }: { circulatingSupply: number
           <a href="https://coincodex.com/crypto/zkas/" target="_blank" rel="noreferrer">CoinCodex <ExternalLink size={12} /></a>
           <a href="https://coincheckup.com/coins/zkas" target="_blank" rel="noreferrer">CoinCheckup <ExternalLink size={12} /></a>
           <a href="https://www.coincarp.com/currencies/zkas/" target="_blank" rel="noreferrer">CoinCarp <ExternalLink size={12} /></a>
+          <a href="https://www.coingecko.com/en/coins/zkas" target="_blank" rel="noreferrer">CoinGecko <ExternalLink size={12} /></a>
         </nav>
       </section>
     </div>
