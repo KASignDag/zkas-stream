@@ -115,6 +115,20 @@ main { width: min(1320px, calc(100% - 40px)); margin: 0 auto; padding: 36px 0 58
 .metric-icon { display: inline-flex; color: var(--text); }
 .metric-value { margin-top: 18px; font-size: clamp(20px, 2.1vw, 27px); font-weight: 820; letter-spacing: -.7px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .metric-sub { margin-top: 5px; color: var(--muted); font-size: 11px; }
+.coingecko-market-panel { margin-top: 16px; }
+.coingecko-market-note { margin: -4px 0 14px; color: var(--muted); font-size: 12px; line-height: 1.5; }
+.coingecko-page-link { display: inline-flex; align-items: center; gap: 5px; color: var(--accent); font-size: 11px; font-weight: 800; text-decoration: none; }
+.coingecko-page-link:hover { text-decoration: underline; }
+.coingecko-market-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
+.coingecko-range { display: inline-flex; flex-wrap: wrap; gap: 4px; padding: 3px; border: 1px solid var(--border); border-radius: 9px; background: var(--surface-2); }
+.coingecko-range button { border: 0; border-radius: 6px; padding: 6px 10px; color: var(--muted); background: transparent; font-size: 10px; font-weight: 850; cursor: pointer; }
+.coingecko-range button.active { color: var(--surface); background: var(--accent); }
+.coingecko-market-stats { display: flex; flex-wrap: wrap; gap: 14px 36px; padding: 4px 0 12px; }
+.coingecko-market-stats span, .coingecko-market-stats strong { display: block; }
+.coingecko-market-stats span { color: var(--muted); font-size: 10px; }
+.coingecko-market-stats strong { margin-top: 4px; font-size: 18px; font-variant-numeric: tabular-nums; }
+.coingecko-chart-footnote { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 6px 16px; color: var(--muted); font-size: 10px; }
+.coingecko-chart-state { min-height: 220px; display: grid; place-items: center; padding: 24px; color: var(--muted); background: var(--surface-2); border-radius: 10px; font-size: 12px; text-align: center; }
 .panel { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 20px; box-shadow: 0 3px 12px rgba(16, 35, 29, .025); min-width: 0; }
 .panel-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 16px; }
 .panel-head > div { display: flex; align-items: center; gap: 10px; min-width: 0; }

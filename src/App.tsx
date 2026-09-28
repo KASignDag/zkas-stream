@@ -55,6 +55,7 @@ import { GenesisSupportersPage } from './components/GenesisSupportersPage';
 import { MiningPayoutRanking } from './components/MiningPayoutRanking';
 import { ExchangesPage } from './components/ExchangesPage';
 import { KasUsdConverter, ZkasUsdConverter } from './components/KasUsdConverter';
+import { CoinGeckoZkasChart } from './components/CoinGeckoZkasChart';
 import { NetworkMap } from './components/NetworkMap';
 import { ShareZkasUpdate } from './components/ShareZkasUpdate';
 import { useGenesisArchive } from './genesisHistory';
@@ -1749,6 +1750,8 @@ function EventsPage({ data, history }: { data: DashboardData; history: HistorySn
           {!events.length && <div className="empty-mini">Collecting enough observer data to describe network changes.</div>}
         </div>
       </section>
+
+      <CoinGeckoZkasChart />
 
       <div className="metric-grid nodes-metrics">
         <MetricCard icon={<Boxes size={19} />} label="Recent public blocks" value={displayNumber(data.blocks.length)} sub="Latest explorer snapshot" accent />
