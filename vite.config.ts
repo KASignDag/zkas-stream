@@ -16,11 +16,10 @@ export default defineConfig({
         secure: true,
         rewrite: (path) => path.replace(/^\/zkas-api/, '/api'),
       },
-      '/api/coingecko-market-chart': {
-        target: 'https://api.coingecko.com',
+      '/api/kas-price': {
+        target: 'https://zkas.stream',
         changeOrigin: true,
         secure: true,
-        rewrite: (path) => path.replace(/^\/api\/coingecko-market-chart/, '/api/v3/coins/zkas/market_chart') + '&vs_currency=usd',
       },
     },
   },
