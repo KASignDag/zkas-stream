@@ -32,7 +32,7 @@ export function CoinGeckoZkasChart() {
     const controller = new AbortController();
     setLoading(true);
     setError(false);
-    fetch(`/api/coingecko-market-chart?days=${range}`, { signal: controller.signal })
+    fetch(`/api/kas-price?chart-days=${range}`, { signal: controller.signal })
       .then((response) => {
         if (!response.ok) throw new Error('CoinGecko chart unavailable');
         return response.json() as Promise<ChartPayload>;
