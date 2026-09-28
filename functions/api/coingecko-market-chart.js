@@ -11,19 +11,21 @@ function json(body, status = 200) {
 }
 
 export async function onRequestGet({ request }) {
-  const requestedDays = new URL(request.url).searchParams.get('days');
-  const days = ['1', '7', '30', '90', '365', 'max'].includes(requestedDays) ? requestedDays : '1';
-  const cache = caches.default;
-  const cacheKey = new Request(`https://zkas.stream/__cache/coingecko-zkas-chart-${days}d`);
-
   try {
-    const cached = await cache.match(cacheKey);
-    if (cached) return cached;
-  } catch {
-    // Continue to CoinGecko if the edge cache is unavailable.
-  }
+    const requestedDays = new URL(request.url).searchParams.get('days');
+    const days = ['1', '7', '30', '90', '365', 'max'].includes(requestedDays) ? requestedDays : '1';
+    const cache = globalThis.caches?.default;
+    const cacheKey = new Request(`https://zkas.stream/__cache/coingecko-zkas-chart-${days}d`);
 
-  try {
+    if (cache) {
+      try {
+        const cached = await cache.match(cacheKey);
+        if (cached) return cached;
+      } catch {
+        // Continue to CoinGecko if the edge cache is unavailable.
+      }
+    }
+
     const upstream = await fetch(`https://api.coingecko.com/api/v3/coins/zkas/market_chart?vs_currency=usd&days=${days}`, {
       headers: { Accept: 'application/json' },
       cf: { cacheEverything: true, cacheTtl: 300 },
@@ -39,10 +41,12 @@ export async function onRequestGet({ request }) {
       total_volumes: payload.total_volumes,
       source: 'CoinGecko',
     });
-    try {
-      await cache.put(cacheKey, response.clone());
-    } catch {
-      // A live response is still usable when cache storage is unavailable.
+    if (cache) {
+      try {
+        await cache.put(cacheKey, response.clone());
+      } catch {
+        // A live response is still usable when cache storage is unavailable.
+      }
     }
     return response;
   } catch {
