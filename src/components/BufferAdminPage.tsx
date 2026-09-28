@@ -7,17 +7,16 @@ type DailyPost = { time: string; text: string; imageUrl: string };
 
 const DAILY_POSTS: DailyPost[] = [
 
-  {time:'05:00',imageUrl:'',text:'⚡ Good morning, ZKAS.\n\nWhat matters most to you in a privacy coin?\n\n🔐 Privacy by default\n⚡ Fast block flow\n⛏️ Merge mining\n🌐 Open network data\n\nReply with the one you care about most 👇\n\n#ZKAS #Kaspa'},
-  {time:'06:54',imageUrl:'',text:'🔐 One simple ZKAS benefit: privacy is built in from the start.\n\nYour balance, payments and transaction history should not automatically become public information.\n\nWould you use private digital money for everyday purchases?\n\n#ZKAS #Privacy'},
-  {time:'08:48',imageUrl:'',text:'⚡ ZKAS + Kaspa mining\n\nMerged mining lets the same mining effort participate in securing both networks.\n\nFor miners, that means another network can be supported without choosing one ecosystem over the other.\n\nMiners: are you already merge mining? 👇\n\n#ZKAS #Kaspa #Mining'},
-  {time:'10:42',imageUrl:'',text:'💬 ZKAS COMMUNITY QUESTION\n\nIf you could improve one thing about crypto payments, what would it be?\n\n🔐 More privacy\n⚡ Faster confirmations\n💸 Lower friction\n🧰 Better wallets and tools\n\nReply with your pick — or add your own.\n\n#ZKAS #Crypto'},
-  {time:'12:36',imageUrl:'',text:'📊 One benefit of ZKAS.stream is transparency around the network and markets.\n\nYou can follow mining, exchange activity, OTC data, supply information and network stats from one place.\n\nWhat metric do you check first?\n\nhttps://zkas.stream/\n\n#ZKAS'},
-  {time:'14:30',imageUrl:'',text:'Privacy is useful for normal people too.\n\nYour salary is private.\nYour bank balance is private.\nYour purchases are private.\n\nDigital money can follow the same idea.\n\nWhat is the strongest real-world case for financial privacy in your opinion? 👇\n\n#ZKAS #Privacy'},
-  {time:'16:24',imageUrl:'',text:'⛏️ Another ZKAS benefit: there are multiple ways to participate.\n\nPool mining. Solo mining. Merge mining. Community mining.\n\nDifferent miners can choose the setup that fits them best.\n\nWhich setup do you prefer?\n\nhttps://zkas.stream/community-mining\n\n#ZKAS #Mining'},
-  {time:'18:18',imageUrl:'',text:'🤝 EARLY ZKAS HOLDERS & FOLLOWERS\n\nWhat made you start paying attention to ZKAS?\n\nPrivacy?\nKaspa connection?\nMining?\nTechnology?\nCommunity?\n\nI want to hear the real reasons people are here 👇\n\n#ZKAS #Kaspa'},
-  {time:'20:12',imageUrl:'',text:'🌐 ZKAS.stream keeps growing as a community hub.\n\nNetwork intelligence, mining data, community mining, markets, OTC activity, explorer tools and more — all in one place.\n\nWhat feature should we improve or build next?\n\nhttps://zkas.stream/\n\n#ZKAS'},
-  {time:'22:00',imageUrl:'',text:'🌙 End-of-day ZKAS check:\n\nPrivacy by default.\nActive miners.\nGrowing tools.\nDeveloping markets.\nA community still early enough to help shape what comes next.\n\nIf you could explain one benefit of ZKAS to a new person, what would you tell them? 👇\n\n@ZKas_X @ZKas_Stream\n#ZKAS #Kaspa'},
-];
+  {time:'05:00',imageUrl:'',text:'🔎 PRIVACY TEST\n\nWhen you send digital money, what should a stranger be able to learn about you?\n\nYour balance?\nYour past payments?\nWho you paid next?\n\nFor ZKAS, the goal is simple: less public financial exposure by default.\n\nWhat would you keep private? 👇\n\n#ZKAS #Privacy'},
+  {time:'06:54',imageUrl:'',text:'🚀 One thing that matters to early crypto communities: how the network started.\n\nZKAS launched without a premine, so there was no private stash created before miners began participating.\n\nHow important is a fair launch to you?\n\n#ZKAS #Crypto'},
+  {time:'08:48',imageUrl:'',text:'📱 WALLET QUESTION\n\nWhat would make you more likely to use ZKAS day to day?\n\n✅ Faster mobile wallet\n✅ Easier backups\n✅ Better transaction history\n✅ QR payments\n✅ More language support\n\nWhich one matters most? 👇\n\n#ZKAS #Wallet'},
+  {time:'10:42',imageUrl:'',text:'🧭 ZKAS.stream is not just a price page.\n\nIt is built to make the network easier to understand: mining, markets, OTC activity, supply, explorer tools and live stats in one place.\n\nWhat page do you use the most?\n\nhttps://zkas.stream/\n\n#ZKAS'},
+  {time:'12:36',imageUrl:'',text:'🛡️ Privacy and transparency can coexist.\n\nA network can publish useful health data — blocks, hashrate, miners and market activity — without exposing every person’s financial history.\n\nThat balance is one of the ideas behind ZKAS.\n\nAgree or disagree? 👇\n\n#ZKAS #Privacy'},
+  {time:'14:30',imageUrl:'',text:'⛏️ MINER ROLL CALL\n\nWhat are you running right now?\n\nDrop your miner model + whether you are pool, solo or community mining.\n\nLet’s see what hardware is actually securing ZKAS today. 👇\n\n#ZKAS #Mining'},
+  {time:'16:24',imageUrl:'',text:'🤝 OTC or exchange?\n\nSome traders prefer an order book on an exchange. Others like direct OTC access. ZKAS.stream keeps those markets separate so you can see each one clearly.\n\nWhich do you use more?\n\nhttps://zkas.stream/#otc\n\n#ZKAS'},
+  {time:'18:18',imageUrl:'',text:'🧠 BUILD WITH US\n\nIf ZKAS.stream could add one completely new tool tomorrow, what should it be?\n\nA wallet feature?\nMining tool?\nMarket alert?\nExplorer feature?\nSomething else?\n\nBest idea may become a real feature. 👇\n\n#ZKAS #BuildInPublic'},
+  {time:'20:12',imageUrl:'',text:'🌍 ZKAS COMMUNITY CHECK-IN\n\nWhat country are you following ZKAS from?\n\nReply with your flag. No wallet address, no personal info — just the flag. 👇\n\nLet’s see how far the community reaches.\n\n#ZKAS #Community'},
+  {time:'22:00',imageUrl:'',text:'🌙 Tonight’s question:\n\nIf someone asked you “Why ZKAS?” and you only had one sentence, what would you say?\n\nKeep it short. Best answers may get reposted from @ZKas_Stream. 👇\n\n#ZKAS #Kaspa'},
 
 function tomorrowLocalDate(){
   const d=new Date(); d.setDate(d.getDate()+1);
@@ -94,8 +93,8 @@ export function BufferAdminPage() {
   function drawAutomaticVisual(index:number,dateLabel:string){
     const canvas=document.createElement('canvas');canvas.width=1200;canvas.height=675;
     const ctx=canvas.getContext('2d');if(!ctx) throw new Error('Could not create visual.');
-    const titles=['WHAT MATTERS MOST?','PRIVACY BY DEFAULT','KASPA + ZKAS','YOUR CRYPTO PRIORITY','ZKAS.stream DATA','PRIVACY IS NORMAL','WAYS TO MINE ZKAS','WHY ARE YOU HERE?','BUILD ZKAS.stream','ONE ZKAS BENEFIT'];
-    const subs=['PRIVACY · SPEED · MINING · DATA','PRIVATE FROM THE START','ONE MINING EFFORT · TWO NETWORKS','PRIVACY · SPEED · TOOLS · FRICTION','NETWORK · MINING · MARKETS · OTC','YOUR MONEY IS YOUR BUSINESS','POOL · SOLO · MERGED · COMMUNITY','PRIVACY · KASPA · MINING · COMMUNITY','WHAT SHOULD WE BUILD NEXT?','HOW WOULD YOU EXPLAIN ZKAS?'];
+    const titles=['WHAT SHOULD STAY PRIVATE?','FAIR LAUNCH','WALLET WISHLIST','MORE THAN PRICE','PRIVACY + TRANSPARENCY','MINER ROLL CALL','OTC OR EXCHANGE?','BUILD WITH US','WHERE IS ZKAS?','WHY ZKAS?'];
+    const subs=['YOUR MONEY · YOUR HISTORY','NO PREMINE','WHAT SHOULD COME NEXT?','NETWORK · MINING · MARKETS · TOOLS','PUBLIC NETWORK · PRIVATE FINANCES','SHOW YOUR SETUP','TWO WAYS TO TRADE','YOUR IDEA COULD BE NEXT','GLOBAL COMMUNITY CHECK-IN','ONE SENTENCE ONLY'];
     const g=ctx.createLinearGradient(0,0,1200,675);g.addColorStop(0,'#031814');g.addColorStop(.55,'#061e24');g.addColorStop(1,index===9?'#352414':'#07383a');ctx.fillStyle=g;ctx.fillRect(0,0,1200,675);
     ctx.globalAlpha=.22;ctx.strokeStyle='#2ee8ca';ctx.lineWidth=2;
     for(let x=-200;x<1400;x+=90){ctx.beginPath();ctx.moveTo(600,340);ctx.lineTo(x,675);ctx.stroke();}
