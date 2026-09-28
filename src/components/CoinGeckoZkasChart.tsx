@@ -22,6 +22,27 @@ const ranges: Array<{ value: Range; label: string }> = [
 const usd = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 8 });
 const volumeUsd = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', notation: 'compact', maximumFractionDigits: 2 });
 
+async function loadChart(days: Range, signal: AbortSignal): Promise<ChartPayload> {
+  const urls = [
+    `/api/kas-price?chart-days=${days}`,
+    `https://api.coingecko.com/api/v3/coins/zkas/market_chart?vs_currency=usd&days=${days}`,
+  ];
+  let lastError: unknown;
+  for (const url of urls) {
+    try {
+      const response = await fetch(url, { signal });
+      if (!response.ok) throw new Error(`CoinGecko request failed (${response.status})`);
+      const data = await response.json() as ChartPayload;
+      if (!Array.isArray(data.prices) || !Array.isArray(data.total_volumes)) throw new Error('Invalid CoinGecko chart data');
+      return data;
+    } catch (cause) {
+      if (cause instanceof DOMException && cause.name === 'AbortError') throw cause;
+      lastError = cause;
+    }
+  }
+  throw lastError ?? new Error('CoinGecko chart unavailable');
+}
+
 export function CoinGeckoZkasChart() {
   const [range, setRange] = useState<Range>('1');
   const [payload, setPayload] = useState<ChartPayload | null>(null);
@@ -32,15 +53,8 @@ export function CoinGeckoZkasChart() {
     const controller = new AbortController();
     setLoading(true);
     setError(false);
-    fetch(`/api/kas-price?chart-days=${range}`, { signal: controller.signal })
-      .then((response) => {
-        if (!response.ok) throw new Error('CoinGecko chart unavailable');
-        return response.json() as Promise<ChartPayload>;
-      })
-      .then((data) => {
-        if (!Array.isArray(data.prices) || !Array.isArray(data.total_volumes)) throw new Error('Invalid chart response');
-        setPayload(data);
-      })
+    loadChart(range, controller.signal)
+      .then(setPayload)
       .catch((cause: unknown) => {
         if (cause instanceof DOMException && cause.name === 'AbortError') return;
         setError(true);
