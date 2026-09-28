@@ -9,6 +9,7 @@ type ChartPayload = {
 };
 
 type Range = '1' | '7' | '30' | '90' | '365' | 'max';
+type CachedChart = { payload: ChartPayload; savedAt: number };
 
 const ranges: Array<{ value: Range; label: string }> = [
   { value: '1', label: '24H' },
@@ -21,6 +22,28 @@ const ranges: Array<{ value: Range; label: string }> = [
 
 const usd = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 8 });
 const volumeUsd = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', notation: 'compact', maximumFractionDigits: 2 });
+
+function readCachedChart(range: Range): CachedChart | null {
+  try {
+    const value = localStorage.getItem(`zkas-coingecko-chart-${range}`);
+    if (!value) return null;
+    const cached = JSON.parse(value) as CachedChart;
+    if (Array.isArray(cached?.payload?.prices) && Array.isArray(cached?.payload?.total_volumes)) {
+      return { payload: cached.payload, savedAt: Number.isFinite(cached.savedAt) ? cached.savedAt : 0 };
+    }
+  } catch {
+    // Storage may be disabled; the live request can still succeed.
+  }
+  return null;
+}
+
+function saveCachedChart(range: Range, payload: ChartPayload, savedAt: number) {
+  try {
+    localStorage.setItem(`zkas-coingecko-chart-${range}`, JSON.stringify({ payload, savedAt }));
+  } catch {
+    // Storage may be full or disabled; keep the chart available in memory.
+  }
+}
 
 async function loadChart(days: Range, signal: AbortSignal): Promise<ChartPayload> {
   const urls = [
@@ -46,15 +69,29 @@ async function loadChart(days: Range, signal: AbortSignal): Promise<ChartPayload
 export function CoinGeckoZkasChart() {
   const [range, setRange] = useState<Range>('1');
   const [payload, setPayload] = useState<ChartPayload | null>(null);
+  const [displayRange, setDisplayRange] = useState<Range | null>(null);
+  const [savedAt, setSavedAt] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
 
   useEffect(() => {
     const controller = new AbortController();
-    setLoading(true);
+    const cached = readCachedChart(range);
+    if (cached) {
+      setPayload(cached.payload);
+      setDisplayRange(range);
+      setSavedAt(cached.savedAt);
+    }
+    setLoading(!cached);
     setError(false);
     loadChart(range, controller.signal)
-      .then(setPayload)
+      .then((data) => {
+        const timestamp = Date.now();
+        saveCachedChart(range, data, timestamp);
+        setPayload(data);
+        setDisplayRange(range);
+        setSavedAt(timestamp);
+      })
       .catch((cause: unknown) => {
         if (cause instanceof DOMException && cause.name === 'AbortError') return;
         setError(true);
@@ -71,6 +108,18 @@ export function CoinGeckoZkasChart() {
     const volume = payload.total_volumes.filter((point) => Number.isFinite(point[0]) && Number.isFinite(point[1])).at(-1);
     return { rows, latest, first, volume };
   }, [payload]);
+
+  const selectedLabel = ranges.find((option) => option.value === range)?.label ?? range;
+  const displayedLabel = ranges.find((option) => option.value === displayRange)?.label ?? displayRange;
+  const chartStatus = error && savedAt
+    ? `Refresh failed; showing saved ${displayedLabel} data from ${new Date(savedAt).toLocaleString()}.`
+    : error && chart && displayRange !== range
+      ? `Could not load ${selectedLabel}; showing the previously loaded ${displayedLabel} chart.`
+      : loading && chart && displayRange !== range
+        ? `Loading ${selectedLabel}; showing ${displayedLabel} data until it arrives.`
+        : savedAt
+          ? `Last loaded from CoinGecko ${new Date(savedAt).toLocaleString()}.`
+          : '';
 
   return (
     <section className="panel coingecko-market-panel">
@@ -102,7 +151,7 @@ export function CoinGeckoZkasChart() {
           <SparkChart values={chart.rows.map((point) => point[1])} labels={chart.rows.map((point) => point[0])} height={220} />
           <div className="coingecko-chart-footnote">
             <span>{chart.first ? `History shown from ${new Date(chart.first[0]).toLocaleString()}` : 'Historical chart'}</span>
-            <span>CoinGecko currently reports no usable market-cap data for ZKAS.</span>
+            <span>{chartStatus ? `${chartStatus} CoinGecko currently reports no usable market-cap data for ZKAS.` : 'CoinGecko currently reports no usable market-cap data for ZKAS.'}</span>
           </div>
         </>
       ) : <div className="coingecko-chart-state">No ZKAS price history is available from CoinGecko yet.</div>}
