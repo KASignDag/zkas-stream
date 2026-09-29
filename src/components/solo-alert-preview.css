@@ -199,3 +199,7 @@
     border-color:rgba(93,238,207,.58);
   }
 }
+
+.solo-pair-selection-note{display:flex;align-items:center;gap:7px;margin-top:10px;color:#55e5c6;font-size:12px;font-weight:750}
+.solo-pair-selection-note svg{flex:0 0 auto}
+.solo-mode-card.selected em{color:#67f0d3}
