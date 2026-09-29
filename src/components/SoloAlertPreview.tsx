@@ -354,7 +354,7 @@ export function SoloAlertPreview() {
     <div className="solo-alert-preview">
       <section className="solo-preview-banner">
         <div>
-          <span className="solo-preview-kicker"><ShieldCheck size={16} /> COMMUNITY MINER PREVIEW</span>
+          <span className="solo-preview-kicker"><ShieldCheck size={16} /> COMMUNITY MINER PREVIEW · BUILD 09-29B</span>
           <h2>ZKAS Solo Alert</h2>
           <p>One dashboard for solo miners: live status, hashrate, shares, block alerts and optional ASIC health telemetry from a local read-only agent.</p>
         </div>
@@ -697,7 +697,7 @@ export function SoloAlertPreview() {
 
             {pairingStep === 2 && <>
               <span className="solo-preview-kicker">PAIR MINER · STEP 2</span>
-              <h3 className="solo-pair-title">Create your private pairing code</h3>
+              <h3 className="solo-pair-title">Create your private pairing code <small className="solo-build-tag">09-29B</small></h3>
               <p className="solo-muted">You will not see a list of other Community Mining workers. Your worker identity is attached only after your own mining connection claims this one-time code.</p>
               <div className="solo-safe-box"><ShieldCheck size={20} /><div><b>Private worker discovery</b><span>The pairing code identifies your private dashboard. Your Community Mining connection supplies its own worker identity when it claims the code, so another user's miner never appears in your setup.</span></div></div>
               <div className="solo-private-steps">
