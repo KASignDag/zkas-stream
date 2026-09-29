@@ -61,6 +61,21 @@ type NotificationReadiness = {
   browser: 'ready' | 'needs-permission';
 };
 
+type DeviceKind = 'ios' | 'android' | 'windows' | 'other';
+
+function detectDeviceKind(): DeviceKind {
+  const ua = navigator.userAgent || '';
+  if (/iPhone|iPad|iPod/i.test(ua) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)) return 'ios';
+  if (/Android/i.test(ua)) return 'android';
+  if (/Windows/i.test(ua)) return 'windows';
+  return 'other';
+}
+
+function isStandaloneWebApp() {
+  const nav = navigator as Navigator & { standalone?: boolean };
+  return window.matchMedia?.('(display-mode: standalone)').matches || nav.standalone === true;
+}
+
 const demoMiners: PreviewMiner[] = [
   {
     name: 'IceRiver KS0 Ultra',
@@ -149,6 +164,8 @@ export function SoloAlertPreview() {
   const [readiness, setReadiness] = useState<NotificationReadiness>({
     browser: typeof Notification !== 'undefined' && Notification.permission === 'granted' ? 'ready' : 'needs-permission',
   });
+  const [deviceKind] = useState<DeviceKind>(() => detectDeviceKind());
+  const [standalone] = useState(() => isStandaloneWebApp());
   const [pairingOpen, setPairingOpen] = useState(false);
   const [pairingStep, setPairingStep] = useState<1 | 2 | 3>(1);
   const [pairingMode, setPairingMode] = useState<MinerMode>('basic');
@@ -335,6 +352,43 @@ export function SoloAlertPreview() {
           <p>One dashboard for solo miners: live status, hashrate, shares, block alerts and optional ASIC health telemetry from a local read-only agent.</p>
         </div>
         <div className="solo-preview-live"><span /> Preview only · current mining page unchanged</div>
+      </section>
+
+      <section className="solo-section solo-device-test">
+        <div className="solo-section-head">
+          <div><span>DEVICE TEST</span><h3>Test Solo Alert on this device</h3></div>
+          <span className="solo-device-pill">{deviceKind === 'ios' ? 'iPhone / iPad' : deviceKind === 'android' ? 'Android' : deviceKind === 'windows' ? 'Windows' : 'Browser'}</span>
+        </div>
+        <div className="solo-device-grid">
+          <div className="solo-device-check">
+            <CheckCircle2 size={18} />
+            <div><b>Dashboard access</b><span>Ready — the private Solo Alert dashboard works in this browser.</span></div>
+          </div>
+          <div className="solo-device-check">
+            {deviceKind === 'ios' && !standalone ? <RadioTower size={18} /> : <CheckCircle2 size={18} />}
+            <div>
+              <b>Background alerts</b>
+              {deviceKind === 'ios' && !standalone
+                ? <span>Add ZKAS.stream to your Home Screen first, then open it from the new icon before enabling web-push alerts.</span>
+                : <span>{deviceKind === 'ios' ? 'Home Screen web app detected.' : 'This device can use browser notification support when web push is enabled.'}</span>}
+            </div>
+          </div>
+          <div className="solo-device-check">
+            <ShieldCheck size={18} />
+            <div><b>No mining PC required for viewing</b><span>Community Mining users can view their dashboard from this device. A local PC/agent is only needed for optional local ASIC health telemetry.</span></div>
+          </div>
+        </div>
+        {deviceKind === 'ios' && !standalone && (
+          <div className="solo-ios-steps">
+            <b>iPhone / iPad test:</b>
+            <span>Safari → Share → Add to Home Screen → Open the ZKAS.stream icon → return to Solo Alert.</span>
+          </div>
+        )}
+        <div className="solo-device-actions">
+          <button onClick={() => void testBrowserAlert()}><BellRing size={16} /> Test notification permission</button>
+          <button onClick={() => simulateBlock('ZKAS')}><Trophy size={16} /> Test block screen</button>
+          <button onClick={() => { setPairingStep(1); setPairingOpen(true); }}><RadioTower size={16} /> Test pairing</button>
+        </div>
       </section>
 
       <section className="solo-section solo-setup-section">
