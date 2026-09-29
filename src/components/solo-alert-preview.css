@@ -170,3 +170,32 @@
   .solo-pair-modal .solo-mode-card{background:#10242d}
   .solo-pair-modal .solo-mode-card.selected{background:#123832}
 }
+
+/* High-visibility close controls for dark Solo Alert dialogs. */
+.solo-close-button,
+.solo-celebration-close{
+  width:44px;
+  height:44px;
+  right:14px;
+  top:14px;
+  z-index:8;
+  border:1px solid rgba(91,232,202,.42);
+  background:#17333a;
+  color:#effffc;
+  box-shadow:0 5px 18px rgba(0,0,0,.35);
+}
+.solo-close-button:hover,
+.solo-celebration-close:hover{background:#21454c;color:#fff}
+.solo-close-button svg,
+.solo-celebration-close svg{width:24px;height:24px;stroke-width:3}
+@media(max-width:560px){
+  .solo-close-button,
+  .solo-celebration-close{
+    width:46px;
+    height:46px;
+    right:12px;
+    top:12px;
+    background:#1a3c42;
+    border-color:rgba(93,238,207,.58);
+  }
+}
