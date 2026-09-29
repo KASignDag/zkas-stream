@@ -152,3 +152,21 @@
 .solo-ios-help-modal{width:min(620px,94vw)}
 .solo-ios-help-icon{display:grid;place-items:center;width:62px;height:62px;border-radius:18px;background:rgba(43,205,172,.11);color:#2ec9aa;margin-bottom:14px}
 @media(max-width:560px){.solo-ios-help-modal{max-height:86dvh;overflow:auto}.solo-ios-help-modal .solo-pair-instructions{gap:6px}.solo-ios-help-modal .solo-pair-instructions>div{padding:8px 10px}}
+
+/* Mobile/PWA dialog legibility: keep underlying dashboard from bleeding through. */
+.solo-modal-backdrop{background:rgba(2,8,14,.88);backdrop-filter:blur(16px)}
+.solo-detail-modal{background:#0b1820;color:#eefdfa}
+.solo-detail-modal .solo-pair-title,
+.solo-detail-modal .solo-mode-card b,
+.solo-detail-modal .solo-safe-box b{color:#f2fffc}
+.solo-detail-modal .solo-muted,
+.solo-detail-modal .solo-mode-card small,
+.solo-detail-modal .solo-pair-instructions p{color:#b7ccc8}
+.solo-detail-modal .solo-mode-card{background:#10232c;border-color:rgba(126,177,167,.2)}
+.solo-detail-modal .solo-mode-card.selected{background:#12332f;border-color:rgba(71,226,193,.62)}
+@media(max-width:560px){
+  .solo-modal-backdrop{padding:12px;background:rgba(2,8,14,.94);backdrop-filter:blur(18px)}
+  .solo-detail-modal{background:#0a171e;border-color:rgba(65,220,190,.45);box-shadow:0 24px 90px rgba(0,0,0,.72)}
+  .solo-pair-modal .solo-mode-card{background:#10242d}
+  .solo-pair-modal .solo-mode-card.selected{background:#123832}
+}
