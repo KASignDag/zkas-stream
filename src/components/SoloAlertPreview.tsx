@@ -94,8 +94,8 @@ export function SoloAlertPreview() {
   }
 
   async function testBrowserAlert() {
-    if (!('Notification' in window)) {
-      window.alert('Browser notifications are not supported by this browser.');
+    if (typeof Notification === 'undefined') {
+      globalThis.alert?.('Browser notifications are not supported by this browser.');
       return;
     }
     const permission = Notification.permission === 'default'
