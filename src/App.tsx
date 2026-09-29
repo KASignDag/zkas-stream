@@ -58,13 +58,15 @@ import { KasUsdConverter, ZkasUsdConverter } from './components/KasUsdConverter'
 import { CoinGeckoZkasChart } from './components/CoinGeckoZkasChart';
 import { NetworkMap } from './components/NetworkMap';
 import { ShareZkasUpdate } from './components/ShareZkasUpdate';
+import { SoloAlertPreview } from './components/SoloAlertPreview';
 import { useGenesisArchive } from './genesisHistory';
 
-type Tab = 'intelligence' | 'merged' | 'health' | 'nodes' | 'events' | 'explorer' | 'otc' | 'otcPreview' | 'exchanges' | 'importer' | 'history' | 'supply' | 'reference' | 'supporters';
+type Tab = 'intelligence' | 'merged' | 'soloAlertPreview' | 'health' | 'nodes' | 'events' | 'explorer' | 'otc' | 'otcPreview' | 'exchanges' | 'importer' | 'history' | 'supply' | 'reference' | 'supporters';
 
 const tabHashes: Record<Tab, string> = {
   intelligence: '',
   merged: 'merged-mining',
+  soloAlertPreview: 'solo-alert-preview',
   health: 'network-health',
   nodes: 'nodes',
   events: 'events',
@@ -585,6 +587,7 @@ function stabilizeLiveSnapshot(previous: DashboardData, incoming: DashboardData)
 const heroTitles: Record<Tab, string> = {
   intelligence: 'Merged-mining & network intelligence',
   merged: 'Mining & merged-mining intelligence',
+  soloAlertPreview: 'ZKAS Solo Alert — community miner dashboard',
   health: 'Network health signals',
   nodes: 'Public node view',
   events: 'Live event intelligence',
@@ -602,6 +605,7 @@ const heroTitles: Record<Tab, string> = {
 const heroDescriptions: Record<Tab, string> = {
   intelligence: 'Public ZKas intelligence with a focus on Kaspa ↔ ZKas merged mining, network work, peer signals and security context.',
   merged: 'Public mining signals, producer distribution and practical solo merged-mining estimates for the ZKas network.',
+  soloAlertPreview: 'Private preview of the community miner monitoring dashboard, alerts and optional read-only ASIC telemetry.',
   health: 'Current public network capacity, consensus activity, peer reachability and relay health in one view.',
   nodes: 'Privacy-aware observations of the public nodes currently visible to the ZKas network scanner.',
   events: 'Recent public block and network activity, organized into stable signals instead of a reconstructed animated DAG.',
@@ -824,14 +828,14 @@ function App() {
                 </div>
               </details>
             </div>
-            {tab !== 'otc' && tab !== 'otcPreview' && tab !== 'exchanges' && tab !== 'importer' && tab !== 'supporters' && <div className="sync-box">
+            {tab !== 'otc' && tab !== 'otcPreview' && tab !== 'soloAlertPreview' && tab !== 'exchanges' && tab !== 'importer' && tab !== 'supporters' && <div className="sync-box">
               <span>Network</span><b>{data.network}</b>
               <span>Updated</span><b>{new Date(data.updatedAt).toLocaleTimeString()}</b>
             </div>}
           </div>
         </section>
 
-        {tab !== 'otc' && tab !== 'otcPreview' && tab !== 'exchanges' && tab !== 'importer' && tab !== 'supporters' && <>
+        {tab !== 'otc' && tab !== 'otcPreview' && tab !== 'soloAlertPreview' && tab !== 'exchanges' && tab !== 'importer' && tab !== 'supporters' && <>
           <form className="searchbar" onSubmit={onSearch}>
             <Search size={21} />
             <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search public block hash or transaction ID" aria-label="Search public block hash or transaction ID" />
@@ -839,14 +843,15 @@ function App() {
           </form>
           {searchError && <div className="inline-error">{searchError}</div>}
         </>}
-        {tab !== 'otc' && tab !== 'otcPreview' && tab !== 'exchanges' && tab !== 'importer' && tab !== 'supporters' && status === 'stale' && <div className="demo-banner"><b>Live refresh delayed.</b> Showing the last good public mainnet snapshot while the API retries. {error && <span>{error}</span>}</div>}
-        {tab !== 'otc' && tab !== 'otcPreview' && tab !== 'exchanges' && tab !== 'importer' && tab !== 'supporters' && status === 'connecting' && <div className="demo-banner"><b>Connecting to ZKas mainnet.</b> Waiting for the first public API snapshot. {error && <span>{error}</span>}</div>}
+        {tab !== 'otc' && tab !== 'otcPreview' && tab !== 'soloAlertPreview' && tab !== 'exchanges' && tab !== 'importer' && tab !== 'supporters' && status === 'stale' && <div className="demo-banner"><b>Live refresh delayed.</b> Showing the last good public mainnet snapshot while the API retries. {error && <span>{error}</span>}</div>}
+        {tab !== 'otc' && tab !== 'otcPreview' && tab !== 'soloAlertPreview' && tab !== 'exchanges' && tab !== 'importer' && tab !== 'supporters' && status === 'connecting' && <div className="demo-banner"><b>Connecting to ZKas mainnet.</b> Waiting for the first public API snapshot. {error && <span>{error}</span>}</div>}
 
         {tab === 'intelligence' && (
           <IntelligenceHome data={data} txValues={txValues} pulseTimes={pulseTimes} onReference={() => navigateToTab('reference')} />
         )}
 
         {tab === 'merged' && <MergedIntelligencePage data={data} />}
+        {tab === 'soloAlertPreview' && <SoloAlertPreview />}
         {tab === 'health' && <NetworkHealthPage data={data} diffValues={diffValues} txValues={txValues} pulseTimes={pulseTimes} onOpenNodes={() => navigateToTab('nodes')} />}
         {tab === 'nodes' && <NodesPage data={data} />}
         {tab === 'events' && <EventsPage data={data} history={history} />}
