@@ -327,8 +327,14 @@ export function SoloAlertPreview() {
   }
 
   async function testBrowserAlert() {
+    if (deviceKind === 'ios' && !isStandaloneWebApp()) {
+      setBrowserState('denied');
+      setReadiness((current) => ({ ...current, browser: 'needs-permission' }));
+      return;
+    }
     if (typeof Notification === 'undefined') {
-      globalThis.alert?.('Browser notifications are not supported by this browser.');
+      setBrowserState('denied');
+      setReadiness((current) => ({ ...current, browser: 'needs-permission' }));
       return;
     }
     const permission = Notification.permission === 'default'
@@ -338,7 +344,7 @@ export function SoloAlertPreview() {
     setReadiness((current) => ({ ...current, browser: permission === 'granted' ? 'ready' : 'needs-permission' }));
     if (permission === 'granted') {
       new Notification('ZKAS Solo Alert test', {
-        body: 'KSOPRO is online · 359 GH/s · 61°C · 2,870 RPM',
+        body: 'KSOPRO Solo Alert test · notification permission is working',
       });
     }
   }
@@ -385,7 +391,7 @@ export function SoloAlertPreview() {
           </div>
         )}
         <div className="solo-device-actions">
-          <button onClick={() => void testBrowserAlert()}><BellRing size={16} /> Test notification permission</button>
+          <button onClick={() => void testBrowserAlert()}><BellRing size={16} /> {deviceKind === 'ios' && !standalone ? 'Enable iPhone alerts' : 'Test notification permission'}</button>
           <button onClick={() => simulateBlock('ZKAS')}><Trophy size={16} /> Test block screen</button>
           <button onClick={() => { setPairingStep(1); setPairingOpen(true); }}><RadioTower size={16} /> Test pairing</button>
         </div>
@@ -612,7 +618,13 @@ export function SoloAlertPreview() {
               Open local Dual Alert settings
             </button>
           </div>
-          {browserState !== 'idle' && <div className={`solo-test-state ${browserState}`}>Browser permission: {browserState}</div>}
+          {browserState !== 'idle' && (
+            <div className={`solo-test-state ${browserState}`}>
+              {deviceKind === 'ios' && !standalone
+                ? 'On iPhone/iPad: Safari → Share → Add to Home Screen, then open ZKAS.stream from the new icon.'
+                : `Browser permission: ${browserState}`}
+            </div>
+          )}
           <div className="solo-security-note"><ShieldCheck size={15} /><span>Telegram bot tokens and Discord webhook URLs never enter ZKAS.stream. They stay inside your local Dual Alert installation.</span></div>
         </article>
 
