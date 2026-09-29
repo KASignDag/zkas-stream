@@ -148,3 +148,7 @@
   .solo-pair-modal .solo-pair-footer{position:sticky;bottom:-16px;margin:12px -16px -16px;padding:10px 16px 16px;background:linear-gradient(180deg,transparent,var(--panel) 24%)}
   .solo-test-state{display:block;margin:10px 0 0;line-height:1.45}
 }
+
+.solo-ios-help-modal{width:min(620px,94vw)}
+.solo-ios-help-icon{display:grid;place-items:center;width:62px;height:62px;border-radius:18px;background:rgba(43,205,172,.11);color:#2ec9aa;margin-bottom:14px}
+@media(max-width:560px){.solo-ios-help-modal{max-height:86dvh;overflow:auto}.solo-ios-help-modal .solo-pair-instructions{gap:6px}.solo-ios-help-modal .solo-pair-instructions>div{padding:8px 10px}}
