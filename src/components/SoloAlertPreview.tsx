@@ -59,8 +59,6 @@ type CommunityMiningSnapshot = {
 
 type NotificationReadiness = {
   browser: 'ready' | 'needs-permission';
-  telegram: 'configured-locally' | 'not-configured';
-  discord: 'configured-locally' | 'not-configured';
 };
 
 const demoMiners: PreviewMiner[] = [
@@ -144,9 +142,12 @@ export function SoloAlertPreview() {
   const [liveError, setLiveError] = useState<string | null>(null);
   const [readiness, setReadiness] = useState<NotificationReadiness>({
     browser: typeof Notification !== 'undefined' && Notification.permission === 'granted' ? 'ready' : 'needs-permission',
-    telegram: 'configured-locally',
-    discord: 'configured-locally',
   });
+  const [pairingOpen, setPairingOpen] = useState(false);
+  const [pairingStep, setPairingStep] = useState<1 | 2 | 3>(1);
+  const [pairingMode, setPairingMode] = useState<MinerMode>('basic');
+  const [pairingName, setPairingName] = useState('');
+  const [pairingCode] = useState(() => 'ZKAS-' + Math.random().toString(36).slice(2, 6).toUpperCase() + '-' + Math.random().toString(36).slice(2, 6).toUpperCase());
   const previousBlocksRef = useRef<Record<string, { zkas: number; kas: number }> | null>(null);
 
   const enabledCount = useMemo(() => Object.values(channels).filter(Boolean).length, [channels]);
@@ -338,7 +339,7 @@ export function SoloAlertPreview() {
       <section className="solo-section">
         <div className="solo-section-head">
           <div><span>MINERS</span><h3>Community miner fleet</h3></div>
-          <button className="solo-add-button">+ Pair miner</button>
+          <button className="solo-add-button" onClick={() => { setPairingStep(1); setPairingOpen(true); }}>+ Pair miner</button>
         </div>
 
         <div className="solo-miner-grid">
@@ -506,6 +507,68 @@ export function SoloAlertPreview() {
           <button className="solo-agent-button">Download agent — coming next</button>
         </article>
       </section>
+
+      {pairingOpen && (
+        <div className="solo-modal-backdrop" role="presentation" onMouseDown={() => setPairingOpen(false)}>
+          <section className="solo-detail-modal solo-pair-modal" role="dialog" aria-modal="true" aria-label="Pair a miner" onMouseDown={(event) => event.stopPropagation()}>
+            <button className="solo-close-button" onClick={() => setPairingOpen(false)} aria-label="Close pairing"><X size={20} /></button>
+            <div className="solo-pair-progress">
+              <span className={pairingStep >= 1 ? 'active' : ''}>1</span><i />
+              <span className={pairingStep >= 2 ? 'active' : ''}>2</span><i />
+              <span className={pairingStep >= 3 ? 'active' : ''}>3</span>
+            </div>
+
+            {pairingStep === 1 && <>
+              <span className="solo-preview-kicker">PAIR MINER · STEP 1</span>
+              <h3 className="solo-pair-title">Choose your mining setup</h3>
+              <p className="solo-muted">You do not need ASIC access to use Solo Alert.</p>
+              <div className="solo-mode-grid">
+                <button className={`solo-mode-card ${pairingMode === 'basic' ? 'selected' : ''}`} onClick={() => setPairingMode('basic')}>
+                  <span className="solo-mode-icon"><BellRing size={23} /></span><b>Basic</b><small>Blocks, workers, shares and bridge status.</small><em>Easiest</em>
+                </button>
+                <button className={`solo-mode-card ${pairingMode === 'local' ? 'selected' : ''}`} onClick={() => setPairingMode('local')}>
+                  <span className="solo-mode-icon"><Cpu size={23} /></span><b>Local ASIC</b><small>Add optional temperature and fan monitoring.</small><em>Advanced</em>
+                </button>
+                <button className={`solo-mode-card ${pairingMode === 'rental' ? 'selected' : ''}`} onClick={() => setPairingMode('rental')}>
+                  <span className="solo-mode-icon"><RadioTower size={23} /></span><b>Rental / Remote</b><small>No ASIC login or local miner access needed.</small><em>Rental friendly</em>
+                </button>
+              </div>
+              <div className="solo-pair-footer"><span /><button onClick={() => setPairingStep(2)}>Continue</button></div>
+            </>}
+
+            {pairingStep === 2 && <>
+              <span className="solo-preview-kicker">PAIR MINER · STEP 2</span>
+              <h3 className="solo-pair-title">Name this miner</h3>
+              <p className="solo-muted">Use a simple label you will recognize. Do not enter a wallet seed phrase, private key, or miner password.</p>
+              <label className="solo-pair-field">
+                <span>Miner / worker label</span>
+                <input value={pairingName} onChange={(event) => setPairingName(event.target.value.slice(0, 32))} placeholder="Example: Basement KS0 Ultra" />
+              </label>
+              <div className="solo-safe-box"><ShieldCheck size={20} /><div><b>Safe by design</b><span>Pairing is for read-only monitoring. Solo Alert never needs spending keys or remote miner control.</span></div></div>
+              <div className="solo-pair-footer"><button className="secondary" onClick={() => setPairingStep(1)}>Back</button><button disabled={!pairingName.trim()} onClick={() => setPairingStep(3)}>Continue</button></div>
+            </>}
+
+            {pairingStep === 3 && <>
+              <span className="solo-preview-kicker">PAIR MINER · STEP 3</span>
+              <h3 className="solo-pair-title">Connect Solo Alert</h3>
+              <p className="solo-muted">This preview shows the pairing experience. The production version will exchange this one-time code for a miner-specific token instead of sharing the site-wide ingest secret.</p>
+              <div className="solo-pair-code">
+                <span>ONE-TIME PAIRING CODE</span>
+                <b>{pairingCode}</b>
+                <small>Preview code only · not active yet</small>
+              </div>
+              <div className="solo-pair-instructions">
+                <div><span>1</span><p>Install or update <b>ZKas Dual Alert</b> on the bridge PC.</p></div>
+                <div><span>2</span><p>Open the local dashboard at <b>127.0.0.1:3040</b>.</p></div>
+                <div><span>3</span><p>Enter the pairing code under <b>ZKAS.stream Community Dashboard</b>.</p></div>
+                {pairingMode === 'local' && <div><span>4</span><p>Optionally enable the read-only ASIC health agent for temperature and fans.</p></div>}
+              </div>
+              <div className="solo-safe-box"><ShieldCheck size={20} /><div><b>Per-miner access</b><span>The final pairing service will issue a separate token for this miner so community users cannot access each other's telemetry.</span></div></div>
+              <div className="solo-pair-footer"><button className="secondary" onClick={() => setPairingStep(2)}>Back</button><button onClick={() => setPairingOpen(false)}>Finish preview</button></div>
+            </>}
+          </section>
+        </div>
+      )}
 
       {selectedMiner && (
         <div className="solo-modal-backdrop" role="presentation" onMouseDown={() => setSelectedMiner(null)}>
