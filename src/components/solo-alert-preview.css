@@ -83,3 +83,5 @@
 @keyframes solo-pop{from{opacity:0;transform:scale(.92)}to{opacity:1;transform:scale(1)}}@keyframes solo-pulse-ring{50%{transform:scale(1.06);box-shadow:0 0 80px rgba(58,222,188,.24)}}@keyframes solo-fall{to{transform:translateY(120vh) rotate(520deg)}}
 @media(max-width:850px){.solo-block-center-grid,.solo-detail-metrics{grid-template-columns:repeat(2,1fr)}.solo-detail-columns{grid-template-columns:1fr}}
 @media(max-width:560px){.solo-block-actions{width:100%}.solo-block-actions button{flex:1;justify-content:center}.solo-detail-modal{padding:18px}.solo-detail-heading{grid-template-columns:auto 1fr}.solo-detail-heading>.solo-status-pill{grid-column:1/-1;width:max-content}.solo-detail-metrics,.solo-celebration-grid{grid-template-columns:1fr}.solo-celebration-grid .wide{grid-column:auto}.solo-block-center-grid{grid-template-columns:1fr 1fr}.solo-block-celebration{padding:28px 18px}.solo-health-gauges{grid-template-columns:1fr}}
+
+.solo-history-empty.live{border-style:solid;border-color:rgba(43,205,172,.28);background:rgba(43,205,172,.06)}
