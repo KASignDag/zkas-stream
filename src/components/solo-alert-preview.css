@@ -203,3 +203,8 @@
 .solo-pair-selection-note{display:flex;align-items:center;gap:7px;margin-top:10px;color:#55e5c6;font-size:12px;font-weight:750}
 .solo-pair-selection-note svg{flex:0 0 auto}
 .solo-mode-card.selected em{color:#67f0d3}
+
+.solo-get-started{display:flex;align-items:center;justify-content:space-between;gap:20px;background:linear-gradient(135deg,rgba(43,205,172,.09),var(--panel))}
+.solo-get-started-copy h3{font-size:24px;margin:7px 0}.solo-get-started-copy p{margin:0;max-width:680px;color:var(--muted);line-height:1.5}
+.solo-get-started-button{display:inline-flex;align-items:center;justify-content:center;gap:8px;flex:0 0 auto;border:0;border-radius:14px;padding:13px 18px;background:#23c8a7;color:#06251f;font-weight:900;font-size:15px;cursor:pointer}
+@media(max-width:650px){.solo-get-started{align-items:stretch;flex-direction:column}.solo-get-started-button{width:100%}}
