@@ -394,7 +394,7 @@ export function SoloAlertPreview() {
         <div className="solo-device-actions">
           <button onClick={() => void testBrowserAlert()}><BellRing size={16} /> {deviceKind === 'ios' && !standalone ? 'Enable iPhone alerts' : 'Test notification permission'}</button>
           <button onClick={() => simulateBlock('ZKAS')}><Trophy size={16} /> Test block screen</button>
-          <button onClick={() => { setPairingStep(1); setPairingOpen(true); }}><RadioTower size={16} /> Test pairing</button>
+          <button onClick={() => { setPairingName(''); setPairingStep(1); setPairingOpen(true); }}><RadioTower size={16} /> Test pairing</button>
         </div>
       </section>
 
@@ -405,7 +405,7 @@ export function SoloAlertPreview() {
             <h3>Connect your miner</h3>
             <p>One simple setup handles Basic, Local ASIC, and Rental / Remote miners. ASIC temperature and fan monitoring stays optional.</p>
           </div>
-          <button className="solo-get-started-button" onClick={() => { setPairingStep(1); setPairingOpen(true); }}>
+          <button className="solo-get-started-button" onClick={() => { setPairingName(''); setPairingStep(1); setPairingOpen(true); }}>
             <RadioTower size={20} />
             Pair a miner
           </button>
@@ -470,7 +470,7 @@ export function SoloAlertPreview() {
       <section className="solo-section">
         <div className="solo-section-head">
           <div><span>MINERS</span><h3>Community miner fleet</h3></div>
-          <button className="solo-add-button" onClick={() => { setPairingStep(1); setPairingOpen(true); }}>+ Pair miner</button>
+          <button className="solo-add-button" onClick={() => { setPairingName(''); setPairingStep(1); setPairingOpen(true); }}>+ Pair miner</button>
         </div>
 
         <div className="solo-miner-grid">
@@ -697,15 +697,27 @@ export function SoloAlertPreview() {
 
             {pairingStep === 2 && <>
               <span className="solo-preview-kicker">PAIR MINER · STEP 2</span>
-              <h3 className="solo-pair-title">Name this miner</h3>
-              <p className="solo-muted">Use a simple label you will recognize. Do not enter a wallet seed phrase, private key, or miner password.</p>
-              <label className="solo-pair-field">
-                <span>Miner / worker label</span>
-                <input value={pairingName} onChange={(event) => setPairingName(event.target.value.slice(0, 32))} placeholder="Example: Basement KS0 Ultra" />
-              </label>
-              <div className="solo-safe-box"><ShieldCheck size={20} /><div><b>Safe by design</b><span>Pairing is for read-only monitoring. Solo Alert never needs spending keys or remote miner control.</span></div></div>
+              <h3 className="solo-pair-title">Select your Community Mining worker</h3>
+              <p className="solo-muted">Choose the same worker already shown by ZKAS.stream Community Mining. No typing or miner password is required.</p>
+              <div className="solo-worker-picker">
+                {liveMiners.length > 0 ? liveMiners.map((miner) => (
+                  <button
+                    type="button"
+                    key={miner.worker}
+                    className={`solo-worker-option ${pairingName === miner.worker ? 'selected' : ''}`}
+                    onClick={() => setPairingName(miner.worker)}
+                  >
+                    <span className="solo-worker-radio">{pairingName === miner.worker ? <CheckCircle2 size={20} /> : <RadioTower size={20} />}</span>
+                    <div><b>{miner.worker}</b><small>{miner.hashrate !== '—' ? miner.hashrate : 'Community Mining worker'} · {miner.status === 'online' ? 'Online' : 'Offline / historical'}</small></div>
+                    {pairingName === miner.worker && <em>SELECTED</em>}
+                  </button>
+                )) : (
+                  <div className="solo-worker-empty"><RadioTower size={20} /><div><b>No Community Mining workers detected yet</b><span>Keep Community Mining connected and try again when your worker appears.</span></div></div>
+                )}
+              </div>
+              <div className="solo-safe-box"><ShieldCheck size={20} /><div><b>Matched to Community Mining</b><span>Solo Alert uses the existing worker identity so block, share and uptime data stay attached to the correct miner.</span></div></div>
               {pairingError && <div className="inline-error">{pairingError}</div>}
-              <div className="solo-pair-footer"><button className="secondary" onClick={() => setPairingStep(1)}>Back</button><button disabled={!pairingName.trim() || pairingBusy} onClick={() => void createPairing()}>{pairingBusy ? 'Creating…' : 'Create pairing code'}</button></div>
+              <div className="solo-pair-footer"><button className="secondary" onClick={() => setPairingStep(1)}>Back</button><button disabled={!pairingName || pairingBusy} onClick={() => void createPairing()}>{pairingBusy ? 'Creating…' : 'Pair selected worker'}</button></div>
             </>}
 
             {pairingStep === 3 && <>
