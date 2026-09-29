@@ -166,6 +166,7 @@ export function SoloAlertPreview() {
   });
   const [deviceKind] = useState<DeviceKind>(() => detectDeviceKind());
   const [standalone] = useState(() => isStandaloneWebApp());
+  const [iosAlertHelpOpen, setIosAlertHelpOpen] = useState(false);
   const [pairingOpen, setPairingOpen] = useState(false);
   const [pairingStep, setPairingStep] = useState<1 | 2 | 3>(1);
   const [pairingMode, setPairingMode] = useState<MinerMode>('basic');
@@ -330,6 +331,7 @@ export function SoloAlertPreview() {
     if (deviceKind === 'ios' && !isStandaloneWebApp()) {
       setBrowserState('denied');
       setReadiness((current) => ({ ...current, browser: 'needs-permission' }));
+      setIosAlertHelpOpen(true);
       return;
     }
     if (typeof Notification === 'undefined') {
@@ -663,6 +665,27 @@ export function SoloAlertPreview() {
           <button className="solo-agent-button">Download agent — coming next</button>
         </article>
       </section>
+
+      {iosAlertHelpOpen && (
+        <div className="solo-modal-backdrop" role="presentation" onMouseDown={() => setIosAlertHelpOpen(false)}>
+          <section className="solo-detail-modal solo-ios-help-modal" role="dialog" aria-modal="true" aria-label="Enable iPhone alerts" onMouseDown={(event) => event.stopPropagation()}>
+            <button className="solo-close-button" onClick={() => setIosAlertHelpOpen(false)} aria-label="Close iPhone alert instructions"><X size={20} /></button>
+            <div className="solo-ios-help-icon"><BellRing size={32} /></div>
+            <span className="solo-preview-kicker">IPHONE / IPAD ALERTS</span>
+            <h3 className="solo-pair-title">Add Solo Alert to your Home Screen</h3>
+            <p className="solo-muted">Apple only allows web-push notification permission for Home Screen web apps. You only have to do this once.</p>
+            <div className="solo-pair-instructions">
+              <div><span>1</span><p>Tap the <b>Share</b> button at the bottom of Safari — the square with the upward arrow.</p></div>
+              <div><span>2</span><p>Scroll down and tap <b>Add to Home Screen</b>.</p></div>
+              <div><span>3</span><p>Tap <b>Add</b>, then leave Safari.</p></div>
+              <div><span>4</span><p>Open <b>ZKAS.stream</b> from the new Home Screen icon.</p></div>
+              <div><span>5</span><p>Return to Solo Alert and tap <b>Enable iPhone alerts</b> again. iOS should then show the real notification permission prompt.</p></div>
+            </div>
+            <div className="solo-safe-box"><ShieldCheck size={20} /><div><b>Your dashboard stays private</b><span>Adding the site to your Home Screen does not give ZKAS.stream access to your phone or miner.</span></div></div>
+            <div className="solo-pair-footer"><span /><button onClick={() => setIosAlertHelpOpen(false)}>Got it</button></div>
+          </section>
+        </div>
+      )}
 
       {pairingOpen && (
         <div className="solo-modal-backdrop" role="presentation" onMouseDown={() => setPairingOpen(false)}>
