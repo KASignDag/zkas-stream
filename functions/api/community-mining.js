@@ -80,6 +80,24 @@ function cleanMiner(value) {
   };
 }
 
+function counterTotal(saved) {
+  return counterValue(saved?.zkas?.total) + counterValue(saved?.kas?.total);
+}
+
+function resolveStoredAlias(state, incomingAlias) {
+  const exact = state.miners[incomingAlias];
+  if (counterTotal(exact) > 0) return incomingAlias;
+
+  // After a bridge restart, some bridge builds report only the worker's base
+  // name (for example `KS7`) instead of its previously published stable alias
+  // (`KS7-pnw`). Reattach that live worker to its one unambiguous historical
+  // record so lifetime and pre-restart rewards do not appear to reset.
+  const historicalMatches = Object.keys(state.miners).filter((alias) => (
+    alias.startsWith(`${incomingAlias}-`) && counterTotal(state.miners[alias]) > 0
+  ));
+  return historicalMatches.length === 1 ? historicalMatches[0] : incomingAlias;
+}
+
 function accumulateCounter(previous, raw) {
   const lastRaw = counterValue(previous?.lastRaw);
   const total = counterValue(previous?.total);
@@ -185,7 +203,9 @@ function applyLifetimeBlockCounters(state, gateway, miners, bridgeStartedAt) {
   }
 
   const published = miners.map((miner) => {
-    const previous = state.miners[miner.alias] || null;
+    const resolvedAlias = resolveStoredAlias(state, miner.alias);
+    const publishedMiner = resolvedAlias === miner.alias ? miner : { ...miner, alias: resolvedAlias };
+    const previous = state.miners[resolvedAlias] || null;
     const zkas = accumulateCounter(previous?.zkas, miner.zkasBlocks);
     const kas = accumulateCounter(previous?.kas, miner.kasBlocks);
     const now = Date.now();
@@ -212,7 +232,7 @@ function applyLifetimeBlockCounters(state, gateway, miners, bridgeStartedAt) {
       ? previous.sessionBaseline
       : { zkas: counterValue(previous?.zkas?.total), kas: counterValue(previous?.kas?.total) };
 
-    state.miners[miner.alias] = {
+    state.miners[resolvedAlias] = {
       ...previous,
       zkas,
       kas,
@@ -223,9 +243,9 @@ function applyLifetimeBlockCounters(state, gateway, miners, bridgeStartedAt) {
       updatedAt: now,
     };
 
-    if (miner.status !== 'online') return historicalMinerRow(miner.alias, state.miners[miner.alias]);
+    if (miner.status !== 'online') return historicalMinerRow(resolvedAlias, state.miners[resolvedAlias]);
     return {
-      ...miner,
+      ...publishedMiner,
       historical: false,
       lastSeenAt,
       zkasBlocks: zkas.total,
