@@ -13,12 +13,19 @@ type MinerRow = {
   lastShareAt: number | null;
   zkasBlocks: number | null;
   kasBlocks: number | null;
+  zkasBeforeRestart: number | null;
+  kasBeforeRestart: number | null;
+  zkasSinceRestart: number | null;
+  kasSinceRestart: number | null;
   kasPayoutSet: boolean;
 };
 
 type MiningSnapshot = {
   schemaVersion: number;
   updatedAt: number | null;
+  bridgeStartedAt: number | null;
+  zkasRpcConnected: boolean | null;
+  kaspaRpcConnected: boolean | null;
   gatewayOnline: boolean;
   miners: MinerRow[];
 };
@@ -26,6 +33,9 @@ type MiningSnapshot = {
 const EMPTY: MiningSnapshot = {
   schemaVersion: 1,
   updatedAt: null,
+  bridgeStartedAt: null,
+  zkasRpcConnected: null,
+  kaspaRpcConnected: null,
   gatewayOnline: false,
   miners: [],
 };
@@ -114,7 +124,9 @@ export function CommunityMiningPage() {
   }), [snapshot.miners]);
 
   const snapshotFresh = snapshot.updatedAt !== null && Date.now() - snapshot.updatedAt < STALE_AFTER_MS;
-  const gatewayOnline = snapshot.gatewayOnline && snapshotFresh;
+  const nodeLinksKnown = snapshot.zkasRpcConnected !== null || snapshot.kaspaRpcConnected !== null;
+  const nodeLinksHealthy = snapshot.zkasRpcConnected === true && snapshot.kaspaRpcConnected === true;
+  const gatewayOnline = snapshot.gatewayOnline && snapshotFresh && (!nodeLinksKnown || nodeLinksHealthy);
 
   return (
     <section className="community-mining">
@@ -139,6 +151,8 @@ export function CommunityMiningPage() {
         <span>{snapshot.updatedAt ? `Updated ${fmtAge(snapshot.updatedAt)}` : state === 'loading' ? 'Waiting for first snapshot' : 'No snapshot yet'}</span>
         <span>•</span>
         <span>Auto-refreshes every 15 seconds</span>
+        {snapshot.bridgeStartedAt && <><span>•</span><span>Bridge restarted {fmtAge(snapshot.bridgeStartedAt)}</span></>}
+        {nodeLinksKnown && <><span>•</span><span>Node links: ZKAS {snapshot.zkasRpcConnected ? 'connected' : 'disconnected'} · KAS {snapshot.kaspaRpcConnected ? 'connected' : 'disconnected'}</span></>}
       </div>
 
       <div className="community-mining__cards">
@@ -171,8 +185,9 @@ export function CommunityMiningPage() {
                   <th>Accepted</th>
                   <th>Invalid / stale</th>
                   <th>Last share</th>
-                  <th>ZKAS blocks</th>
-                  <th>KAS blocks</th>
+                  <th>Lifetime rewards</th>
+                  <th>Before restart</th>
+                  <th>Since restart</th>
                   <th>KAS payout</th>
                 </tr>
               </thead>
@@ -186,8 +201,9 @@ export function CommunityMiningPage() {
                     <td>{fmtNumber(miner.acceptedShares)}</td>
                     <td>{fmtNumber((miner.invalidShares ?? 0) + (miner.staleShares ?? 0))}</td>
                     <td>{fmtAge(miner.lastShareAt)}</td>
-                    <td>{fmtNumber(miner.zkasBlocks)}</td>
-                    <td>{fmtNumber(miner.kasBlocks)}</td>
+                    <td className="community-mining__rewards"><span>ZKAS {fmtNumber(miner.zkasBlocks)}</span><span>KAS {fmtNumber(miner.kasBlocks)}</span></td>
+                    <td className="community-mining__rewards"><span>ZKAS {fmtNumber(miner.zkasBeforeRestart)}</span><span>KAS {fmtNumber(miner.kasBeforeRestart)}</span></td>
+                    <td className="community-mining__rewards"><span>ZKAS {fmtNumber(miner.zkasSinceRestart)}</span><span>KAS {fmtNumber(miner.kasSinceRestart)}</span></td>
                     <td><span className={`community-mining__payout ${miner.kasPayoutSet ? 'is-set' : ''}`}>{miner.kasPayoutSet ? 'Miner wallet' : 'Pool fallback'}</span></td>
                   </tr>
                 ))}

@@ -16,6 +16,24 @@ $workTotals = @{}
 $history = @{}
 $lastShareAt = @{}
 
+function Get-BridgeStatus {
+  try {
+    $uri = [Uri]$MetricsUrl
+    $listener = Get-NetTCPConnection -LocalPort $uri.Port -State Listen -ErrorAction Stop |
+      Select-Object -First 1
+    if ($null -eq $listener) { throw 'Bridge metrics listener not found.' }
+    $process = Get-Process -Id $listener.OwningProcess -ErrorAction Stop
+    $connections = @(Get-NetTCPConnection -OwningProcess $listener.OwningProcess -State Established -ErrorAction Stop)
+    return [pscustomobject]@{
+      StartedAt = [DateTimeOffset]::new($process.StartTime.ToUniversalTime()).ToUnixTimeMilliseconds()
+      ZkasConnected = [bool]($connections | Where-Object { $_.RemoteAddress -eq '127.0.0.1' -and $_.RemotePort -eq 16810 })
+      KaspaConnected = [bool]($connections | Where-Object { $_.RemoteAddress -eq '127.0.0.1' -and $_.RemotePort -eq 16110 })
+    }
+  } catch {
+    return [pscustomobject]@{ StartedAt = $null; ZkasConnected = $false; KaspaConnected = $false }
+  }
+}
+
 function Parse-Labels([string]$raw) {
   $labels = @{}
   foreach ($m in [regex]::Matches($raw, '(\w+)="([^"]*)"')) {
@@ -166,6 +184,7 @@ function Get-RollingHashrate([string]$worker) {
 function Build-Snapshot([string]$text) {
   $now = [DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds()
   $nowSec = $now / 1000.0
+  $bridgeStatus = Get-BridgeStatus
 
   $valid = Get-Series $text 'ks_valid_share_counter'
   $invalid = Get-Series $text 'ks_invalid_share_counter'
@@ -229,6 +248,9 @@ function Build-Snapshot([string]$text) {
 
   return [ordered]@{
     gatewayOnline = $true
+    bridgeStartedAt = $bridgeStatus.StartedAt
+    zkasRpcConnected = $bridgeStatus.ZkasConnected
+    kaspaRpcConnected = $bridgeStatus.KaspaConnected
     miners = $miners
   }
 }

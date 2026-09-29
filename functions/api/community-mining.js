@@ -149,6 +149,10 @@ function historicalMinerRow(alias, saved) {
       ?? finiteNonNegative(saved?.updatedAt),
     zkasBlocks: counterValue(saved?.zkas?.total),
     kasBlocks: counterValue(saved?.kas?.total),
+    zkasBeforeRestart: counterValue(saved?.sessionBaseline?.zkas),
+    kasBeforeRestart: counterValue(saved?.sessionBaseline?.kas),
+    zkasSinceRestart: Math.max(0, counterValue(saved?.zkas?.total) - counterValue(saved?.sessionBaseline?.zkas)),
+    kasSinceRestart: Math.max(0, counterValue(saved?.kas?.total) - counterValue(saved?.sessionBaseline?.kas)),
     kasPayoutSet: saved?.kasPayoutSet === true,
   };
 }
@@ -161,9 +165,24 @@ async function loadCounterState(store, gateway, snapshot) {
   return (await store.get(COUNTER_KEYS[gateway], 'json')) || { schemaVersion: 1, miners: {} };
 }
 
-function applyLifetimeBlockCounters(state, gateway, miners) {
+function applyLifetimeBlockCounters(state, gateway, miners, bridgeStartedAt) {
   if (!state.miners || typeof state.miners !== 'object' || Array.isArray(state.miners)) state.miners = {};
   restoreVerifiedPreRebootTotals(state, gateway);
+
+  const cleanBridgeStartedAt = finiteNonNegative(bridgeStartedAt);
+  const previousBridgeStartedAt = finiteNonNegative(state.bridgeStartedAt);
+  const newBridgeSession = cleanBridgeStartedAt !== null
+    && (previousBridgeStartedAt === null || cleanBridgeStartedAt !== previousBridgeStartedAt);
+
+  if (newBridgeSession) {
+    for (const saved of Object.values(state.miners)) {
+      saved.sessionBaseline = {
+        zkas: counterValue(saved?.zkas?.total),
+        kas: counterValue(saved?.kas?.total),
+      };
+    }
+    state.bridgeStartedAt = cleanBridgeStartedAt;
+  }
 
   const published = miners.map((miner) => {
     const previous = state.miners[miner.alias] || null;
@@ -189,10 +208,15 @@ function applyLifetimeBlockCounters(state, gateway, miners) {
         ?? finiteNonNegative(previous?.updatedAt)
         ?? now;
 
+    const sessionBaseline = previous?.sessionBaseline && typeof previous.sessionBaseline === 'object'
+      ? previous.sessionBaseline
+      : { zkas: counterValue(previous?.zkas?.total), kas: counterValue(previous?.kas?.total) };
+
     state.miners[miner.alias] = {
       ...previous,
       zkas,
       kas,
+      sessionBaseline,
       kasPayoutSet: miner.kasPayoutSet,
       lastSnapshot,
       lastSeenAt,
@@ -206,6 +230,10 @@ function applyLifetimeBlockCounters(state, gateway, miners) {
       lastSeenAt,
       zkasBlocks: zkas.total,
       kasBlocks: kas.total,
+      zkasBeforeRestart: counterValue(sessionBaseline.zkas),
+      kasBeforeRestart: counterValue(sessionBaseline.kas),
+      zkasSinceRestart: Math.max(0, zkas.total - counterValue(sessionBaseline.zkas)),
+      kasSinceRestart: Math.max(0, kas.total - counterValue(sessionBaseline.kas)),
     };
   });
 
@@ -220,7 +248,13 @@ function applyLifetimeBlockCounters(state, gateway, miners) {
   state.gateway = gateway;
   state.updatedAt = Date.now();
   const totals = preserveGatewayTotals(state);
-  return { state, miners: published, lifetimeZkasBlocks: totals.zkas, lifetimeKasBlocks: totals.kas };
+  return {
+    state,
+    miners: published,
+    bridgeStartedAt: finiteNonNegative(state.bridgeStartedAt),
+    lifetimeZkasBlocks: totals.zkas,
+    lifetimeKasBlocks: totals.kas,
+  };
 }
 
 function publicSnapshot(snapshot, gateway) {
@@ -258,12 +292,15 @@ export async function onRequest(context) {
   try {
     const previousSnapshot = await store.get(storageKey, 'json');
     const counterState = await loadCounterState(store, gateway, previousSnapshot);
-    const counted = applyLifetimeBlockCounters(counterState, gateway, cleanMiners);
+    const counted = applyLifetimeBlockCounters(counterState, gateway, cleanMiners, body.bridgeStartedAt);
     const snapshot = {
       schemaVersion: 4,
       gateway,
       updatedAt: Date.now(),
       gatewayOnline: body.gatewayOnline !== false,
+      bridgeStartedAt: counted.bridgeStartedAt,
+      zkasRpcConnected: typeof body.zkasRpcConnected === 'boolean' ? body.zkasRpcConnected : null,
+      kaspaRpcConnected: typeof body.kaspaRpcConnected === 'boolean' ? body.kaspaRpcConnected : null,
       miners: counted.miners,
       lifetimeZkasBlocks: counted.lifetimeZkasBlocks,
       lifetimeKasBlocks: counted.lifetimeKasBlocks,
