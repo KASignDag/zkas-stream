@@ -8,17 +8,16 @@ const VISUAL_PACK_VERSION = '2026-09-29-a';
 
 const DAILY_POSTS: DailyPost[] = [
 
-  {time:'05:00',imageUrl:'',text:'🔐 Everyday privacy question\n\nIf your digital money is truly yours, should every transaction automatically be public forever?\n\nZKAS takes a different direction: privacy by default.\n\nDo you think privacy should be:\n• default\n• optional\n• unnecessary\n\nReply with your view 👇\n\n#ZKAS #Privacy'},
-  {time:'06:54',imageUrl:'',text:'⚡ Why merge mining matters\n\nOne of the most interesting things about ZKAS is that merged mining helps support the network alongside Kaspa.\n\nThat means miners can contribute without choosing one side over the other.\n\nMiners: is merged mining one of the reasons ZKAS caught your attention?\n\n#ZKAS #Kaspa #Mining'},
-  {time:'08:48',imageUrl:'',text:'📲 Wallet adoption check\n\nWhat would help bring more people into ZKAS faster?\n\n• easier mobile wallet\n• better UX\n• more exchange access\n• merchant tools\n• education/content\n\nPick the biggest one 👇\n\n#ZKAS #Wallet #Crypto'},
-  {time:'10:42',imageUrl:'',text:'📊 What do you check first?\n\nWhen you visit ZKAS.stream, what do you usually look at first?\n\n• mining data\n• OTC activity\n• exchange markets\n• explorer/network info\n• supply / market cap\n\nWhat’s your first stop?\n\nhttps://zkas.stream/\n\n#ZKAS'},
-  {time:'12:36',imageUrl:'',text:'🛡️ Privacy is not just for “bad actors”\n\nPeople want privacy for normal reasons:\n• savings\n• salary\n• purchases\n• business payments\n• personal security\n\nThat is one of the strongest arguments for ZKAS.\n\nWhat’s the best real-world use case for private digital money?\n\n#ZKAS #Privacy'},
-  {time:'14:30',imageUrl:'',text:'⛏️ Community mining question\n\nZKAS has more than one path for miners to get involved.\n\nPool mining, solo mining, merged mining, community mining — different setups for different people.\n\nWhich style fits you best right now?\n\n#ZKAS #Mining'},
-  {time:'16:24',imageUrl:'',text:'💡 Growth question\n\nWhat do you think would help ZKAS grow the most over the next few months?\n\n• stronger wallets\n• more miners\n• better exchange liquidity\n• more community tools\n• more awareness on X\n\nWhich one matters most?\n\n#ZKAS #Crypto'},
-  {time:'18:18',imageUrl:'',text:'🌐 Why ZKAS.stream exists\n\nThe goal of ZKAS.stream is simple: make the network easier to follow.\n\nMining, markets, OTC activity, community tools, and live network data — all in one place.\n\nWhat feature has been most useful to you so far?\n\nhttps://zkas.stream/\n\n#ZKAS'},
-  {time:'20:12',imageUrl:'',text:'🤝 Community check-in\n\nEarly communities help shape the future.\n\nIf you are following ZKAS now, what keeps you here most?\n\n• privacy\n• mining\n• Kaspa connection\n• technology\n• community\n\nReply with your reason 👇\n\n#ZKAS #Kaspa'},
-  {time:'22:00',imageUrl:'',text:'🌙 End-of-day question\n\nFinish this sentence:\n\n“ZKAS matters because ________.”\n\nKeep it short.\n\nBest replies might deserve a repost 👇\n\n#ZKAS #Privacy #Kaspa'},
-];
+  {time:'05:00',imageUrl:'',text:"🔐 Everyday privacy question\n\nShould every digital-money transaction be public forever?\n\nZKAS takes a different approach: privacy by default.\n\nShould privacy be default, optional, or unnecessary?\n\nReply below 👇\n\n#ZKAS #Privacy"},
+  {time:'06:54',imageUrl:'',text:"⚡ Why merge mining matters\n\nZKAS can be merge mined alongside Kaspa, letting the same mining work support both networks.\n\nMiners: is merge mining one of the reasons ZKAS caught your attention?\n\n#ZKAS #Kaspa #Mining"},
+  {time:'08:48',imageUrl:'',text:"📲 Wallet adoption check\n\nWhat would help ZKAS adoption most?\n\n• easier mobile wallet\n• better UX\n• more exchange access\n• merchant tools\n• education\n\nPick one 👇\n\n#ZKAS #Wallet #Crypto"},
+  {time:'10:42',imageUrl:'',text:"📊 What do you check first on ZKAS.stream?\n\n• mining data\n• OTC activity\n• exchange markets\n• explorer/network info\n• supply / market cap\n\nWhat’s your first stop?\n\nhttps://zkas.stream/\n\n#ZKAS"},
+  {time:'12:36',imageUrl:'',text:"🛡️ Privacy is normal.\n\nPeople want financial privacy for everyday reasons: salary, savings, purchases, business payments, and personal security.\n\nWhat’s the strongest real-world use case for private digital money?\n\n#ZKAS #Privacy"},
+  {time:'14:30',imageUrl:'',text:"⛏️ Community mining question\n\nZKAS miners can choose pool, solo, merged, or community mining.\n\nWhich setup fits you best right now?\n\n#ZKAS #Mining"},
+  {time:'16:24',imageUrl:'',text:"💡 Growth question\n\nWhat would help ZKAS grow most?\n\n• stronger wallets\n• more miners\n• better liquidity\n• more community tools\n• more awareness\n\nWhich matters most?\n\n#ZKAS #Crypto"},
+  {time:'18:18',imageUrl:'',text:"🌐 Why ZKAS.stream exists\n\nOne place to follow mining, markets, OTC activity, community tools, and live network data.\n\nWhich feature has been most useful to you?\n\nhttps://zkas.stream/\n\n#ZKAS"},
+  {time:'20:12',imageUrl:'',text:"🤝 Community check-in\n\nWhat keeps you following ZKAS?\n\n• privacy\n• mining\n• Kaspa connection\n• technology\n• community\n\nReply with your reason 👇\n\n#ZKAS #Kaspa"},
+  {time:'22:00',imageUrl:'',text:"🌙 End-of-day question\n\nFinish this sentence:\n\n“ZKAS matters because ________.”\n\nKeep it short. Best replies may get reposted 👇\n\n#ZKAS #Privacy #Kaspa"},
 
 function tomorrowLocalDate(){
   const d=new Date(); d.setDate(d.getDate()+1);
