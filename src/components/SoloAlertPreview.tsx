@@ -142,7 +142,7 @@ export function SoloAlertPreview() {
                 <div className="solo-miner-stats">
                   {hasAsicTelemetry && <>
                     <div><Thermometer size={17} /><span>Temperature</span><b>{miner.temp}°C</b></div>
-                    <div><Fan size={17} /><span>Fan speed</span><b>{miner.fan.toLocaleString()} RPM</b></div>
+                    <div><Fan size={17} /><span>Fan speed</span><b>{miner.fan === null ? '—' : `${miner.fan.toLocaleString()} RPM`}</b></div>
                   </>}
                   {!hasAsicTelemetry && <div className="solo-telemetry-optional"><ShieldCheck size={17} /><span>ASIC telemetry</span><b>Not required</b></div>}
                   <div><CheckCircle2 size={17} /><span>Shares</span><b>{miner.shares}</b></div>
