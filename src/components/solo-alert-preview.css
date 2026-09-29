@@ -93,3 +93,9 @@
 .solo-event-main b,.solo-event-main small{display:block}.solo-event-main small{margin-top:3px;color:var(--muted)}
 .solo-event-channels{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}.solo-event-channels span{display:inline-flex;align-items:center;gap:5px;padding:5px 7px;border-radius:999px;background:rgba(43,205,172,.08);color:#2ec9aa;font-size:10px;font-weight:800}
 @media(max-width:650px){.solo-event-row{grid-template-columns:auto 1fr}.solo-event-channels{grid-column:1/-1;justify-content:flex-start}}
+
+.solo-alert-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px}
+.solo-alert-actions .solo-test-button{margin-top:0}
+.solo-local-settings-button{border:1px solid var(--line);border-radius:12px;padding:10px 14px;background:var(--panel-soft);color:var(--text);font-weight:800;cursor:pointer}
+.solo-security-note{display:flex;align-items:flex-start;gap:8px;margin-top:12px;padding:10px 11px;border-radius:11px;background:rgba(43,205,172,.06);color:var(--muted);font-size:11px;line-height:1.45}
+.solo-security-note svg{color:#2ec9aa;flex:0 0 auto}
