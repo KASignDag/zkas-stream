@@ -125,6 +125,12 @@ function ageLabel(timestamp: number | null | undefined) {
   return `${Math.floor(seconds / 3600)}h ago`;
 }
 
+function telemetryAgeMs(timestamp: number | null | undefined) {
+  if (!timestamp) return Number.POSITIVE_INFINITY;
+  const ms = timestamp < 10_000_000_000 ? timestamp * 1000 : timestamp;
+  return Math.max(0, Date.now() - ms);
+}
+
 export function SoloAlertPreview() {
   const [channels, setChannels] = useState<Record<AlertChannel, boolean>>({
     browser: true,
@@ -365,18 +371,38 @@ export function SoloAlertPreview() {
         </div>
       </section>
 
-      {privateTelemetry?.telemetry && (
-        <section className="solo-section solo-private-feed">
+      {privateTelemetry?.paired && (
+        <section className={`solo-section solo-private-feed ${!privateTelemetry.telemetry ? 'waiting' : telemetryAgeMs(privateTelemetry.telemetry.updatedAt) > 120000 ? 'stale' : 'live'}`}>
           <div className="solo-section-head">
             <div><span>MY PRIVATE SOLO ALERT</span><h3>{privateTelemetry.profile?.name || 'Paired miner'}</h3></div>
-            <span className="solo-status-pill online"><Wifi size={14} /> PRIVATE FEED</span>
+            {!privateTelemetry.telemetry && <span className="solo-status-pill waiting"><RadioTower size={14} /> WAITING FOR FIRST REPORT</span>}
+            {privateTelemetry.telemetry && telemetryAgeMs(privateTelemetry.telemetry.updatedAt) <= 120000 && <span className="solo-status-pill online"><Wifi size={14} /> LIVE</span>}
+            {privateTelemetry.telemetry && telemetryAgeMs(privateTelemetry.telemetry.updatedAt) > 120000 && <span className="solo-status-pill offline"><WifiOff size={14} /> STALE / OFFLINE</span>}
           </div>
-          <div className="solo-block-center-grid">
-            <div className="solo-block-stat"><span>WORKER</span><b>{privateTelemetry.telemetry.worker || '—'}</b><small>Paired Dual Alert source</small></div>
-            <div className="solo-block-stat"><span>HASHRATE</span><b>{formatHashrate(privateTelemetry.telemetry.hashrateHps)}</b><small>Read-only telemetry</small></div>
-            <div className="solo-block-stat"><span>SHARES</span><b>{Math.floor(privateTelemetry.telemetry.acceptedShares || 0).toLocaleString()}</b><small>Accepted shares</small></div>
-            <div className="solo-block-stat"><span>BLOCKS</span><b>{Math.floor((privateTelemetry.telemetry.zkasBlocks || 0) + (privateTelemetry.telemetry.kasBlocks || 0)).toLocaleString()}</b><small>ZKAS + KAS</small></div>
-          </div>
+
+          {!privateTelemetry.telemetry ? (
+            <div className="solo-private-waiting">
+              <RadioTower size={23} />
+              <div><b>Paired successfully — waiting for Dual Alert</b><span>Leave Dual Alert running locally. The first sanitized telemetry report will appear here automatically.</span></div>
+            </div>
+          ) : (
+            <>
+              <div className="solo-block-center-grid">
+                <div className="solo-block-stat"><span>WORKER</span><b>{privateTelemetry.telemetry.worker || '—'}</b><small>Paired Dual Alert source</small></div>
+                <div className="solo-block-stat"><span>HASHRATE</span><b>{formatHashrate(privateTelemetry.telemetry.hashrateHps)}</b><small>Read-only telemetry</small></div>
+                <div className="solo-block-stat"><span>SHARES</span><b>{Math.floor(privateTelemetry.telemetry.acceptedShares || 0).toLocaleString()}</b><small>Accepted shares</small></div>
+                <div className="solo-block-stat"><span>BLOCKS</span><b>{Math.floor((privateTelemetry.telemetry.zkasBlocks || 0) + (privateTelemetry.telemetry.kasBlocks || 0)).toLocaleString()}</b><small>ZKAS + KAS</small></div>
+              </div>
+              <div className="solo-private-meta">
+                <span>Last report: <b>{ageLabel(privateTelemetry.telemetry.updatedAt)}</b></span>
+                <span>Source: <b>{privateTelemetry.telemetry.source || 'dual-alert'}</b></span>
+                <span>Mode: <b>{privateTelemetry.profile?.mode || 'basic'}</b></span>
+              </div>
+              {telemetryAgeMs(privateTelemetry.telemetry.updatedAt) > 120000 && (
+                <div className="solo-private-warning"><WifiOff size={17} /><span>No telemetry report has arrived for over 2 minutes. Block/share data shown above may be stale.</span></div>
+              )}
+            </>
+          )}
         </section>
       )}
 
