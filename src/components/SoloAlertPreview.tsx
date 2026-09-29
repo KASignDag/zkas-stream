@@ -147,7 +147,11 @@ export function SoloAlertPreview() {
   const [pairingStep, setPairingStep] = useState<1 | 2 | 3>(1);
   const [pairingMode, setPairingMode] = useState<MinerMode>('basic');
   const [pairingName, setPairingName] = useState('');
-  const [pairingCode] = useState(() => 'ZKAS-' + Math.random().toString(36).slice(2, 6).toUpperCase() + '-' + Math.random().toString(36).slice(2, 6).toUpperCase());
+  const [pairingCode, setPairingCode] = useState('');
+  const [pairingBusy, setPairingBusy] = useState(false);
+  const [pairingError, setPairingError] = useState<string | null>(null);
+  const [privateDashboardToken, setPrivateDashboardToken] = useState(() => window.localStorage.getItem('zkas-solo-dashboard-token') || '');
+  const [privateTelemetry, setPrivateTelemetry] = useState<any>(null);
   const previousBlocksRef = useRef<Record<string, { zkas: number; kas: number }> | null>(null);
 
   const enabledCount = useMemo(() => Object.values(channels).filter(Boolean).length, [channels]);
@@ -229,6 +233,51 @@ export function SoloAlertPreview() {
   function toggle(channel: AlertChannel) {
     setChannels((current) => ({ ...current, [channel]: !current[channel] }));
   }
+
+  async function createPairing() {
+    setPairingBusy(true);
+    setPairingError(null);
+    try {
+      const response = await fetch('/api/solo-pairing?action=create', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: pairingName.trim(), mode: pairingMode }),
+      });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result?.error || 'Could not create pairing code');
+      setPairingCode(result.pairingCode);
+      setPrivateDashboardToken(result.dashboardToken);
+      window.localStorage.setItem('zkas-solo-dashboard-token', result.dashboardToken);
+      setPairingStep(3);
+    } catch (error) {
+      setPairingError(error instanceof Error ? error.message : 'Could not create pairing code');
+    } finally {
+      setPairingBusy(false);
+    }
+  }
+
+  useEffect(() => {
+    if (!privateDashboardToken) return;
+    let stopped = false;
+    let timer = 0;
+    async function refreshPrivate() {
+      try {
+        const response = await fetch('/api/solo-telemetry', {
+          headers: { Authorization: `Bearer ${privateDashboardToken}` },
+          cache: 'no-store',
+        });
+        if (!response.ok) return;
+        const result = await response.json();
+        if (!stopped) setPrivateTelemetry(result);
+      } catch {}
+    }
+    void refreshPrivate();
+    timer = window.setInterval(refreshPrivate, 15000);
+    return () => {
+      stopped = true;
+      window.clearInterval(timer);
+    };
+  }, [privateDashboardToken]);
 
   function recordBlockEvent(event: BlockCelebration, source: 'live' | 'simulation') {
     const activeChannels = (Object.entries(channels) as Array<[AlertChannel, boolean]>)
@@ -315,6 +364,21 @@ export function SoloAlertPreview() {
           {mode === 'rental' && <span><b>Rental mode selected.</b> Hardware fields stay hidden and do not generate missing-telemetry warnings.</span>}
         </div>
       </section>
+
+      {privateTelemetry?.telemetry && (
+        <section className="solo-section solo-private-feed">
+          <div className="solo-section-head">
+            <div><span>MY PRIVATE SOLO ALERT</span><h3>{privateTelemetry.profile?.name || 'Paired miner'}</h3></div>
+            <span className="solo-status-pill online"><Wifi size={14} /> PRIVATE FEED</span>
+          </div>
+          <div className="solo-block-center-grid">
+            <div className="solo-block-stat"><span>WORKER</span><b>{privateTelemetry.telemetry.worker || '—'}</b><small>Paired Dual Alert source</small></div>
+            <div className="solo-block-stat"><span>HASHRATE</span><b>{formatHashrate(privateTelemetry.telemetry.hashrateHps)}</b><small>Read-only telemetry</small></div>
+            <div className="solo-block-stat"><span>SHARES</span><b>{Math.floor(privateTelemetry.telemetry.acceptedShares || 0).toLocaleString()}</b><small>Accepted shares</small></div>
+            <div className="solo-block-stat"><span>BLOCKS</span><b>{Math.floor((privateTelemetry.telemetry.zkasBlocks || 0) + (privateTelemetry.telemetry.kasBlocks || 0)).toLocaleString()}</b><small>ZKAS + KAS</small></div>
+          </div>
+        </section>
+      )}
 
       <section className="solo-hero-grid">
         <article className="solo-hero-card primary">
@@ -545,17 +609,18 @@ export function SoloAlertPreview() {
                 <input value={pairingName} onChange={(event) => setPairingName(event.target.value.slice(0, 32))} placeholder="Example: Basement KS0 Ultra" />
               </label>
               <div className="solo-safe-box"><ShieldCheck size={20} /><div><b>Safe by design</b><span>Pairing is for read-only monitoring. Solo Alert never needs spending keys or remote miner control.</span></div></div>
-              <div className="solo-pair-footer"><button className="secondary" onClick={() => setPairingStep(1)}>Back</button><button disabled={!pairingName.trim()} onClick={() => setPairingStep(3)}>Continue</button></div>
+              {pairingError && <div className="inline-error">{pairingError}</div>}
+              <div className="solo-pair-footer"><button className="secondary" onClick={() => setPairingStep(1)}>Back</button><button disabled={!pairingName.trim() || pairingBusy} onClick={() => void createPairing()}>{pairingBusy ? 'Creating…' : 'Create pairing code'}</button></div>
             </>}
 
             {pairingStep === 3 && <>
               <span className="solo-preview-kicker">PAIR MINER · STEP 3</span>
               <h3 className="solo-pair-title">Connect Solo Alert</h3>
-              <p className="solo-muted">This preview shows the pairing experience. The production version will exchange this one-time code for a miner-specific token instead of sharing the site-wide ingest secret.</p>
+              <p className="solo-muted">Enter this one-time code in the local Dual Alert dashboard. It exchanges the code for a miner-specific publisher token; your private dashboard token stays in this browser.</p>
               <div className="solo-pair-code">
                 <span>ONE-TIME PAIRING CODE</span>
                 <b>{pairingCode}</b>
-                <small>Preview code only · not active yet</small>
+                <small>Expires in 15 minutes · single use</small>
               </div>
               <div className="solo-pair-instructions">
                 <div><span>1</span><p>Install or update <b>ZKas Dual Alert</b> on the bridge PC.</p></div>
@@ -563,7 +628,8 @@ export function SoloAlertPreview() {
                 <div><span>3</span><p>Enter the pairing code under <b>ZKAS.stream Community Dashboard</b>.</p></div>
                 {pairingMode === 'local' && <div><span>4</span><p>Optionally enable the read-only ASIC health agent for temperature and fans.</p></div>}
               </div>
-              <div className="solo-safe-box"><ShieldCheck size={20} /><div><b>Per-miner access</b><span>The final pairing service will issue a separate token for this miner so community users cannot access each other's telemetry.</span></div></div>
+              <div className="solo-safe-box"><ShieldCheck size={20} /><div><b>Per-miner access</b><span>This pairing service uses separate publisher and dashboard tokens. Community users cannot read or publish another miner's telemetry without that miner's token.</span></div></div>
+              {privateTelemetry?.paired && <div className="solo-pair-connected"><CheckCircle2 size={18} /><span>Dual Alert paired successfully. Private telemetry can now flow to this dashboard.</span></div>}
               <div className="solo-pair-footer"><button className="secondary" onClick={() => setPairingStep(2)}>Back</button><button onClick={() => setPairingOpen(false)}>Finish preview</button></div>
             </>}
           </section>
