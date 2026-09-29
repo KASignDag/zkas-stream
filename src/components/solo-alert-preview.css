@@ -218,3 +218,4 @@
 @media(max-width:560px){.solo-worker-option{grid-template-columns:auto 1fr}.solo-worker-option em{grid-column:2}}
 
 .solo-private-steps{display:grid;gap:8px;margin:14px 0}.solo-private-steps>div{display:grid;grid-template-columns:auto 1fr;gap:9px;align-items:center;padding:9px 10px;border-radius:10px;background:#10242d}.solo-private-steps>div>span{display:grid;place-items:center;width:25px;height:25px;border-radius:50%;background:rgba(43,205,172,.12);color:#55e5c6;font-size:11px;font-weight:900}.solo-private-steps p{margin:0;color:#b7ccc8}
+.solo-build-tag{display:inline-block;margin-left:6px;padding:3px 6px;border-radius:999px;background:rgba(43,205,172,.12);color:#55e5c6;font-size:9px;vertical-align:middle}
