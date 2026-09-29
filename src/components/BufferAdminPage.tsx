@@ -18,6 +18,7 @@ const DAILY_POSTS: DailyPost[] = [
   {time:'18:18',imageUrl:'',text:"🌐 Why ZKAS.stream exists\n\nOne place to follow mining, markets, OTC activity, community tools, and live network data.\n\nWhich feature has been most useful to you?\n\nhttps://zkas.stream/\n\n#ZKAS"},
   {time:'20:12',imageUrl:'',text:"🤝 Community check-in\n\nWhat keeps you following ZKAS?\n\n• privacy\n• mining\n• Kaspa connection\n• technology\n• community\n\nReply with your reason 👇\n\n#ZKAS #Kaspa"},
   {time:'22:00',imageUrl:'',text:"🌙 End-of-day question\n\nFinish this sentence:\n\n“ZKAS matters because ________.”\n\nKeep it short. Best replies may get reposted 👇\n\n#ZKAS #Privacy #Kaspa"},
+];
 
 function tomorrowLocalDate(){
   const d=new Date(); d.setDate(d.getDate()+1);
