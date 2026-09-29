@@ -124,3 +124,12 @@
 .solo-private-waiting svg{color:#e6bc63;flex:0 0 auto}.solo-private-waiting b,.solo-private-waiting span{display:block}.solo-private-waiting b{color:var(--text);margin-bottom:4px}
 .solo-private-meta{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}.solo-private-meta span{padding:6px 8px;border-radius:999px;background:var(--panel-soft);color:var(--muted);font-size:10px}.solo-private-meta b{color:var(--text)}
 .solo-private-warning{display:flex;align-items:flex-start;gap:8px;margin-top:12px;padding:10px 11px;border-radius:11px;background:rgba(242,176,108,.09);color:#d9a96e;font-size:11px}
+
+.solo-device-test{border-color:rgba(43,205,172,.28)}
+.solo-device-pill{padding:7px 10px;border-radius:999px;background:rgba(43,205,172,.1);color:#2ec9aa;font-size:11px;font-weight:850}
+.solo-device-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+.solo-device-check{display:flex;gap:10px;align-items:flex-start;padding:13px;border:1px solid var(--line);border-radius:13px;background:var(--panel-soft)}
+.solo-device-check svg{color:#2ec9aa;flex:0 0 auto;margin-top:1px}.solo-device-check b,.solo-device-check span{display:block}.solo-device-check span{margin-top:4px;color:var(--muted);font-size:12px;line-height:1.45}
+.solo-ios-steps{margin-top:12px;padding:11px 12px;border-radius:11px;background:rgba(235,192,83,.08);color:var(--muted);font-size:12px}.solo-ios-steps b{color:var(--text)}
+.solo-device-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:13px}.solo-device-actions button{display:inline-flex;align-items:center;gap:7px;border:1px solid rgba(43,205,172,.24);border-radius:10px;padding:9px 11px;background:rgba(43,205,172,.08);color:#2ec9aa;font-weight:800;cursor:pointer}
+@media(max-width:850px){.solo-device-grid{grid-template-columns:1fr}}
