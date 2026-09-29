@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Activity, Bell, BellRing, CheckCircle2, Coins, Cpu, Fan, Gauge, MessageCircle, RadioTower,
   Send, ShieldCheck, Thermometer, Trophy, Wifi, WifiOff, X, Zap
@@ -32,6 +32,25 @@ type BlockCelebration = {
   time: string;
 };
 
+type CommunityMiningRow = {
+  alias: string;
+  status: 'online' | 'offline';
+  hashrateHps: number | null;
+  uptimeSeconds: number | null;
+  acceptedShares: number | null;
+  zkasBlocks: number | null;
+  kasBlocks: number | null;
+  lastSeenAt?: number | null;
+};
+
+type CommunityMiningSnapshot = {
+  updatedAt: number | null;
+  gatewayOnline: boolean;
+  miners: CommunityMiningRow[];
+  lifetimeZkasBlocks: number;
+  lifetimeKasBlocks: number;
+};
+
 const demoMiners: PreviewMiner[] = [
   {
     name: 'IceRiver KS0 Ultra',
@@ -63,6 +82,39 @@ const demoMiners: PreviewMiner[] = [
   },
 ];
 
+function formatHashrate(hps: number | null) {
+  if (hps === null || !Number.isFinite(hps) || hps <= 0) return '—';
+  const units = ['H/s', 'KH/s', 'MH/s', 'GH/s', 'TH/s', 'PH/s'];
+  let value = hps;
+  let index = 0;
+  while (value >= 1000 && index < units.length - 1) {
+    value /= 1000;
+    index += 1;
+  }
+  const digits = value >= 100 ? 0 : value >= 10 ? 1 : 2;
+  return `${value.toFixed(digits)} ${units[index]}`;
+}
+
+function formatUptime(seconds: number | null) {
+  if (seconds === null || !Number.isFinite(seconds) || seconds < 0) return '—';
+  const whole = Math.floor(seconds);
+  const d = Math.floor(whole / 86400);
+  const h = Math.floor((whole % 86400) / 3600);
+  const m = Math.floor((whole % 3600) / 60);
+  if (d) return `${d}d ${h}h`;
+  if (h) return `${h}h ${m}m`;
+  return `${m}m`;
+}
+
+function ageLabel(timestamp: number | null | undefined) {
+  if (!timestamp) return 'unknown';
+  const ms = timestamp < 10_000_000_000 ? timestamp * 1000 : timestamp;
+  const seconds = Math.max(0, Math.floor((Date.now() - ms) / 1000));
+  if (seconds < 60) return `${seconds}s ago`;
+  if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`;
+  return `${Math.floor(seconds / 3600)}h ago`;
+}
+
 export function SoloAlertPreview() {
   const [channels, setChannels] = useState<Record<AlertChannel, boolean>>({
     browser: true,
@@ -75,8 +127,85 @@ export function SoloAlertPreview() {
   const [mode, setMode] = useState<MinerMode>('basic');
   const [selectedMiner, setSelectedMiner] = useState<PreviewMiner | null>(null);
   const [celebration, setCelebration] = useState<BlockCelebration | null>(null);
+  const [liveSnapshot, setLiveSnapshot] = useState<CommunityMiningSnapshot | null>(null);
+  const [liveError, setLiveError] = useState<string | null>(null);
+  const previousBlocksRef = useRef<Record<string, { zkas: number; kas: number }> | null>(null);
 
   const enabledCount = useMemo(() => Object.values(channels).filter(Boolean).length, [channels]);
+
+  const liveMiners = useMemo<PreviewMiner[]>(() => {
+    if (!liveSnapshot?.miners?.length) return demoMiners;
+    return liveSnapshot.miners.map((miner) => ({
+      name: miner.alias,
+      worker: miner.alias,
+      mode: 'basic',
+      status: miner.status,
+      hashrate: formatHashrate(miner.hashrateHps),
+      temp: null,
+      fan: null,
+      shares: Math.max(0, Math.floor(miner.acceptedShares ?? 0)),
+      uptime: formatUptime(miner.uptimeSeconds),
+      zkasBlocks: Math.max(0, Math.floor(miner.zkasBlocks ?? 0)),
+      kasBlocks: Math.max(0, Math.floor(miner.kasBlocks ?? 0)),
+      lastSeen: ageLabel(miner.lastSeenAt ?? liveSnapshot.updatedAt),
+    }));
+  }, [liveSnapshot]);
+
+  const totalShares = useMemo(() => liveMiners.reduce((sum, miner) => sum + miner.shares, 0), [liveMiners]);
+  const totalBlocks = (liveSnapshot?.lifetimeZkasBlocks ?? 0) + (liveSnapshot?.lifetimeKasBlocks ?? 0);
+  const onlineMiners = liveMiners.filter((miner) => miner.status === 'online').length;
+
+  useEffect(() => {
+    let stopped = false;
+    let timer = 0;
+
+    async function refresh() {
+      try {
+        const response = await fetch('/api/community-mining?gateway=community-107', { cache: 'no-store' });
+        if (!response.ok) throw new Error(`Live telemetry returned HTTP ${response.status}`);
+        const snapshot = await response.json() as CommunityMiningSnapshot;
+        if (stopped) return;
+
+        const previous = previousBlocksRef.current;
+        const next: Record<string, { zkas: number; kas: number }> = {};
+        for (const miner of snapshot.miners ?? []) {
+          const zkas = Math.max(0, Math.floor(miner.zkasBlocks ?? 0));
+          const kas = Math.max(0, Math.floor(miner.kasBlocks ?? 0));
+          next[miner.alias] = { zkas, kas };
+          const prior = previous?.[miner.alias];
+          if (prior && zkas > prior.zkas) {
+            setCelebration({
+              chain: 'ZKAS',
+              worker: miner.alias,
+              hash: `live-event-${miner.alias}-zkas-${zkas}`,
+              reward: null,
+              time: new Date().toLocaleTimeString(),
+            });
+          } else if (prior && kas > prior.kas) {
+            setCelebration({
+              chain: 'KAS',
+              worker: miner.alias,
+              hash: `live-event-${miner.alias}-kas-${kas}`,
+              reward: 'Reward shown when bridge exposes it',
+              time: new Date().toLocaleTimeString(),
+            });
+          }
+        }
+        previousBlocksRef.current = next;
+        setLiveSnapshot(snapshot);
+        setLiveError(null);
+      } catch (error) {
+        if (!stopped) setLiveError(error instanceof Error ? error.message : 'Live telemetry unavailable');
+      }
+    }
+
+    void refresh();
+    timer = window.setInterval(refresh, 15000);
+    return () => {
+      stopped = true;
+      window.clearInterval(timer);
+    };
+  }, []);
 
   function toggle(channel: AlertChannel) {
     setChannels((current) => ({ ...current, [channel]: !current[channel] }));
@@ -157,11 +286,11 @@ export function SoloAlertPreview() {
       <section className="solo-hero-grid">
         <article className="solo-hero-card primary">
           <div className="solo-card-icon"><RadioTower size={24} /></div>
-          <div><span>Connected miners</span><b>2 / 2</b><small>Local ASIC + rental worker</small></div>
+          <div><span>Connected miners</span><b>{onlineMiners} / {liveMiners.length}</b><small>{liveSnapshot ? 'Live Community Bridge telemetry' : 'Preview data until live feed connects'}</small></div>
         </article>
         <article className="solo-hero-card">
           <div className="solo-card-icon"><Gauge size={24} /></div>
-          <div><span>Total hashrate</span><b>1.61 TH/s</b><small>Bridge + agent reported hashrate</small></div>
+          <div><span>Accepted shares</span><b>{totalShares.toLocaleString()}</b><small>Live bridge-reported total</small></div>
         </article>
         <article className="solo-hero-card">
           <div className="solo-card-icon"><BellRing size={24} /></div>
@@ -169,7 +298,7 @@ export function SoloAlertPreview() {
         </article>
         <article className="solo-hero-card solo-block-card">
           <div className="solo-card-icon"><Zap size={24} /></div>
-          <div><span>Blocks found</span><b>0</b><small>Current monitored session</small></div>
+          <div><span>Blocks found</span><b>{totalBlocks.toLocaleString()}</b><small>ZKAS + KAS lifetime counters</small></div>
           <button className="solo-mini-action" onClick={() => simulateBlock('ZKAS')}>Test block</button>
         </article>
       </section>
@@ -181,7 +310,7 @@ export function SoloAlertPreview() {
         </div>
 
         <div className="solo-miner-grid">
-          {demoMiners.map((miner) => {
+          {liveMiners.map((miner) => {
             const online = miner.status === 'online';
             const hasAsicTelemetry = miner.mode === 'local' && miner.temp !== null && miner.fan !== null;
             return (
@@ -214,7 +343,7 @@ export function SoloAlertPreview() {
                 </div>
 
                 <div className="solo-miner-footer">
-                  <span>{miner.mode === 'local' ? 'Bridge + ASIC update 8 sec ago' : 'Bridge update 8 sec ago'}</span>
+                  <span>{miner.mode === 'local' ? `Bridge + ASIC update ${miner.lastSeen}` : `Bridge update ${miner.lastSeen}`}</span>
                   <button onClick={() => setSelectedMiner(miner)}>View details</button>
                 </div>
               </article>
@@ -234,13 +363,13 @@ export function SoloAlertPreview() {
         <div className="solo-block-center-grid">
           <div className="solo-block-stat">
             <span>ZKAS BLOCKS</span>
-            <b>0</b>
-            <small>Detected by Dual Alert</small>
+            <b>{(liveSnapshot?.lifetimeZkasBlocks ?? 0).toLocaleString()}</b>
+            <small>Preserved lifetime counter</small>
           </div>
           <div className="solo-block-stat">
             <span>KAS BLOCKS</span>
-            <b>0</b>
-            <small>Detected by Dual Alert</small>
+            <b>{(liveSnapshot?.lifetimeKasBlocks ?? 0).toLocaleString()}</b>
+            <small>Preserved lifetime counter</small>
           </div>
           <div className="solo-block-stat">
             <span>LAST BLOCK</span>
@@ -253,9 +382,12 @@ export function SoloAlertPreview() {
             <small>Enabled notification channels</small>
           </div>
         </div>
-        <div className="solo-history-empty">
+        <div className={`solo-history-empty ${liveSnapshot ? 'live' : ''}`}>
           <Activity size={20} />
-          <div><b>Block history will appear here</b><span>ZKAS/KAS block hash, worker, time, reward when available, and alert-delivery status.</span></div>
+          <div>
+            <b>{liveSnapshot ? 'Live Community Bridge feed connected' : 'Connecting to live Community Bridge telemetry'}</b>
+            <span>{liveSnapshot ? `Last update ${ageLabel(liveSnapshot.updatedAt)} · ${liveSnapshot.miners.length} worker records` : (liveError ?? 'Waiting for the first telemetry snapshot.')}</span>
+          </div>
         </div>
       </section>
 
