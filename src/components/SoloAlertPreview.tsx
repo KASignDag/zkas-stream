@@ -410,19 +410,19 @@ export function SoloAlertPreview() {
             <span className="solo-mode-icon"><BellRing size={23} /></span>
             <b>Basic Solo Alert</b>
             <small>Best for the easiest setup. Monitor bridge status, workers, shares and block events.</small>
-            <em>Recommended starting point</em>
+            <em>{mode === 'basic' ? '✓ SELECTED' : 'RECOMMENDED START'}</em>
           </button>
           <button className={`solo-mode-card ${mode === 'local' ? 'selected' : ''}`} onClick={() => setMode('local')}>
             <span className="solo-mode-icon"><Cpu size={23} /></span>
             <b>Local ASIC + Health</b>
             <small>Add the optional read-only agent for temperature, fan RPM and richer hardware telemetry.</small>
-            <em>Advanced · optional</em>
+            <em>{mode === 'local' ? '✓ SELECTED' : 'ADVANCED · OPTIONAL'}</em>
           </button>
           <button className={`solo-mode-card ${mode === 'rental' ? 'selected' : ''}`} onClick={() => setMode('rental')}>
             <span className="solo-mode-icon"><RadioTower size={23} /></span>
             <b>Rental / Remote Hashrate</b>
             <small>No ASIC access required. Track the bridge, shares and block alerts without temperature or fan data.</small>
-            <em>MRR / remote friendly</em>
+            <em>{mode === 'rental' ? '✓ SELECTED' : 'RENTAL FRIENDLY'}</em>
           </button>
         </div>
         <div className="solo-mode-note">
@@ -703,16 +703,17 @@ export function SoloAlertPreview() {
               <p className="solo-muted">You do not need ASIC access to use Solo Alert.</p>
               <div className="solo-mode-grid">
                 <button className={`solo-mode-card ${pairingMode === 'basic' ? 'selected' : ''}`} onClick={() => setPairingMode('basic')}>
-                  <span className="solo-mode-icon"><BellRing size={23} /></span><b>Basic</b><small>Blocks, workers, shares and bridge status.</small><em>Easiest</em>
+                  <span className="solo-mode-icon"><BellRing size={23} /></span><b>Basic</b><small>Blocks, workers, shares and bridge status.</small><em>{pairingMode === 'basic' ? '✓ SELECTED' : 'TAP TO SELECT'}</em>
                 </button>
                 <button className={`solo-mode-card ${pairingMode === 'local' ? 'selected' : ''}`} onClick={() => setPairingMode('local')}>
-                  <span className="solo-mode-icon"><Cpu size={23} /></span><b>Local ASIC</b><small>Add optional temperature and fan monitoring.</small><em>Advanced</em>
+                  <span className="solo-mode-icon"><Cpu size={23} /></span><b>Local ASIC</b><small>Add optional temperature and fan monitoring.</small><em>{pairingMode === 'local' ? '✓ SELECTED' : 'TAP TO SELECT'}</em>
                 </button>
                 <button className={`solo-mode-card ${pairingMode === 'rental' ? 'selected' : ''}`} onClick={() => setPairingMode('rental')}>
-                  <span className="solo-mode-icon"><RadioTower size={23} /></span><b>Rental / Remote</b><small>No ASIC login or local miner access needed.</small><em>Rental friendly</em>
+                  <span className="solo-mode-icon"><RadioTower size={23} /></span><b>Rental / Remote</b><small>No ASIC login or local miner access needed.</small><em>{pairingMode === 'rental' ? '✓ SELECTED' : 'TAP TO SELECT'}</em>
                 </button>
               </div>
-              <div className="solo-pair-footer"><span /><button onClick={() => setPairingStep(2)}>Continue</button></div>
+              <div className="solo-pair-selection-note"><CheckCircle2 size={16} /><span><b>{pairingMode === 'basic' ? 'Basic' : pairingMode === 'local' ? 'Local ASIC' : 'Rental / Remote'}</b> selected</span></div>
+              <div className="solo-pair-footer"><span /><button onClick={() => setPairingStep(2)}>Continue with {pairingMode === 'basic' ? 'Basic' : pairingMode === 'local' ? 'Local ASIC' : 'Rental'}</button></div>
             </>}
 
             {pairingStep === 2 && <>
