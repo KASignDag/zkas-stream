@@ -155,7 +155,6 @@ export function SoloAlertPreview() {
   const [browserState, setBrowserState] = useState<'idle' | 'granted' | 'denied'>('idle');
   const [threshold, setThreshold] = useState(70);
   const [offlineMinutes, setOfflineMinutes] = useState(3);
-  const [mode, setMode] = useState<MinerMode>('basic');
   const [selectedMiner, setSelectedMiner] = useState<PreviewMiner | null>(null);
   const [celebration, setCelebration] = useState<BlockCelebration | null>(null);
   const [blockHistory, setBlockHistory] = useState<BlockHistoryEvent[]>([]);
@@ -399,39 +398,19 @@ export function SoloAlertPreview() {
         </div>
       </section>
 
-      <section className="solo-section solo-setup-section">
-        <div className="solo-section-head">
-          <div><span>QUICK SETUP</span><h3>How are you mining?</h3></div>
-          <div className="solo-optional-pill">ASIC telemetry is optional</div>
-        </div>
-        <p className="solo-muted">Solo Alert works without direct ASIC access. Pick the setup that matches you now—you can change it later.</p>
-        <div className="solo-mode-grid">
-          <button className={`solo-mode-card ${mode === 'basic' ? 'selected' : ''}`} onClick={() => setMode('basic')}>
-            <span className="solo-mode-icon"><BellRing size={23} /></span>
-            <b>Basic Solo Alert</b>
-            <small>Best for the easiest setup. Monitor bridge status, workers, shares and block events.</small>
-            <em>{mode === 'basic' ? '✓ SELECTED' : 'RECOMMENDED START'}</em>
+      {!privateTelemetry?.paired && (
+        <section className="solo-section solo-setup-section solo-get-started">
+          <div className="solo-get-started-copy">
+            <span className="solo-preview-kicker"><RadioTower size={16} /> COMMUNITY SOLO ALERT</span>
+            <h3>Connect your miner</h3>
+            <p>One simple setup handles Basic, Local ASIC, and Rental / Remote miners. ASIC temperature and fan monitoring stays optional.</p>
+          </div>
+          <button className="solo-get-started-button" onClick={() => { setPairingStep(1); setPairingOpen(true); }}>
+            <RadioTower size={20} />
+            Pair a miner
           </button>
-          <button className={`solo-mode-card ${mode === 'local' ? 'selected' : ''}`} onClick={() => setMode('local')}>
-            <span className="solo-mode-icon"><Cpu size={23} /></span>
-            <b>Local ASIC + Health</b>
-            <small>Add the optional read-only agent for temperature, fan RPM and richer hardware telemetry.</small>
-            <em>{mode === 'local' ? '✓ SELECTED' : 'ADVANCED · OPTIONAL'}</em>
-          </button>
-          <button className={`solo-mode-card ${mode === 'rental' ? 'selected' : ''}`} onClick={() => setMode('rental')}>
-            <span className="solo-mode-icon"><RadioTower size={23} /></span>
-            <b>Rental / Remote Hashrate</b>
-            <small>No ASIC access required. Track the bridge, shares and block alerts without temperature or fan data.</small>
-            <em>{mode === 'rental' ? '✓ SELECTED' : 'RENTAL FRIENDLY'}</em>
-          </button>
-        </div>
-        <div className="solo-mode-note">
-          <CheckCircle2 size={17} />
-          {mode === 'basic' && <span><b>Basic mode selected.</b> You can start with only the existing Dual Alert bridge telemetry.</span>}
-          {mode === 'local' && <span><b>Local ASIC mode selected.</b> Hardware telemetry will be added only after the miner is paired with the read-only agent.</span>}
-          {mode === 'rental' && <span><b>Rental mode selected.</b> Hardware fields stay hidden and do not generate missing-telemetry warnings.</span>}
-        </div>
-      </section>
+        </section>
+      )}
 
       {privateTelemetry?.paired && (
         <section className={`solo-section solo-private-feed ${!privateTelemetry.telemetry ? 'waiting' : telemetryAgeMs(privateTelemetry.telemetry.updatedAt) > 120000 ? 'stale' : 'live'}`}>
