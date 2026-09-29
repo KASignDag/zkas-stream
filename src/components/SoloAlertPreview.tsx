@@ -57,6 +57,12 @@ type CommunityMiningSnapshot = {
   lifetimeKasBlocks: number;
 };
 
+type NotificationReadiness = {
+  browser: 'ready' | 'needs-permission';
+  telegram: 'configured-locally' | 'not-configured';
+  discord: 'configured-locally' | 'not-configured';
+};
+
 const demoMiners: PreviewMiner[] = [
   {
     name: 'IceRiver KS0 Ultra',
@@ -136,6 +142,11 @@ export function SoloAlertPreview() {
   const [blockHistory, setBlockHistory] = useState<BlockHistoryEvent[]>([]);
   const [liveSnapshot, setLiveSnapshot] = useState<CommunityMiningSnapshot | null>(null);
   const [liveError, setLiveError] = useState<string | null>(null);
+  const [readiness, setReadiness] = useState<NotificationReadiness>({
+    browser: typeof Notification !== 'undefined' && Notification.permission === 'granted' ? 'ready' : 'needs-permission',
+    telegram: 'configured-locally',
+    discord: 'configured-locally',
+  });
   const previousBlocksRef = useRef<Record<string, { zkas: number; kas: number }> | null>(null);
 
   const enabledCount = useMemo(() => Object.values(channels).filter(Boolean).length, [channels]);
@@ -251,6 +262,7 @@ export function SoloAlertPreview() {
       ? await Notification.requestPermission()
       : Notification.permission;
     setBrowserState(permission === 'granted' ? 'granted' : 'denied');
+    setReadiness((current) => ({ ...current, browser: permission === 'granted' ? 'ready' : 'needs-permission' }));
     if (permission === 'granted') {
       new Notification('ZKAS Solo Alert test', {
         body: 'KSOPRO is online · 359 GH/s · 61°C · 2,870 RPM',
@@ -435,22 +447,28 @@ export function SoloAlertPreview() {
           <p className="solo-muted">Choose how each miner should alert you when a block is found or the mining bridge goes offline. ASIC health alerts appear only when optional hardware telemetry is enabled.</p>
 
           <div className="solo-alert-row">
-            <div className="solo-alert-label"><BellRing size={19} /><div><b>Browser alerts</b><small>Desktop and mobile browser notifications</small></div></div>
+            <div className="solo-alert-label"><BellRing size={19} /><div><b>Browser alerts</b><small>Desktop and mobile browser notifications · {readiness.browser === 'ready' ? 'Ready' : 'Permission needed'}</small></div></div>
             <button className={`solo-toggle ${channels.browser ? 'on' : ''}`} onClick={() => toggle('browser')} aria-label="Toggle browser alerts"><span /></button>
           </div>
           <div className="solo-alert-row">
-            <div className="solo-alert-label"><Send size={19} /><div><b>Telegram</b><small>Private bot notifications</small></div></div>
+            <div className="solo-alert-label"><Send size={19} /><div><b>Telegram</b><small>Private bot notifications · configured in Dual Alert locally</small></div></div>
             <button className={`solo-toggle ${channels.telegram ? 'on' : ''}`} onClick={() => toggle('telegram')} aria-label="Toggle Telegram alerts"><span /></button>
           </div>
           <div className="solo-alert-row">
-            <div className="solo-alert-label"><MessageCircle size={19} /><div><b>Discord</b><small>DM or private channel webhook</small></div></div>
+            <div className="solo-alert-label"><MessageCircle size={19} /><div><b>Discord</b><small>Webhook notifications · configured in Dual Alert locally</small></div></div>
             <button className={`solo-toggle ${channels.discord ? 'on' : ''}`} onClick={() => toggle('discord')} aria-label="Toggle Discord alerts"><span /></button>
           </div>
 
-          <button className="solo-test-button" onClick={() => void testBrowserAlert()}>
-            Test browser alert
-          </button>
+          <div className="solo-alert-actions">
+            <button className="solo-test-button" onClick={() => void testBrowserAlert()}>
+              Test browser alert
+            </button>
+            <button className="solo-local-settings-button" onClick={() => window.open('http://127.0.0.1:3040', '_blank', 'noopener,noreferrer')}>
+              Open local Dual Alert settings
+            </button>
+          </div>
           {browserState !== 'idle' && <div className={`solo-test-state ${browserState}`}>Browser permission: {browserState}</div>}
+          <div className="solo-security-note"><ShieldCheck size={15} /><span>Telegram bot tokens and Discord webhook URLs never enter ZKAS.stream. They stay inside your local Dual Alert installation.</span></div>
         </article>
 
         <article className="solo-panel">
