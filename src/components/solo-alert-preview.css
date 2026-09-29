@@ -46,3 +46,17 @@
 .solo-agent-badges{display:flex;flex-wrap:wrap;gap:8px;margin:14px 0}.solo-agent-badges span{padding:7px 10px;border-radius:999px;background:rgba(43,205,172,.1);color:#2ec9aa;font-size:11px;font-weight:800}
 @media(max-width:950px){.solo-hero-grid{grid-template-columns:repeat(2,1fr)}.solo-miner-grid,.solo-bottom-grid{grid-template-columns:1fr}.solo-panel.agent{grid-column:auto}}
 @media(max-width:620px){.solo-preview-banner{padding:22px;align-items:flex-start;flex-direction:column}.solo-preview-live{white-space:normal}.solo-hero-grid{grid-template-columns:1fr}.solo-section{padding:14px}.solo-miner-card{padding:16px}.solo-miner-top{align-items:flex-start;gap:12px}.solo-miner-stats{grid-template-columns:1fr}.solo-agent-diagram{grid-template-columns:1fr}.solo-agent-diagram>span{transform:rotate(90deg)}.solo-range-row>div{display:grid;gap:4px}}
+
+.solo-setup-section{background:linear-gradient(180deg,rgba(43,205,172,.045),var(--panel))}
+.solo-optional-pill{padding:7px 10px;border-radius:999px;background:rgba(43,205,172,.1);color:#2ec9aa;font-size:11px;font-weight:850;letter-spacing:.04em}
+.solo-mode-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+.solo-mode-card{text-align:left;border:1px solid var(--line);border-radius:16px;padding:16px;background:var(--panel-soft);color:var(--text);cursor:pointer;transition:.18s}
+.solo-mode-card:hover{transform:translateY(-1px);border-color:rgba(43,205,172,.32)}
+.solo-mode-card.selected{border-color:rgba(43,205,172,.62);background:linear-gradient(180deg,rgba(43,205,172,.12),var(--panel-soft));box-shadow:0 0 0 1px rgba(43,205,172,.08)}
+.solo-mode-icon{display:grid;place-items:center;width:42px;height:42px;border-radius:13px;background:rgba(43,205,172,.12);color:#2ec9aa;margin-bottom:12px}
+.solo-mode-card b,.solo-mode-card small,.solo-mode-card em{display:block}
+.solo-mode-card b{font-size:15px}.solo-mode-card small{margin-top:7px;color:var(--muted);line-height:1.45}.solo-mode-card em{margin-top:12px;font-size:10px;font-style:normal;font-weight:850;letter-spacing:.08em;text-transform:uppercase;color:#2ec9aa}
+.solo-mode-note{display:flex;align-items:flex-start;gap:9px;margin-top:13px;padding:11px 13px;border-radius:12px;background:rgba(43,205,172,.075);color:var(--muted);font-size:12px}
+.solo-mode-note svg{color:#2ec9aa;flex:0 0 auto}.solo-mode-note b{color:var(--text)}
+.solo-telemetry-optional{grid-column:1/-1}
+@media(max-width:850px){.solo-mode-grid{grid-template-columns:1fr}}
