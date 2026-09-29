@@ -32,6 +32,12 @@ type BlockCelebration = {
   time: string;
 };
 
+type BlockHistoryEvent = BlockCelebration & {
+  id: string;
+  source: 'live' | 'simulation';
+  channels: AlertChannel[];
+};
+
 type CommunityMiningRow = {
   alias: string;
   status: 'online' | 'offline';
@@ -127,6 +133,7 @@ export function SoloAlertPreview() {
   const [mode, setMode] = useState<MinerMode>('basic');
   const [selectedMiner, setSelectedMiner] = useState<PreviewMiner | null>(null);
   const [celebration, setCelebration] = useState<BlockCelebration | null>(null);
+  const [blockHistory, setBlockHistory] = useState<BlockHistoryEvent[]>([]);
   const [liveSnapshot, setLiveSnapshot] = useState<CommunityMiningSnapshot | null>(null);
   const [liveError, setLiveError] = useState<string | null>(null);
   const previousBlocksRef = useRef<Record<string, { zkas: number; kas: number }> | null>(null);
@@ -174,21 +181,21 @@ export function SoloAlertPreview() {
           next[miner.alias] = { zkas, kas };
           const prior = previous?.[miner.alias];
           if (prior && zkas > prior.zkas) {
-            setCelebration({
+            recordBlockEvent({
               chain: 'ZKAS',
               worker: miner.alias,
               hash: `live-event-${miner.alias}-zkas-${zkas}`,
               reward: null,
               time: new Date().toLocaleTimeString(),
-            });
+            }, 'live');
           } else if (prior && kas > prior.kas) {
-            setCelebration({
+            recordBlockEvent({
               chain: 'KAS',
               worker: miner.alias,
               hash: `live-event-${miner.alias}-kas-${kas}`,
               reward: 'Reward shown when bridge exposes it',
               time: new Date().toLocaleTimeString(),
-            });
+            }, 'live');
           }
         }
         previousBlocksRef.current = next;
@@ -211,15 +218,28 @@ export function SoloAlertPreview() {
     setChannels((current) => ({ ...current, [channel]: !current[channel] }));
   }
 
+  function recordBlockEvent(event: BlockCelebration, source: 'live' | 'simulation') {
+    const activeChannels = (Object.entries(channels) as Array<[AlertChannel, boolean]>)
+      .filter(([, enabled]) => enabled)
+      .map(([channel]) => channel);
+    setCelebration(event);
+    setBlockHistory((current) => [{
+      ...event,
+      id: `${Date.now()}-${event.chain}-${event.worker}-${Math.random().toString(16).slice(2)}`,
+      source,
+      channels: activeChannels,
+    }, ...current].slice(0, 25));
+  }
+
   function simulateBlock(chain: Chain, miner = demoMiners[0]) {
     const suffix = Math.random().toString(16).slice(2, 14).padEnd(12, '0');
-    setCelebration({
+    recordBlockEvent({
       chain,
       worker: miner.worker,
       hash: `${chain.toLowerCase()}-preview-${suffix}`,
       reward: chain === 'KAS' ? 'Reward shown when bridge exposes it' : null,
       time: new Date().toLocaleTimeString(),
-    });
+    }, 'simulation');
   }
 
   async function testBrowserAlert() {
@@ -389,6 +409,24 @@ export function SoloAlertPreview() {
             <span>{liveSnapshot ? `Last update ${ageLabel(liveSnapshot.updatedAt)} · ${liveSnapshot.miners.length} worker records` : (liveError ?? 'Waiting for the first telemetry snapshot.')}</span>
           </div>
         </div>
+        {blockHistory.length > 0 && (
+          <div className="solo-event-table" aria-label="Recent Solo Alert events">
+            {blockHistory.map((event) => (
+              <div className="solo-event-row" key={event.id}>
+                <span className={`solo-chain-chip ${event.chain.toLowerCase()}`}>{event.chain}</span>
+                <div className="solo-event-main">
+                  <b>{event.worker}</b>
+                  <small>{event.source === 'live' ? 'Live block counter increase' : 'Preview simulation'} · {event.time}</small>
+                </div>
+                <div className="solo-event-channels">
+                  {event.channels.includes('browser') && <span><Bell size={13} /> Browser</span>}
+                  {event.channels.includes('telegram') && <span><Send size={13} /> Telegram</span>}
+                  {event.channels.includes('discord') && <span><MessageCircle size={13} /> Discord</span>}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </section>
 
       <section className="solo-bottom-grid">
