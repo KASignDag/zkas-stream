@@ -1,17 +1,67 @@
 import { useMemo, useState } from 'react';
 import {
-  Bell, BellRing, CheckCircle2, Cpu, Fan, Gauge, MessageCircle, RadioTower,
-  Send, ShieldCheck, Thermometer, Wifi, WifiOff, Zap
+  Activity, Bell, BellRing, CheckCircle2, Coins, Cpu, Fan, Gauge, MessageCircle, RadioTower,
+  Send, ShieldCheck, Thermometer, Trophy, Wifi, WifiOff, X, Zap
 } from 'lucide-react';
 import './solo-alert-preview.css';
 
 type AlertChannel = 'browser' | 'telegram' | 'discord';
 type MinerMode = 'basic' | 'local' | 'rental';
+type Chain = 'ZKAS' | 'KAS';
 
-const demoMiners = [
-  { name: 'IceRiver KS0 Ultra', worker: 'KSOPRO', mode: 'local', status: 'online', hashrate: '359 GH/s', temp: 61, fan: 2870, shares: 60, uptime: '12h 42m', blocks: 0 },
-  { name: 'Rental hashrate', worker: 'MRR-RENTAL-01', mode: 'rental', status: 'online', hashrate: '1.25 TH/s', temp: null, fan: null, shares: 184, uptime: '6h 18m', blocks: 0 },
-] as const;
+type PreviewMiner = {
+  name: string;
+  worker: string;
+  mode: MinerMode;
+  status: 'online' | 'offline';
+  hashrate: string;
+  temp: number | null;
+  fan: number | null;
+  shares: number;
+  uptime: string;
+  zkasBlocks: number;
+  kasBlocks: number;
+  lastSeen: string;
+};
+
+type BlockCelebration = {
+  chain: Chain;
+  worker: string;
+  hash: string;
+  reward: string | null;
+  time: string;
+};
+
+const demoMiners: PreviewMiner[] = [
+  {
+    name: 'IceRiver KS0 Ultra',
+    worker: 'KSOPRO',
+    mode: 'local',
+    status: 'online',
+    hashrate: '359 GH/s',
+    temp: 61,
+    fan: 2870,
+    shares: 60,
+    uptime: '12h 42m',
+    zkasBlocks: 0,
+    kasBlocks: 0,
+    lastSeen: '8 sec ago',
+  },
+  {
+    name: 'Rental hashrate',
+    worker: 'MRR-RENTAL-01',
+    mode: 'rental',
+    status: 'online',
+    hashrate: '1.25 TH/s',
+    temp: null,
+    fan: null,
+    shares: 184,
+    uptime: '6h 18m',
+    zkasBlocks: 0,
+    kasBlocks: 0,
+    lastSeen: '8 sec ago',
+  },
+];
 
 export function SoloAlertPreview() {
   const [channels, setChannels] = useState<Record<AlertChannel, boolean>>({
@@ -23,11 +73,24 @@ export function SoloAlertPreview() {
   const [threshold, setThreshold] = useState(70);
   const [offlineMinutes, setOfflineMinutes] = useState(3);
   const [mode, setMode] = useState<MinerMode>('basic');
+  const [selectedMiner, setSelectedMiner] = useState<PreviewMiner | null>(null);
+  const [celebration, setCelebration] = useState<BlockCelebration | null>(null);
 
   const enabledCount = useMemo(() => Object.values(channels).filter(Boolean).length, [channels]);
 
   function toggle(channel: AlertChannel) {
     setChannels((current) => ({ ...current, [channel]: !current[channel] }));
+  }
+
+  function simulateBlock(chain: Chain, miner = demoMiners[0]) {
+    const suffix = Math.random().toString(16).slice(2, 14).padEnd(12, '0');
+    setCelebration({
+      chain,
+      worker: miner.worker,
+      hash: `${chain.toLowerCase()}-preview-${suffix}`,
+      reward: chain === 'KAS' ? 'Reward shown when bridge exposes it' : null,
+      time: new Date().toLocaleTimeString(),
+    });
   }
 
   async function testBrowserAlert() {
@@ -104,9 +167,10 @@ export function SoloAlertPreview() {
           <div className="solo-card-icon"><BellRing size={24} /></div>
           <div><span>Alert channels</span><b>{enabledCount} enabled</b><small>Browser · Telegram · Discord</small></div>
         </article>
-        <article className="solo-hero-card">
+        <article className="solo-hero-card solo-block-card">
           <div className="solo-card-icon"><Zap size={24} /></div>
           <div><span>Blocks found</span><b>0</b><small>Current monitored session</small></div>
+          <button className="solo-mini-action" onClick={() => simulateBlock('ZKAS')}>Test block</button>
         </article>
       </section>
 
@@ -151,11 +215,47 @@ export function SoloAlertPreview() {
 
                 <div className="solo-miner-footer">
                   <span>{miner.mode === 'local' ? 'Bridge + ASIC update 8 sec ago' : 'Bridge update 8 sec ago'}</span>
-                  <button>View details</button>
+                  <button onClick={() => setSelectedMiner(miner)}>View details</button>
                 </div>
               </article>
             );
           })}
+        </div>
+      </section>
+
+      <section className="solo-section solo-block-center">
+        <div className="solo-section-head">
+          <div><span>BLOCK CENTER</span><h3>Block alerts & history</h3></div>
+          <div className="solo-block-actions">
+            <button onClick={() => simulateBlock('ZKAS')}><Trophy size={16} /> Simulate ZKAS block</button>
+            <button onClick={() => simulateBlock('KAS')}><Coins size={16} /> Simulate KAS block</button>
+          </div>
+        </div>
+        <div className="solo-block-center-grid">
+          <div className="solo-block-stat">
+            <span>ZKAS BLOCKS</span>
+            <b>0</b>
+            <small>Detected by Dual Alert</small>
+          </div>
+          <div className="solo-block-stat">
+            <span>KAS BLOCKS</span>
+            <b>0</b>
+            <small>Detected by Dual Alert</small>
+          </div>
+          <div className="solo-block-stat">
+            <span>LAST BLOCK</span>
+            <b>—</b>
+            <small>No block detected in this preview session</small>
+          </div>
+          <div className="solo-block-stat">
+            <span>ALERT DELIVERY</span>
+            <b>{enabledCount}/3</b>
+            <small>Enabled notification channels</small>
+          </div>
+        </div>
+        <div className="solo-history-empty">
+          <Activity size={20} />
+          <div><b>Block history will appear here</b><span>ZKAS/KAS block hash, worker, time, reward when available, and alert-delivery status.</span></div>
         </div>
       </section>
 
@@ -218,6 +318,79 @@ export function SoloAlertPreview() {
           <button className="solo-agent-button">Download agent — coming next</button>
         </article>
       </section>
+
+      {selectedMiner && (
+        <div className="solo-modal-backdrop" role="presentation" onMouseDown={() => setSelectedMiner(null)}>
+          <section className="solo-detail-modal" role="dialog" aria-modal="true" aria-label={`${selectedMiner.worker} miner details`} onMouseDown={(event) => event.stopPropagation()}>
+            <button className="solo-close-button" onClick={() => setSelectedMiner(null)} aria-label="Close miner details"><X size={20} /></button>
+            <div className="solo-detail-heading">
+              <span className="solo-miner-avatar"><Cpu size={25} /></span>
+              <div><span className="solo-preview-kicker">MINER DETAIL</span><h3>{selectedMiner.name}</h3><p>{selectedMiner.worker}</p></div>
+              <span className="solo-status-pill online"><Wifi size={14} /> ONLINE</span>
+            </div>
+
+            <div className="solo-detail-metrics">
+              <div><span>HASHRATE</span><b>{selectedMiner.hashrate}</b><small>Latest reported rate</small></div>
+              <div><span>SHARES</span><b>{selectedMiner.shares.toLocaleString()}</b><small>Bridge-reported total</small></div>
+              <div><span>UPTIME</span><b>{selectedMiner.uptime}</b><small>Bridge uptime</small></div>
+              <div><span>LAST SEEN</span><b>{selectedMiner.lastSeen}</b><small>Latest telemetry</small></div>
+            </div>
+
+            <div className="solo-detail-columns">
+              <div className="solo-detail-panel">
+                <div className="solo-panel-head"><div><span>BLOCKS</span><h3>Solo mining events</h3></div><Trophy size={21} /></div>
+                <div className="solo-detail-list">
+                  <div><span>ZKAS blocks</span><b>{selectedMiner.zkasBlocks}</b></div>
+                  <div><span>KAS blocks</span><b>{selectedMiner.kasBlocks}</b></div>
+                  <div><span>KAS reward</span><b>When available</b></div>
+                  <div><span>Source</span><b>Dual Alert bridge</b></div>
+                </div>
+                <div className="solo-detail-test-actions">
+                  <button onClick={() => simulateBlock('ZKAS', selectedMiner)}><Trophy size={16} /> Test ZKAS</button>
+                  <button onClick={() => simulateBlock('KAS', selectedMiner)}><Coins size={16} /> Test KAS</button>
+                </div>
+              </div>
+
+              <div className="solo-detail-panel">
+                <div className="solo-panel-head"><div><span>ASIC HEALTH</span><h3>{selectedMiner.mode === 'local' ? 'Optional hardware telemetry' : 'No hardware access needed'}</h3></div><Thermometer size={21} /></div>
+                {selectedMiner.mode === 'local' ? (
+                  <div className="solo-health-gauges">
+                    <div><Thermometer size={18} /><span>Temperature</span><b>{selectedMiner.temp ?? '—'}{selectedMiner.temp !== null ? '°C' : ''}</b></div>
+                    <div><Fan size={18} /><span>Fan</span><b>{selectedMiner.fan === null ? '—' : `${selectedMiner.fan.toLocaleString()} RPM`}</b></div>
+                  </div>
+                ) : (
+                  <div className="solo-no-telemetry"><ShieldCheck size={22} /><div><b>ASIC telemetry is optional</b><span>This worker can use Solo Alert without miner login, temperature, fan or hashboard access.</span></div></div>
+                )}
+              </div>
+            </div>
+          </section>
+        </div>
+      )}
+
+      {celebration && (
+        <div className="solo-block-overlay" role="dialog" aria-modal="true" aria-label={`${celebration.chain} block found preview`}>
+          <div className="solo-confetti" aria-hidden="true"><i /><i /><i /><i /><i /><i /><i /><i /></div>
+          <section className={`solo-block-celebration ${celebration.chain.toLowerCase()}`}>
+            <button className="solo-celebration-close" onClick={() => setCelebration(null)} aria-label="Close block alert"><X size={22} /></button>
+            <div className="solo-trophy-ring"><Trophy size={52} /></div>
+            <span className="solo-block-kicker">SOLO ALERT</span>
+            <h2>{celebration.chain} BLOCK FOUND!</h2>
+            <p>Your miner just reported a new {celebration.chain} block event.</p>
+            <div className="solo-celebration-grid">
+              <div><span>WORKER</span><b>{celebration.worker}</b></div>
+              <div><span>TIME</span><b>{celebration.time}</b></div>
+              <div className="wide"><span>BLOCK HASH / EVENT ID</span><b>{celebration.hash}</b></div>
+              {celebration.reward && <div className="wide"><span>KAS REWARD</span><b>{celebration.reward}</b></div>}
+            </div>
+            <div className="solo-delivery-row">
+              <span className={channels.browser ? 'sent' : ''}><Bell size={15} /> Browser</span>
+              <span className={channels.telegram ? 'sent' : ''}><Send size={15} /> Telegram</span>
+              <span className={channels.discord ? 'sent' : ''}><MessageCircle size={15} /> Discord</span>
+            </div>
+            <small>Preview simulation only — no mining counters or real block state were changed.</small>
+          </section>
+        </div>
+      )}
     </div>
   );
 }
