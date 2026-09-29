@@ -43,6 +43,12 @@ function safeMode(value) {
   return ['basic', 'local', 'rental'].includes(value) ? value : 'basic';
 }
 
+function safeWorker(value) {
+  if (typeof value !== 'string') return '';
+  const worker = value.trim().slice(0, 64);
+  return /^[A-Za-z0-9._:-]{1,64}$/.test(worker) ? worker : '';
+}
+
 export async function onRequest(context) {
   const { request, env } = context;
   const store = env.COMMUNITY_MINING || env.OTC_TRADES;
@@ -65,7 +71,7 @@ export async function onRequest(context) {
     const record = {
       schemaVersion: 1,
       pairCode,
-      name: safeName(body.name),
+      name: 'Paired Community Miner',
       mode: safeMode(body.mode),
       createdAt,
       expiresAt,
@@ -84,6 +90,8 @@ export async function onRequest(context) {
     try { body = await request.json(); } catch { return json({ error: 'invalid_json' }, 400); }
     const pairCode = typeof body?.pairingCode === 'string' ? body.pairingCode.trim().toUpperCase() : '';
     if (!/^[A-Z2-9]{10}$/.test(pairCode)) return json({ error: 'invalid_pairing_code' }, 400);
+    const worker = safeWorker(body?.worker);
+    if (!worker) return json({ error: 'worker_required' }, 400);
     const pairKey = `solo-pair:${pairCode}`;
     const record = await store.get(pairKey, 'json');
     if (!record || record.status !== 'pending' || Number(record.expiresAt) < Date.now()) return json({ error: 'pairing_code_expired_or_invalid' }, 404);
@@ -92,13 +100,13 @@ export async function onRequest(context) {
     const publisherHash = await digest(publisherToken);
     const publisherKey = `solo-publisher:${publisherHash}`;
     const dashboardKey = `solo-dashboard:${record.dashboardHash}`;
-    const claimed = { ...record, status: 'claimed', claimedAt: Date.now(), publisherHash };
+    const claimed = { ...record, name: worker, worker, status: 'claimed', claimedAt: Date.now(), publisherHash };
     await Promise.all([
-      store.put(publisherKey, JSON.stringify({ dashboardHash: record.dashboardHash, name: record.name, mode: record.mode }), { expirationTtl: 60 * 60 * 24 * 365 }),
+      store.put(publisherKey, JSON.stringify({ dashboardHash: record.dashboardHash, name: worker, worker, mode: record.mode }), { expirationTtl: 60 * 60 * 24 * 365 }),
       store.put(dashboardKey, JSON.stringify(claimed), { expirationTtl: 60 * 60 * 24 * 365 }),
       store.delete(pairKey),
     ]);
-    return json({ ok: true, publisherToken, name: record.name, mode: record.mode });
+    return json({ ok: true, publisherToken, name: worker, worker, mode: record.mode });
   }
 
   if (request.method === 'GET' && action === 'status') {
