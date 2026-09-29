@@ -642,17 +642,17 @@ export function SoloAlertPreview() {
             {pairingStep === 3 && <>
               <span className="solo-preview-kicker">PAIR MINER · STEP 3</span>
               <h3 className="solo-pair-title">Connect Solo Alert</h3>
-              <p className="solo-muted">Enter this one-time code in the local Dual Alert dashboard. It exchanges the code for a miner-specific publisher token; your private dashboard token stays in this browser.</p>
+              <p className="solo-muted">For normal users this is plug-and-play: run SETUP.cmd and paste the code when asked. The installer exchanges it for a miner-specific publisher token; your private dashboard token stays in this browser.</p>
               <div className="solo-pair-code">
                 <span>ONE-TIME PAIRING CODE</span>
                 <b>{pairingCode}</b>
                 <small>Expires in 15 minutes · single use</small>
               </div>
               <div className="solo-pair-instructions">
-                <div><span>1</span><p>Install or update <b>ZKas Dual Alert</b> on the bridge PC.</p></div>
-                <div><span>2</span><p>Open the local dashboard at <b>127.0.0.1:3040</b>.</p></div>
-                <div><span>3</span><p>Enter the pairing code under <b>ZKAS.stream Community Dashboard</b>.</p></div>
-                {pairingMode === 'local' && <div><span>4</span><p>Optionally enable the read-only ASIC health agent for temperature and fans.</p></div>}
+                <div><span>1</span><p>Download and extract the <b>ZKas Dual Alert</b> Windows package.</p></div>
+                <div><span>2</span><p>Double-click <b>SETUP.cmd</b> and approve the Windows prompt.</p></div>
+                <div><span>3</span><p>Paste this pairing code when setup asks for it. Bridge detection, startup and pairing happen automatically.</p></div>
+                {pairingMode === 'local' && <div><span>4</span><p>Optionally enable ASIC health monitoring later for temperature and fans.</p></div>}
               </div>
               <div className="solo-safe-box"><ShieldCheck size={20} /><div><b>Per-miner access</b><span>This pairing service uses separate publisher and dashboard tokens. Community users cannot read or publish another miner's telemetry without that miner's token.</span></div></div>
               {privateTelemetry?.paired && <div className="solo-pair-connected"><CheckCircle2 size={18} /><span>Dual Alert paired successfully. Private telemetry can now flow to this dashboard.</span></div>}
