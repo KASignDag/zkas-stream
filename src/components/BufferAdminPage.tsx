@@ -18,6 +18,7 @@ const DAILY_POSTS: DailyPost[] = [
   {time:'18:18',imageUrl:'',text:'🌐 Why ZKAS.stream exists\n\nThe goal of ZKAS.stream is simple: make the network easier to follow.\n\nMining, markets, OTC activity, community tools, and live network data — all in one place.\n\nWhat feature has been most useful to you so far?\n\nhttps://zkas.stream/\n\n#ZKAS'},
   {time:'20:12',imageUrl:'',text:'🤝 Community check-in\n\nEarly communities help shape the future.\n\nIf you are following ZKAS now, what keeps you here most?\n\n• privacy\n• mining\n• Kaspa connection\n• technology\n• community\n\nReply with your reason 👇\n\n#ZKAS #Kaspa'},
   {time:'22:00',imageUrl:'',text:'🌙 End-of-day question\n\nFinish this sentence:\n\n“ZKAS matters because ________.”\n\nKeep it short.\n\nBest replies might deserve a repost 👇\n\n#ZKAS #Privacy #Kaspa'},
+];
 
 function tomorrowLocalDate(){
   const d=new Date(); d.setDate(d.getDate()+1);
