@@ -65,6 +65,31 @@ function Get-WorkersFromSeries($seriesSets) {
   return @($set)
 }
 
+function Get-WorkerWallet($seriesSets, [string]$worker) {
+  foreach ($series in $seriesSets) {
+    foreach ($row in $series) {
+      if ([string]$row.Labels['worker'] -ne $worker) { continue }
+      $wallet = [string]$row.Labels['wallet']
+      if (-not [string]::IsNullOrWhiteSpace($wallet)) { return $wallet.Trim() }
+    }
+  }
+  return $null
+}
+
+function Get-PublicAlias($seriesSets, [string]$worker) {
+  $wallet = Get-WorkerWallet $seriesSets $worker
+  if ([string]::IsNullOrWhiteSpace($wallet) -or $wallet -notmatch '([A-Za-z0-9]{3})$') { return $worker }
+
+  $suffix = $Matches[1].ToLowerInvariant()
+  if ($worker.EndsWith("-$suffix", [StringComparison]::OrdinalIgnoreCase)) { return $worker }
+
+  # API aliases are limited to 32 characters. Preserve as much of the worker
+  # name as possible while reserving four characters for "-xyz".
+  $base = $worker.Trim()
+  if ($base.Length -gt 28) { $base = $base.Substring(0, 28) }
+  return "$base-$suffix"
+}
+
 function Sum-SessionMax($series, [string]$worker, [string[]]$extraKeys = @()) {
   $sessions = @{}
   foreach ($row in $series) {
@@ -195,10 +220,12 @@ function Build-Snapshot([string]$text) {
   $kasAcceptedLegacy = Get-Series $text 'ks_merged_kas_blocks_accepted_total'
   $kasPayoutSet = Get-Series $text 'ks_worker_kas_payout_set'
 
-  $workers = Get-WorkersFromSeries @($valid, $currentDiff, $start, $zkasBlocks, $kasSubmit, $kasAcceptedLegacy, $kasPayoutSet)
+  $identitySeries = @($valid, $invalid, $currentDiff, $start, $zkasBlocks, $kasSubmit, $kasAcceptedLegacy, $kasPayoutSet)
+  $workers = Get-WorkersFromSeries $identitySeries
   $miners = @()
 
   foreach ($worker in ($workers | Sort-Object)) {
+    $publicAlias = Get-PublicAlias $identitySeries $worker
     $acceptedShares = Sum-SessionMax $valid $worker
     $difficultyNow = Max-WorkerValue $currentDiff $worker
 
@@ -232,7 +259,7 @@ function Build-Snapshot([string]$text) {
     $online = ($difficultyNow -gt 0) -or $recentShare
 
     $miners += [ordered]@{
-      alias = $worker
+      alias = $publicAlias
       status = $(if ($online) { 'online' } else { 'offline' })
       hashrateHps = $(if ($null -eq $hashrate) { $null } else { [math]::Round($hashrate, 0) })
       uptimeSeconds = $(if ($null -eq $uptime) { $null } else { [math]::Round($uptime, 0) })
@@ -273,7 +300,7 @@ Write-Host "Community mining collector"
 Write-Host "Metrics:  $MetricsUrl"
 Write-Host "Endpoint: $Endpoint"
 Write-Host ("Hashrate: vardiff-aware share work, rolling {0}s window, minimum {1}s sample" -f $HashrateWindowSeconds, $HashrateMinSampleSeconds)
-Write-Host 'Privacy: wallet and IP labels are parsed locally and never included in the posted JSON.'
+Write-Host 'Privacy: full wallet and IP labels remain local; only the final three wallet characters may be added to the public worker alias.'
 
 while ($true) {
   try {

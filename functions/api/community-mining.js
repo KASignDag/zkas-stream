@@ -88,6 +88,20 @@ function resolveStoredAlias(state, incomingAlias) {
   const exact = state.miners[incomingAlias];
   if (counterTotal(exact) > 0) return incomingAlias;
 
+  // New collectors consistently append the final three wallet characters to
+  // the public worker alias. Move an older unsuffixed record to that stable
+  // alias so enabling the suffix does not split or reset lifetime totals.
+  const suffixed = incomingAlias.match(/^(.+)-[A-Za-z0-9]{3}$/);
+  if (suffixed) {
+    const baseAlias = suffixed[1];
+    const base = state.miners[baseAlias];
+    if (counterTotal(base) > 0) {
+      state.miners[incomingAlias] = base;
+      delete state.miners[baseAlias];
+      return incomingAlias;
+    }
+  }
+
   // After a bridge restart, some bridge builds report only the worker's base
   // name (for example `KS7`) instead of its previously published stable alias
   // (`KS7-pnw`). Reattach that live worker to its one unambiguous historical
