@@ -67,7 +67,7 @@ function cleanMiner(value) {
   if (!alias) return null;
   return {
     alias,
-    status: value.status === 'online' ? 'online' : 'offline',
+    status: value.status === 'online' || value.status === 'attention' ? value.status : 'offline',
     hashrateHps: finiteNonNegative(value.hashrateHps),
     uptimeSeconds: finiteNonNegative(value.uptimeSeconds),
     acceptedShares: finiteNonNegative(value.acceptedShares),
@@ -226,7 +226,7 @@ function applyLifetimeBlockCounters(state, gateway, miners, bridgeStartedAt) {
     const priorSnapshot = previous?.lastSnapshot && typeof previous.lastSnapshot === 'object'
       ? previous.lastSnapshot
       : {};
-    const shouldCapture = miner.status === 'online' || !previous?.lastSnapshot;
+    const shouldCapture = miner.status !== 'offline' || !previous?.lastSnapshot;
     const lastSnapshot = shouldCapture ? {
       hashrateHps: miner.hashrateHps ?? finiteNonNegative(priorSnapshot.hashrateHps),
       uptimeSeconds: miner.uptimeSeconds ?? finiteNonNegative(priorSnapshot.uptimeSeconds),
@@ -235,7 +235,7 @@ function applyLifetimeBlockCounters(state, gateway, miners, bridgeStartedAt) {
       staleShares: miner.staleShares ?? finiteNonNegative(priorSnapshot.staleShares),
       lastShareAt: miner.lastShareAt ?? finiteNonNegative(priorSnapshot.lastShareAt),
     } : priorSnapshot;
-    const lastSeenAt = miner.status === 'online'
+    const lastSeenAt = miner.status !== 'offline'
       ? now
       : finiteNonNegative(previous?.lastSeenAt)
         ?? finiteNonNegative(miner.lastShareAt)
@@ -257,7 +257,7 @@ function applyLifetimeBlockCounters(state, gateway, miners, bridgeStartedAt) {
       updatedAt: now,
     };
 
-    if (miner.status !== 'online') return historicalMinerRow(resolvedAlias, state.miners[resolvedAlias]);
+    if (miner.status === 'offline') return historicalMinerRow(resolvedAlias, state.miners[resolvedAlias]);
     return {
       ...publishedMiner,
       historical: false,

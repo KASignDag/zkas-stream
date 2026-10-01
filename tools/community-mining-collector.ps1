@@ -28,9 +28,10 @@ function Get-BridgeStatus {
       StartedAt = [DateTimeOffset]::new($process.StartTime.ToUniversalTime()).ToUnixTimeMilliseconds()
       ZkasConnected = [bool]($connections | Where-Object { $_.RemoteAddress -eq '127.0.0.1' -and $_.RemotePort -eq 16810 })
       KaspaConnected = [bool]($connections | Where-Object { $_.RemoteAddress -eq '127.0.0.1' -and $_.RemotePort -eq 16110 })
+      ConnectedIps = @($connections | ForEach-Object { [string]$_.RemoteAddress } | Where-Object { $_ } | Sort-Object -Unique)
     }
   } catch {
-    return [pscustomobject]@{ StartedAt = $null; ZkasConnected = $false; KaspaConnected = $false }
+    return [pscustomobject]@{ StartedAt = $null; ZkasConnected = $false; KaspaConnected = $false; ConnectedIps = @() }
   }
 }
 
@@ -74,6 +75,18 @@ function Get-WorkerWallet($seriesSets, [string]$worker) {
     }
   }
   return $null
+}
+
+function Get-WorkerIps($seriesSets, [string]$worker) {
+  $ips = [System.Collections.Generic.HashSet[string]]::new([StringComparer]::OrdinalIgnoreCase)
+  foreach ($series in $seriesSets) {
+    foreach ($row in $series) {
+      if ([string]$row.Labels['worker'] -ne $worker) { continue }
+      $ip = [string]$row.Labels['ip']
+      if (-not [string]::IsNullOrWhiteSpace($ip)) { [void]$ips.Add($ip.Trim()) }
+    }
+  }
+  return @($ips)
 }
 
 function Get-PublicAlias($seriesSets, [string]$worker) {
@@ -256,11 +269,13 @@ function Build-Snapshot([string]$text) {
     $startSec = Min-WorkerStart $start $worker $difficultyNow
     $uptime = if ($null -ne $startSec) { [math]::Max(0, $nowSec - [double]$startSec) } else { $null }
     $recentShare = $lastShareAt.ContainsKey($worker) -and (($now - [int64]$lastShareAt[$worker]) -lt 120000)
-    $online = ($difficultyNow -gt 0) -or $recentShare
+    $workerIps = @(Get-WorkerIps $identitySeries $worker)
+    $connected = @($workerIps | Where-Object { $bridgeStatus.ConnectedIps -contains $_ }).Count -gt 0
+    $status = if ($recentShare) { 'online' } elseif ($connected) { 'attention' } else { 'offline' }
 
     $miners += [ordered]@{
       alias = $publicAlias
-      status = $(if ($online) { 'online' } else { 'offline' })
+      status = $status
       hashrateHps = $(if ($null -eq $hashrate) { $null } else { [math]::Round($hashrate, 0) })
       uptimeSeconds = $(if ($null -eq $uptime) { $null } else { [math]::Round($uptime, 0) })
       acceptedShares = [math]::Round($acceptedShares, 0)
