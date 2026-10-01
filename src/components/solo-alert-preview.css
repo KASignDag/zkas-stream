@@ -219,3 +219,18 @@
 
 .solo-private-steps{display:grid;gap:8px;margin:14px 0}.solo-private-steps>div{display:grid;grid-template-columns:auto 1fr;gap:9px;align-items:center;padding:9px 10px;border-radius:10px;background:#10242d}.solo-private-steps>div>span{display:grid;place-items:center;width:25px;height:25px;border-radius:50%;background:rgba(43,205,172,.12);color:#55e5c6;font-size:11px;font-weight:900}.solo-private-steps p{margin:0;color:#b7ccc8}
 .solo-build-tag{display:inline-block;margin-left:6px;padding:3px 6px;border-radius:999px;background:rgba(43,205,172,.12);color:#55e5c6;font-size:9px;vertical-align:middle}
+
+.solo-advanced-modal{width:min(1040px,96vw)}
+.solo-detail-tabs{display:flex;gap:7px;overflow-x:auto;padding:2px 0 14px;margin:2px 0 14px;border-bottom:1px solid var(--line);scrollbar-width:none}
+.solo-detail-tabs::-webkit-scrollbar{display:none}
+.solo-detail-tabs button{flex:0 0 auto;border:1px solid var(--line);border-radius:10px;padding:8px 11px;background:var(--panel-soft);color:var(--muted);font-weight:800;cursor:pointer}
+.solo-detail-tabs button.active{background:rgba(43,205,172,.12);border-color:rgba(43,205,172,.4);color:#44d5b5}
+.solo-advanced-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.solo-trends-layout{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.solo-chart-card{padding:16px;border:1px solid var(--line);border-radius:16px;background:var(--panel-soft)}
+.solo-chart-head{display:flex;justify-content:space-between;gap:12px;align-items:flex-start;margin-bottom:14px}
+.solo-chart-head span,.solo-chart-head b,.solo-chart-head small{display:block}.solo-chart-head span{font-size:10px;font-weight:850;letter-spacing:.11em;color:var(--muted)}.solo-chart-head b{margin-top:4px;font-size:18px}.solo-chart-head small{color:var(--muted)}
+.solo-trend-placeholder{min-height:210px;display:grid;place-items:center;text-align:center;align-content:center;gap:8px;padding:20px;border:1px dashed var(--line);border-radius:14px;background:rgba(255,255,255,.02);color:var(--muted)}
+.solo-trend-placeholder svg{color:#2ec9aa}.solo-trend-placeholder b{color:var(--text);font-size:15px}.solo-trend-placeholder span{max-width:420px;line-height:1.45;font-size:12px}
+.solo-detail-caption{margin-top:14px}
+@media(max-width:760px){.solo-advanced-grid,.solo-trends-layout{grid-template-columns:1fr}.solo-advanced-modal{width:96vw}.solo-detail-tabs{margin-left:-4px;margin-right:-4px;padding-left:4px;padding-right:4px}}
