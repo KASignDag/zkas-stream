@@ -9,6 +9,7 @@ type AlertChannel = 'browser' | 'telegram' | 'discord';
 type MinerMode = 'basic' | 'local' | 'rental';
 type Chain = 'ZKAS' | 'KAS';
 type DetailTab = 'overview' | 'trends' | 'shares' | 'blocks' | 'hardware';
+type HistoryRange = '1h' | '6h' | '24h' | '7d';
 
 type PreviewMiner = {
   name: string;
@@ -56,6 +57,19 @@ type CommunityMiningSnapshot = {
   miners: CommunityMiningRow[];
   lifetimeZkasBlocks: number;
   lifetimeKasBlocks: number;
+};
+
+type SoloHistoryPoint = {
+  t: number;
+  h: number | null;
+  a: number | null;
+  i: number | null;
+  s: number | null;
+  z: number | null;
+  k: number | null;
+  u: number | null;
+  c: number | null;
+  f: number | null;
 };
 
 type NotificationReadiness = {
@@ -147,6 +161,20 @@ function telemetryAgeMs(timestamp: number | null | undefined) {
   return Math.max(0, Date.now() - ms);
 }
 
+function chartPolyline(points: Array<number | null>, width = 520, height = 180) {
+  const finite = points.map((value, index) => ({ value, index })).filter((row): row is { value: number; index: number } => typeof row.value === 'number' && Number.isFinite(row.value));
+  if (finite.length < 2) return '';
+  const min = Math.min(...finite.map((row) => row.value));
+  const max = Math.max(...finite.map((row) => row.value));
+  const span = Math.max(1, max - min);
+  const maxIndex = Math.max(1, points.length - 1);
+  return finite.map((row) => {
+    const x = (row.index / maxIndex) * width;
+    const y = height - ((row.value - min) / span) * (height - 18) - 9;
+    return `${x.toFixed(1)},${y.toFixed(1)}`;
+  }).join(' ');
+}
+
 export function SoloAlertPreview() {
   const [channels, setChannels] = useState<Record<AlertChannel, boolean>>({
     browser: true,
@@ -158,6 +186,8 @@ export function SoloAlertPreview() {
   const [offlineMinutes, setOfflineMinutes] = useState(3);
   const [selectedMiner, setSelectedMiner] = useState<PreviewMiner | null>(null);
   const [detailTab, setDetailTab] = useState<DetailTab>('overview');
+  const [historyRange, setHistoryRange] = useState<HistoryRange>('1h');
+  const [privateHistory, setPrivateHistory] = useState<SoloHistoryPoint[]>([]);
   const [celebration, setCelebration] = useState<BlockCelebration | null>(null);
   const [blockHistory, setBlockHistory] = useState<BlockHistoryEvent[]>([]);
   const [liveSnapshot, setLiveSnapshot] = useState<CommunityMiningSnapshot | null>(null);
@@ -287,13 +317,16 @@ export function SoloAlertPreview() {
     let timer = 0;
     async function refreshPrivate() {
       try {
-        const response = await fetch('/api/solo-telemetry', {
+        const response = await fetch(`/api/solo-telemetry?range=${historyRange}`, {
           headers: { Authorization: `Bearer ${privateDashboardToken}` },
           cache: 'no-store',
         });
         if (!response.ok) return;
         const result = await response.json();
-        if (!stopped) setPrivateTelemetry(result);
+        if (!stopped) {
+          setPrivateTelemetry(result);
+          setPrivateHistory(Array.isArray(result.history) ? result.history : []);
+        }
       } catch {}
     }
     void refreshPrivate();
@@ -302,7 +335,7 @@ export function SoloAlertPreview() {
       stopped = true;
       window.clearInterval(timer);
     };
-  }, [privateDashboardToken]);
+  }, [privateDashboardToken, historyRange]);
 
   function recordBlockEvent(event: BlockCelebration, source: 'live' | 'simulation') {
     const activeChannels = (Object.entries(channels) as Array<[AlertChannel, boolean]>)
@@ -441,6 +474,28 @@ export function SoloAlertPreview() {
                 <span>Source: <b>{privateTelemetry.telemetry.source || 'dual-alert'}</b></span>
                 <span>Mode: <b>{privateTelemetry.profile?.mode || 'basic'}</b></span>
               </div>
+              <button
+                className="solo-private-details-button"
+                onClick={() => {
+                  setDetailTab('overview');
+                  setSelectedMiner({
+                    name: privateTelemetry.profile?.name || privateTelemetry.telemetry.worker || 'Paired miner',
+                    worker: privateTelemetry.telemetry.worker || privateTelemetry.profile?.name || 'Paired miner',
+                    mode: (privateTelemetry.profile?.mode || 'basic') as MinerMode,
+                    status: privateTelemetry.telemetry.status === 'offline' ? 'offline' : 'online',
+                    hashrate: formatHashrate(privateTelemetry.telemetry.hashrateHps),
+                    temp: privateTelemetry.telemetry.temperatureC ?? null,
+                    fan: privateTelemetry.telemetry.fanRpm ?? null,
+                    shares: Math.max(0, Math.floor(privateTelemetry.telemetry.acceptedShares || 0)),
+                    uptime: formatUptime(privateTelemetry.telemetry.uptimeSeconds),
+                    zkasBlocks: Math.max(0, Math.floor(privateTelemetry.telemetry.zkasBlocks || 0)),
+                    kasBlocks: Math.max(0, Math.floor(privateTelemetry.telemetry.kasBlocks || 0)),
+                    lastSeen: ageLabel(privateTelemetry.telemetry.updatedAt),
+                  });
+                }}
+              >
+                <Activity size={17} /> Open advanced miner details
+              </button>
               {telemetryAgeMs(privateTelemetry.telemetry.updatedAt) > 120000 && (
                 <div className="solo-private-warning"><WifiOff size={17} /><span>No telemetry report has arrived for over 2 minutes. Block/share data shown above may be stale.</span></div>
               )}
@@ -794,29 +849,53 @@ export function SoloAlertPreview() {
             )}
 
             {detailTab === 'trends' && (
-              <div className="solo-trends-layout">
-                <div className="solo-chart-card">
-                  <div className="solo-chart-head">
-                    <div><span>HASHRATE TREND</span><b>{selectedMiner.hashrate}</b></div>
-                    <small>History-ready</small>
+              <div className="solo-trends-wrap">
+                <div className="solo-range-tabs">
+                  {(['1h','6h','24h','7d'] as HistoryRange[]).map((range) => (
+                    <button key={range} className={historyRange === range ? 'active' : ''} onClick={() => setHistoryRange(range)}>{range}</button>
+                  ))}
+                </div>
+                <div className="solo-trends-layout">
+                  <div className="solo-chart-card">
+                    <div className="solo-chart-head">
+                      <div><span>HASHRATE TREND</span><b>{selectedMiner.hashrate}</b></div>
+                      <small>{privateHistory.length} real samples</small>
+                    </div>
+                    {privateHistory.length >= 2 && chartPolyline(privateHistory.map((point) => point.h)) ? (
+                      <div className="solo-real-chart">
+                        <svg viewBox="0 0 520 180" preserveAspectRatio="none" role="img" aria-label="Hashrate history chart">
+                          <polyline points={chartPolyline(privateHistory.map((point) => point.h))} fill="none" vectorEffect="non-scaling-stroke" />
+                        </svg>
+                      </div>
+                    ) : (
+                      <div className="solo-trend-placeholder">
+                        <Activity size={28} />
+                        <b>Collecting real hashrate history</b>
+                        <span>At least two 5-minute telemetry samples are needed before a trend line is drawn.</span>
+                      </div>
+                    )}
                   </div>
-                  <div className="solo-trend-placeholder">
-                    <Activity size={28} />
-                    <b>Trend history is next</b>
-                    <span>We will retain paired telemetry snapshots for 1h, 6h, 24h and 7d charts. No fabricated history is shown.</span>
+                  <div className="solo-chart-card">
+                    <div className="solo-chart-head">
+                      <div><span>ACCEPTED SHARES</span><b>{selectedMiner.shares.toLocaleString()}</b></div>
+                      <small>{historyRange} window</small>
+                    </div>
+                    {privateHistory.length >= 2 && chartPolyline(privateHistory.map((point) => point.a)) ? (
+                      <div className="solo-real-chart shares">
+                        <svg viewBox="0 0 520 180" preserveAspectRatio="none" role="img" aria-label="Accepted shares history chart">
+                          <polyline points={chartPolyline(privateHistory.map((point) => point.a))} fill="none" vectorEffect="non-scaling-stroke" />
+                        </svg>
+                      </div>
+                    ) : (
+                      <div className="solo-trend-placeholder">
+                        <Gauge size={28} />
+                        <b>Collecting real share history</b>
+                        <span>Share growth will appear automatically as paired Community Mining telemetry accumulates.</span>
+                      </div>
+                    )}
                   </div>
                 </div>
-                <div className="solo-chart-card">
-                  <div className="solo-chart-head">
-                    <div><span>SHARE TREND</span><b>{selectedMiner.shares.toLocaleString()} accepted</b></div>
-                    <small>Session activity</small>
-                  </div>
-                  <div className="solo-trend-placeholder">
-                    <Gauge size={28} />
-                    <b>Share-rate history</b>
-                    <span>Accepted, stale and invalid share history will appear here once the time-series collector is enabled.</span>
-                  </div>
-                </div>
+                <div className="solo-history-note"><ShieldCheck size={18}/><span>Charts use only this paired miner's private telemetry. Other Community Mining workers are not included.</span></div>
               </div>
             )}
 
@@ -826,9 +905,9 @@ export function SoloAlertPreview() {
                   <div className="solo-panel-head"><div><span>SHARES</span><h3>Current session</h3></div><Gauge size={21} /></div>
                   <div className="solo-detail-list">
                     <div><span>Accepted</span><b>{selectedMiner.shares.toLocaleString()}</b></div>
-                    <div><span>Rejected</span><b>—</b></div>
-                    <div><span>Stale</span><b>—</b></div>
-                    <div><span>Efficiency</span><b>Waiting for detailed bridge fields</b></div>
+                    <div><span>Rejected</span><b>{privateTelemetry?.telemetry?.worker === selectedMiner.worker && privateTelemetry.telemetry.invalidShares != null ? Math.floor(privateTelemetry.telemetry.invalidShares).toLocaleString() : '—'}</b></div>
+                    <div><span>Stale</span><b>{privateTelemetry?.telemetry?.worker === selectedMiner.worker && privateTelemetry.telemetry.staleShares != null ? Math.floor(privateTelemetry.telemetry.staleShares).toLocaleString() : '—'}</b></div>
+                    <div><span>Efficiency</span><b>{privateTelemetry?.telemetry?.worker === selectedMiner.worker && privateTelemetry.telemetry.invalidShares != null && privateTelemetry.telemetry.staleShares != null ? (((selectedMiner.shares / Math.max(1, selectedMiner.shares + privateTelemetry.telemetry.invalidShares + privateTelemetry.telemetry.staleShares)) * 100).toFixed(2) + '%') : 'Waiting for bridge fields'}</b></div>
                   </div>
                 </div>
                 <div className="solo-detail-panel">
