@@ -20,6 +20,50 @@ function n(value) {
   return typeof value === 'number' && Number.isFinite(value) && value >= 0 ? value : null;
 }
 
+const HISTORY_BUCKET_MS = 5 * 60 * 1000;
+const HISTORY_MAX_POINTS = 7 * 24 * 12;
+const HISTORY_WINDOWS = {
+  '1h': 60 * 60 * 1000,
+  '6h': 6 * 60 * 60 * 1000,
+  '24h': 24 * 60 * 60 * 1000,
+  '7d': 7 * 24 * 60 * 60 * 1000,
+};
+
+function historyPoint(telemetry) {
+  return {
+    t: telemetry.updatedAt,
+    h: telemetry.hashrateHps,
+    a: telemetry.acceptedShares,
+    i: telemetry.invalidShares,
+    s: telemetry.staleShares,
+    z: telemetry.zkasBlocks,
+    k: telemetry.kasBlocks,
+    u: telemetry.uptimeSeconds,
+    c: telemetry.temperatureC,
+    f: telemetry.fanRpm,
+  };
+}
+
+async function appendHistory(store, dashboardHash, telemetry) {
+  const key = `solo-history:${dashboardHash}`;
+  const existing = (await store.get(key, 'json')) || { schemaVersion: 1, points: [] };
+  const points = Array.isArray(existing.points) ? existing.points : [];
+  const latest = points[points.length - 1];
+  const currentBucket = Math.floor(telemetry.updatedAt / HISTORY_BUCKET_MS);
+  const latestBucket = latest?.t ? Math.floor(latest.t / HISTORY_BUCKET_MS) : -1;
+
+  if (currentBucket === latestBucket) {
+    points[points.length - 1] = historyPoint(telemetry);
+  } else {
+    points.push(historyPoint(telemetry));
+  }
+
+  const trimmed = points.slice(-HISTORY_MAX_POINTS);
+  await store.put(key, JSON.stringify({ schemaVersion: 1, points: trimmed }), {
+    expirationTtl: 60 * 60 * 24 * 8,
+  });
+}
+
 function cleanTelemetry(body, profile) {
   const row = body && typeof body === 'object' ? body : {};
   return {
@@ -58,7 +102,10 @@ export async function onRequest(context) {
     let body;
     try { body = await request.json(); } catch { return json({ error: 'invalid_json' }, 400); }
     const telemetry = cleanTelemetry(body, profile);
-    await store.put(`solo-telemetry:${profile.dashboardHash}`, JSON.stringify(telemetry), { expirationTtl: 60 * 60 * 24 * 30 });
+    await Promise.all([
+      store.put(`solo-telemetry:${profile.dashboardHash}`, JSON.stringify(telemetry), { expirationTtl: 60 * 60 * 24 * 30 }),
+      appendHistory(store, profile.dashboardHash, telemetry),
+    ]);
     return json({ ok: true, updatedAt: telemetry.updatedAt });
   }
 
@@ -67,11 +114,23 @@ export async function onRequest(context) {
     const dashboard = await store.get(`solo-dashboard:${dashboardHash}`, 'json');
     if (!dashboard) return json({ error: 'unauthorized' }, 401);
     const telemetry = await store.get(`solo-telemetry:${dashboardHash}`, 'json');
+    const url = new URL(request.url);
+    const range = url.searchParams.get('range');
+    let history = null;
+
+    if (range && HISTORY_WINDOWS[range]) {
+      const saved = await store.get(`solo-history:${dashboardHash}`, 'json');
+      const cutoff = Date.now() - HISTORY_WINDOWS[range];
+      history = (Array.isArray(saved?.points) ? saved.points : []).filter((point) => Number(point?.t) >= cutoff);
+    }
+
     return json({
       ok: true,
       paired: dashboard.status === 'claimed',
       profile: { name: dashboard.name, mode: dashboard.mode },
       telemetry: telemetry || null,
+      historyRange: range && HISTORY_WINDOWS[range] ? range : null,
+      history,
     });
   }
 
