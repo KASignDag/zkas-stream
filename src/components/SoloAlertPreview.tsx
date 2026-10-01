@@ -8,6 +8,7 @@ import './solo-alert-preview.css';
 type AlertChannel = 'browser' | 'telegram' | 'discord';
 type MinerMode = 'basic' | 'local' | 'rental';
 type Chain = 'ZKAS' | 'KAS';
+type DetailTab = 'overview' | 'trends' | 'shares' | 'blocks' | 'hardware';
 
 type PreviewMiner = {
   name: string;
@@ -156,6 +157,7 @@ export function SoloAlertPreview() {
   const [threshold, setThreshold] = useState(70);
   const [offlineMinutes, setOfflineMinutes] = useState(3);
   const [selectedMiner, setSelectedMiner] = useState<PreviewMiner | null>(null);
+  const [detailTab, setDetailTab] = useState<DetailTab>('overview');
   const [celebration, setCelebration] = useState<BlockCelebration | null>(null);
   const [blockHistory, setBlockHistory] = useState<BlockHistoryEvent[]>([]);
   const [liveSnapshot, setLiveSnapshot] = useState<CommunityMiningSnapshot | null>(null);
@@ -508,7 +510,7 @@ export function SoloAlertPreview() {
 
                 <div className="solo-miner-footer">
                   <span>{miner.mode === 'local' ? `Bridge + ASIC update ${miner.lastSeen}` : `Bridge update ${miner.lastSeen}`}</span>
-                  <button onClick={() => setSelectedMiner(miner)}>View details</button>
+                  <button onClick={() => { setDetailTab('overview'); setSelectedMiner(miner); }}>View details</button>
                 </div>
               </article>
             );
@@ -733,48 +735,155 @@ export function SoloAlertPreview() {
 
       {selectedMiner && (
         <div className="solo-modal-backdrop" role="presentation" onMouseDown={() => setSelectedMiner(null)}>
-          <section className="solo-detail-modal" role="dialog" aria-modal="true" aria-label={`${selectedMiner.worker} miner details`} onMouseDown={(event) => event.stopPropagation()}>
+          <section className="solo-detail-modal solo-advanced-modal" role="dialog" aria-modal="true" aria-label={`${selectedMiner.worker} miner details`} onMouseDown={(event) => event.stopPropagation()}>
             <button className="solo-close-button" onClick={() => setSelectedMiner(null)} aria-label="Close miner details"><X size={20} /></button>
+
             <div className="solo-detail-heading">
               <span className="solo-miner-avatar"><Cpu size={25} /></span>
-              <div><span className="solo-preview-kicker">MINER DETAIL</span><h3>{selectedMiner.name}</h3><p>{selectedMiner.worker}</p></div>
-              <span className="solo-status-pill online"><Wifi size={14} /> ONLINE</span>
+              <div>
+                <span className="solo-preview-kicker">SOLO ALERT · MINER DETAILS</span>
+                <h3>{selectedMiner.name}</h3>
+                <p>{selectedMiner.worker}</p>
+              </div>
+              <span className={`solo-status-pill ${selectedMiner.status === 'online' ? 'online' : 'offline'}`}>
+                {selectedMiner.status === 'online' ? <Wifi size={14} /> : <WifiOff size={14} />}
+                {selectedMiner.status.toUpperCase()}
+              </span>
             </div>
 
             <div className="solo-detail-metrics">
               <div><span>HASHRATE</span><b>{selectedMiner.hashrate}</b><small>Latest reported rate</small></div>
-              <div><span>SHARES</span><b>{selectedMiner.shares.toLocaleString()}</b><small>Bridge-reported total</small></div>
-              <div><span>UPTIME</span><b>{selectedMiner.uptime}</b><small>Bridge uptime</small></div>
-              <div><span>LAST SEEN</span><b>{selectedMiner.lastSeen}</b><small>Latest telemetry</small></div>
+              <div><span>SHARES</span><b>{selectedMiner.shares.toLocaleString()}</b><small>Accepted shares</small></div>
+              <div><span>UPTIME</span><b>{selectedMiner.uptime}</b><small>Bridge session</small></div>
+              <div><span>BLOCKS</span><b>{selectedMiner.zkasBlocks + selectedMiner.kasBlocks}</b><small>ZKAS + KAS</small></div>
             </div>
 
-            <div className="solo-detail-columns">
-              <div className="solo-detail-panel">
-                <div className="solo-panel-head"><div><span>BLOCKS</span><h3>Solo mining events</h3></div><Trophy size={21} /></div>
-                <div className="solo-detail-list">
-                  <div><span>ZKAS blocks</span><b>{selectedMiner.zkasBlocks}</b></div>
-                  <div><span>KAS blocks</span><b>{selectedMiner.kasBlocks}</b></div>
-                  <div><span>KAS reward</span><b>When available</b></div>
-                  <div><span>Source</span><b>Dual Alert bridge</b></div>
-                </div>
-                <div className="solo-detail-test-actions">
-                  <button onClick={() => simulateBlock('ZKAS', selectedMiner)}><Trophy size={16} /> Test ZKAS</button>
-                  <button onClick={() => simulateBlock('KAS', selectedMiner)}><Coins size={16} /> Test KAS</button>
-                </div>
-              </div>
+            <nav className="solo-detail-tabs" aria-label="Miner detail sections">
+              {([
+                ['overview','Overview'],
+                ['trends','Trends'],
+                ['shares','Shares'],
+                ['blocks','Blocks'],
+                ['hardware','Hardware'],
+              ] as Array<[DetailTab,string]>).map(([key,label]) => (
+                <button key={key} className={detailTab === key ? 'active' : ''} onClick={() => setDetailTab(key)}>{label}</button>
+              ))}
+            </nav>
 
-              <div className="solo-detail-panel">
-                <div className="solo-panel-head"><div><span>ASIC HEALTH</span><h3>{selectedMiner.mode === 'local' ? 'Optional hardware telemetry' : 'No hardware access needed'}</h3></div><Thermometer size={21} /></div>
-                {selectedMiner.mode === 'local' ? (
-                  <div className="solo-health-gauges">
-                    <div><Thermometer size={18} /><span>Temperature</span><b>{selectedMiner.temp ?? '—'}{selectedMiner.temp !== null ? '°C' : ''}</b></div>
-                    <div><Fan size={18} /><span>Fan</span><b>{selectedMiner.fan === null ? '—' : `${selectedMiner.fan.toLocaleString()} RPM`}</b></div>
+            {detailTab === 'overview' && (
+              <div className="solo-advanced-grid">
+                <div className="solo-detail-panel">
+                  <div className="solo-panel-head"><div><span>SESSION</span><h3>Mining status</h3></div><Activity size={21} /></div>
+                  <div className="solo-detail-list">
+                    <div><span>Worker</span><b>{selectedMiner.worker}</b></div>
+                    <div><span>Status</span><b>{selectedMiner.status === 'online' ? 'Online' : 'Offline'}</b></div>
+                    <div><span>Last report</span><b>{selectedMiner.lastSeen}</b></div>
+                    <div><span>Monitoring</span><b>{selectedMiner.mode === 'local' ? 'Bridge + ASIC' : 'Community bridge'}</b></div>
                   </div>
-                ) : (
-                  <div className="solo-no-telemetry"><ShieldCheck size={22} /><div><b>ASIC telemetry is optional</b><span>This worker can use Solo Alert without miner login, temperature, fan or hashboard access.</span></div></div>
-                )}
+                </div>
+                <div className="solo-detail-panel">
+                  <div className="solo-panel-head"><div><span>SOLO RESULTS</span><h3>Block summary</h3></div><Trophy size={21} /></div>
+                  <div className="solo-detail-list">
+                    <div><span>ZKAS blocks</span><b>{selectedMiner.zkasBlocks}</b></div>
+                    <div><span>KAS blocks</span><b>{selectedMiner.kasBlocks}</b></div>
+                    <div><span>Accepted shares</span><b>{selectedMiner.shares.toLocaleString()}</b></div>
+                    <div><span>Alert channels</span><b>{enabledCount} enabled</b></div>
+                  </div>
+                </div>
               </div>
-            </div>
+            )}
+
+            {detailTab === 'trends' && (
+              <div className="solo-trends-layout">
+                <div className="solo-chart-card">
+                  <div className="solo-chart-head">
+                    <div><span>HASHRATE TREND</span><b>{selectedMiner.hashrate}</b></div>
+                    <small>History-ready</small>
+                  </div>
+                  <div className="solo-trend-placeholder">
+                    <Activity size={28} />
+                    <b>Trend history is next</b>
+                    <span>We will retain paired telemetry snapshots for 1h, 6h, 24h and 7d charts. No fabricated history is shown.</span>
+                  </div>
+                </div>
+                <div className="solo-chart-card">
+                  <div className="solo-chart-head">
+                    <div><span>SHARE TREND</span><b>{selectedMiner.shares.toLocaleString()} accepted</b></div>
+                    <small>Session activity</small>
+                  </div>
+                  <div className="solo-trend-placeholder">
+                    <Gauge size={28} />
+                    <b>Share-rate history</b>
+                    <span>Accepted, stale and invalid share history will appear here once the time-series collector is enabled.</span>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {detailTab === 'shares' && (
+              <div className="solo-advanced-grid">
+                <div className="solo-detail-panel">
+                  <div className="solo-panel-head"><div><span>SHARES</span><h3>Current session</h3></div><Gauge size={21} /></div>
+                  <div className="solo-detail-list">
+                    <div><span>Accepted</span><b>{selectedMiner.shares.toLocaleString()}</b></div>
+                    <div><span>Rejected</span><b>—</b></div>
+                    <div><span>Stale</span><b>—</b></div>
+                    <div><span>Efficiency</span><b>Waiting for detailed bridge fields</b></div>
+                  </div>
+                </div>
+                <div className="solo-detail-panel">
+                  <div className="solo-panel-head"><div><span>QUALITY</span><h3>Share health</h3></div><CheckCircle2 size={21} /></div>
+                  <div className="solo-no-telemetry"><ShieldCheck size={22} /><div><b>No values invented</b><span>Reject/stale metrics will appear only when the paired Community Mining bridge reports them.</span></div></div>
+                </div>
+              </div>
+            )}
+
+            {detailTab === 'blocks' && (
+              <div className="solo-advanced-grid">
+                <div className="solo-detail-panel">
+                  <div className="solo-panel-head"><div><span>BLOCKS</span><h3>Solo mining results</h3></div><Trophy size={21} /></div>
+                  <div className="solo-detail-list">
+                    <div><span>ZKAS blocks</span><b>{selectedMiner.zkasBlocks}</b></div>
+                    <div><span>KAS blocks</span><b>{selectedMiner.kasBlocks}</b></div>
+                    <div><span>Total</span><b>{selectedMiner.zkasBlocks + selectedMiner.kasBlocks}</b></div>
+                    <div><span>KAS reward</span><b>When bridge exposes it</b></div>
+                  </div>
+                </div>
+                <div className="solo-detail-panel">
+                  <div className="solo-panel-head"><div><span>ALERT TEST</span><h3>Preview block alerts</h3></div><BellRing size={21} /></div>
+                  <div className="solo-detail-test-actions">
+                    <button onClick={() => simulateBlock('ZKAS', selectedMiner)}><Trophy size={16} /> Test ZKAS</button>
+                    <button onClick={() => simulateBlock('KAS', selectedMiner)}><Coins size={16} /> Test KAS</button>
+                  </div>
+                  <p className="solo-muted solo-detail-caption">Simulation only. Real counters are never changed by these buttons.</p>
+                </div>
+              </div>
+            )}
+
+            {detailTab === 'hardware' && (
+              <div className="solo-advanced-grid">
+                <div className="solo-detail-panel">
+                  <div className="solo-panel-head"><div><span>ASIC HEALTH</span><h3>{selectedMiner.mode === 'local' ? 'Read-only hardware telemetry' : 'Optional hardware monitoring'}</h3></div><Thermometer size={21} /></div>
+                  {selectedMiner.mode === 'local' ? (
+                    <div className="solo-health-gauges">
+                      <div><Thermometer size={18} /><span>Temperature</span><b>{selectedMiner.temp ?? '—'}{selectedMiner.temp !== null ? '°C' : ''}</b></div>
+                      <div><Fan size={18} /><span>Fan</span><b>{selectedMiner.fan === null ? '—' : `${selectedMiner.fan.toLocaleString()} RPM`}</b></div>
+                    </div>
+                  ) : (
+                    <div className="solo-no-telemetry"><ShieldCheck size={22} /><div><b>No local agent required</b><span>Basic and rental miners can use all core Solo Alert features without temperature or fan access.</span></div></div>
+                  )}
+                </div>
+                <div className="solo-detail-panel">
+                  <div className="solo-panel-head"><div><span>HOST HEALTH</span><h3>Optional bridge PC telemetry</h3></div><Cpu size={21} /></div>
+                  <div className="solo-detail-list">
+                    <div><span>CPU</span><b>Optional agent</b></div>
+                    <div><span>RAM</span><b>Optional agent</b></div>
+                    <div><span>Disk</span><b>Optional agent</b></div>
+                    <div><span>Node sync</span><b>Planned</b></div>
+                  </div>
+                </div>
+              </div>
+            )}
           </section>
         </div>
       )}
