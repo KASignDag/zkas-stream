@@ -234,3 +234,11 @@
 .solo-trend-placeholder svg{color:#2ec9aa}.solo-trend-placeholder b{color:var(--text);font-size:15px}.solo-trend-placeholder span{max-width:420px;line-height:1.45;font-size:12px}
 .solo-detail-caption{margin-top:14px}
 @media(max-width:760px){.solo-advanced-grid,.solo-trends-layout{grid-template-columns:1fr}.solo-advanced-modal{width:96vw}.solo-detail-tabs{margin-left:-4px;margin-right:-4px;padding-left:4px;padding-right:4px}}
+
+.solo-private-details-button{display:inline-flex;align-items:center;gap:8px;margin-top:13px;border:1px solid rgba(43,205,172,.28);border-radius:11px;padding:10px 13px;background:rgba(43,205,172,.08);color:#2ec9aa;font-weight:850;cursor:pointer}
+.solo-trends-wrap{display:grid;gap:12px}
+.solo-range-tabs{display:flex;gap:7px;flex-wrap:wrap}.solo-range-tabs button{border:1px solid var(--line);border-radius:999px;padding:7px 11px;background:var(--panel-soft);color:var(--muted);font-size:11px;font-weight:850;cursor:pointer}.solo-range-tabs button.active{background:rgba(43,205,172,.12);border-color:rgba(43,205,172,.42);color:#2ec9aa}
+.solo-real-chart{height:210px;border:1px solid var(--line);border-radius:14px;background:rgba(255,255,255,.02);padding:10px}
+.solo-real-chart svg{display:block;width:100%;height:100%}.solo-real-chart polyline{stroke:#39d8b7;stroke-width:3;stroke-linejoin:round;stroke-linecap:round}
+.solo-real-chart.shares polyline{stroke:#70d3ff}
+.solo-history-note{display:flex;align-items:flex-start;gap:8px;padding:10px 12px;border-radius:11px;background:rgba(43,205,172,.06);color:var(--muted);font-size:11px}.solo-history-note svg{color:#2ec9aa;flex:0 0 auto}
