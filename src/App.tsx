@@ -1510,7 +1510,7 @@ function MergedIntelligencePage({ data }: { data: DashboardData }) {
         <div>
           <span className="community-tool-label">Community tool</span>
           <b>Kaspa + ZKAS mining calculator</b>
-          <span>Explore an independent community tool with an earnings calculator and mining charts.</span>
+          <span>Estimate how much more you could earn by mining $KAS and $ZKAS together.</span>
         </div>
         <a href="https://zkas-mining.web.app" target="_blank" rel="noreferrer">Open calculator <ExternalLink size={16} /></a>
       </section>
