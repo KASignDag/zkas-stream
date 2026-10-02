@@ -1509,10 +1509,11 @@ function MergedIntelligencePage({ data }: { data: DashboardData }) {
       <div className="privacy-callout"><GitMerge size={21} /><div><b>Merged-mining evidence + solo estimates, kept separate</b><span>Block attribution links observed merge-mined blocks to Kaspa payout attribution; the peer co-location probe is supporting evidence. The solo calculator is probability math based on the hashrate you enter and live public network estimates—it does not identify or monitor any specific miner.</span></div></div>
       <section className="community-mining-tool">
         <div>
-          <b>Community merged-mining calculator</b>
-          <span>Explore an independent community tool with a Kaspa + ZKAS earnings calculator and mining charts.</span>
+          <span className="community-tool-label">Community tool</span>
+          <b>Kaspa + ZKAS mining calculator</b>
+          <span>Explore an independent community tool with an earnings calculator and mining charts.</span>
         </div>
-        <a href="https://zkas-mining.web.app" target="_blank" rel="noreferrer">Open community tool <ExternalLink size={15} /></a>
+        <a href="https://zkas-mining.web.app" target="_blank" rel="noreferrer">Open calculator <ExternalLink size={16} /></a>
       </section>
       <div className="metric-grid mining-metrics attribution-metrics">
         <MetricCard icon={<Boxes size={19} />} label="Attributed blocks" value={displayNumber(matched, true)} sub="Deduplicated public pipeline" accent />
