@@ -647,6 +647,18 @@ footer { width: min(1320px, calc(100% - 40px)); margin: 0 auto; padding: 22px 0 
 .privacy-callout svg { color: var(--accent); flex: 0 0 auto; }
 .privacy-callout b { display: block; font-size: 13px; }
 .privacy-callout span { display: block; margin-top: 4px; color: var(--muted); font-size: 11px; line-height: 1.5; }
+.community-mining-tool { display: flex; align-items: center; justify-content: space-between; gap: 18px; padding: 16px 18px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface); }
+.community-mining-tool > div { min-width: 0; }
+.community-mining-tool b { display: block; font-size: 14px; }
+.community-mining-tool span { display: block; margin-top: 4px; color: var(--muted); font-size: 12px; line-height: 1.5; }
+.community-mining-tool a { display: inline-flex; flex: 0 0 auto; align-items: center; justify-content: center; gap: 8px; min-height: 42px; padding: 0 15px; border: 1px solid color-mix(in srgb, var(--accent) 38%, var(--border)); border-radius: 10px; background: var(--accent-soft); color: var(--accent); font-size: 12px; font-weight: 850; text-decoration: none; }
+.community-mining-tool a:hover { border-color: var(--accent); }
+.community-mining-tool a:focus-visible { outline: 3px solid color-mix(in srgb, var(--accent) 36%, transparent); outline-offset: 2px; }
+@media (max-width: 620px) {
+  .community-mining-tool { align-items: stretch; flex-direction: column; gap: 12px; }
+  .community-mining-tool a { width: 100%; }
+}
+
 .segmented { display: inline-flex; padding: 3px; border: 1px solid var(--border); border-radius: 9px; background: var(--surface-2); }
 .segmented button { border: 0; background: transparent; color: var(--muted); padding: 7px 10px; border-radius: 6px; cursor: pointer; font-size: 11px; font-weight: 800; }
 .segmented button.on { background: var(--surface); color: var(--accent); box-shadow: 0 1px 4px rgba(0,0,0,.06); }
