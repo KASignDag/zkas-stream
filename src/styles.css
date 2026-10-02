@@ -658,7 +658,7 @@ footer { width: min(1320px, calc(100% - 40px)); margin: 0 auto; padding: 22px 0 
 @media (max-width: 620px) {
   .community-mining-tool { align-items: stretch; flex-direction: column; gap: 15px; padding: 18px; }
   .community-mining-tool a { width: 100%; }
-}}
+}
 
 .segmented { display: inline-flex; padding: 3px; border: 1px solid var(--border); border-radius: 9px; background: var(--surface-2); }
 .segmented button { border: 0; background: transparent; color: var(--muted); padding: 7px 10px; border-radius: 6px; cursor: pointer; font-size: 11px; font-weight: 800; }
