@@ -647,17 +647,18 @@ footer { width: min(1320px, calc(100% - 40px)); margin: 0 auto; padding: 22px 0 
 .privacy-callout svg { color: var(--accent); flex: 0 0 auto; }
 .privacy-callout b { display: block; font-size: 13px; }
 .privacy-callout span { display: block; margin-top: 4px; color: var(--muted); font-size: 11px; line-height: 1.5; }
-.community-mining-tool { display: flex; align-items: center; justify-content: space-between; gap: 18px; padding: 16px 18px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface); }
+.community-mining-tool { display: flex; align-items: center; justify-content: space-between; gap: 22px; padding: 21px 24px; border: 1px solid color-mix(in srgb, var(--accent) 44%, var(--border)); border-left: 5px solid var(--accent); border-radius: 14px; background: linear-gradient(110deg, color-mix(in srgb, var(--accent-soft) 74%, var(--surface)), var(--surface) 76%); box-shadow: 0 8px 24px color-mix(in srgb, var(--accent) 10%, transparent); }
 .community-mining-tool > div { min-width: 0; }
-.community-mining-tool b { display: block; font-size: 14px; }
-.community-mining-tool span { display: block; margin-top: 4px; color: var(--muted); font-size: 12px; line-height: 1.5; }
-.community-mining-tool a { display: inline-flex; flex: 0 0 auto; align-items: center; justify-content: center; gap: 8px; min-height: 42px; padding: 0 15px; border: 1px solid color-mix(in srgb, var(--accent) 38%, var(--border)); border-radius: 10px; background: var(--accent-soft); color: var(--accent); font-size: 12px; font-weight: 850; text-decoration: none; }
-.community-mining-tool a:hover { border-color: var(--accent); }
-.community-mining-tool a:focus-visible { outline: 3px solid color-mix(in srgb, var(--accent) 36%, transparent); outline-offset: 2px; }
+.community-tool-label { display: inline-flex; width: fit-content; align-items: center; margin-bottom: 7px; padding: 4px 8px; border-radius: 999px; background: color-mix(in srgb, var(--accent) 15%, var(--surface)); color: var(--accent); font-size: 10px !important; font-weight: 900; letter-spacing: .09em; line-height: 1.2; text-transform: uppercase; }
+.community-mining-tool b { display: block; font-size: 17px; }
+.community-mining-tool span:not(.community-tool-label) { display: block; margin-top: 5px; color: var(--muted); font-size: 13px; line-height: 1.5; }
+.community-mining-tool a { display: inline-flex; flex: 0 0 auto; align-items: center; justify-content: center; gap: 9px; min-height: 48px; padding: 0 18px; border: 1px solid var(--accent); border-radius: 11px; background: var(--accent); color: #062018; font-size: 13px; font-weight: 900; text-decoration: none; box-shadow: 0 4px 12px color-mix(in srgb, var(--accent) 22%, transparent); transition: transform .16s ease, filter .16s ease, box-shadow .16s ease; }
+.community-mining-tool a:hover { filter: brightness(1.04); transform: translateY(-1px); box-shadow: 0 7px 16px color-mix(in srgb, var(--accent) 28%, transparent); }
+.community-mining-tool a:focus-visible { outline: 3px solid color-mix(in srgb, var(--accent) 45%, transparent); outline-offset: 3px; }
 @media (max-width: 620px) {
-  .community-mining-tool { align-items: stretch; flex-direction: column; gap: 12px; }
+  .community-mining-tool { align-items: stretch; flex-direction: column; gap: 15px; padding: 18px; }
   .community-mining-tool a { width: 100%; }
-}
+}}
 
 .segmented { display: inline-flex; padding: 3px; border: 1px solid var(--border); border-radius: 9px; background: var(--surface-2); }
 .segmented button { border: 0; background: transparent; color: var(--muted); padding: 7px 10px; border-radius: 6px; cursor: pointer; font-size: 11px; font-weight: 800; }
