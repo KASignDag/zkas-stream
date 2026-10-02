@@ -1506,7 +1506,6 @@ function MergedIntelligencePage({ data }: { data: DashboardData }) {
   const mergedNodes = data.merged.nodes.filter((n) => n.kaspaDetected);
   return (
     <section className="page-stack">
-      <div className="privacy-callout"><GitMerge size={21} /><div><b>Merged-mining evidence + solo estimates, kept separate</b><span>Block attribution links observed merge-mined blocks to Kaspa payout attribution; the peer co-location probe is supporting evidence. The solo calculator is probability math based on the hashrate you enter and live public network estimates—it does not identify or monitor any specific miner.</span></div></div>
       <section className="community-mining-tool">
         <div>
           <span className="community-tool-label">Community tool</span>
@@ -1515,6 +1514,8 @@ function MergedIntelligencePage({ data }: { data: DashboardData }) {
         </div>
         <a href="https://zkas-mining.web.app" target="_blank" rel="noreferrer">Open calculator <ExternalLink size={16} /></a>
       </section>
+      <div className="privacy-callout"><GitMerge size={21} /><div><b>Merged-mining evidence + solo estimates, kept separate</b><span>Block attribution links observed merge-mined blocks to Kaspa payout attribution; the peer co-location probe is supporting evidence. The solo calculator is probability math based on the hashrate you enter and live public network estimates—it does not identify or monitor any specific miner.</span></div></div>
+
       <div className="metric-grid mining-metrics attribution-metrics">
         <MetricCard icon={<Boxes size={19} />} label="Attributed blocks" value={displayNumber(matched, true)} sub="Deduplicated public pipeline" accent />
         <MetricCard icon={<GitMerge size={19} />} label="Attribution groups" value={displayNumber(groups.length || null)} sub="Unique payout groupings" />
