@@ -1,0 +1,996 @@
+import { useEffect, useMemo, useRef, useState } from 'react';
+import {
+  Activity, Bell, BellRing, CheckCircle2, Coins, Cpu, Fan, Gauge, MessageCircle, RadioTower,
+  Send, ShieldCheck, Thermometer, Trophy, Wifi, WifiOff, X, Zap
+} from 'lucide-react';
+import './solo-alert-preview.css';
+
+type AlertChannel = 'browser' | 'telegram' | 'discord';
+type MinerMode = 'basic' | 'local' | 'rental';
+type Chain = 'ZKAS' | 'KAS';
+type DetailTab = 'overview' | 'trends' | 'shares' | 'blocks' | 'hardware';
+type HistoryRange = '1h' | '6h' | '24h' | '7d';
+
+type PreviewMiner = {
+  name: string;
+  worker: string;
+  mode: MinerMode;
+  status: 'online' | 'offline';
+  hashrate: string;
+  temp: number | null;
+  fan: number | null;
+  shares: number;
+  uptime: string;
+  zkasBlocks: number;
+  kasBlocks: number;
+  lastSeen: string;
+};
+
+type BlockCelebration = {
+  chain: Chain;
+  worker: string;
+  hash: string;
+  reward: string | null;
+  time: string;
+};
+
+type BlockHistoryEvent = BlockCelebration & {
+  id: string;
+  source: 'live' | 'simulation';
+  channels: AlertChannel[];
+};
+
+type CommunityMiningRow = {
+  alias: string;
+  status: 'online' | 'offline';
+  hashrateHps: number | null;
+  uptimeSeconds: number | null;
+  acceptedShares: number | null;
+  zkasBlocks: number | null;
+  kasBlocks: number | null;
+  lastSeenAt?: number | null;
+};
+
+type CommunityMiningSnapshot = {
+  updatedAt: number | null;
+  gatewayOnline: boolean;
+  miners: CommunityMiningRow[];
+  lifetimeZkasBlocks: number;
+  lifetimeKasBlocks: number;
+};
+
+type SoloHistoryPoint = {
+  t: number;
+  h: number | null;
+  a: number | null;
+  i: number | null;
+  s: number | null;
+  z: number | null;
+  k: number | null;
+  u: number | null;
+  c: number | null;
+  f: number | null;
+};
+
+type NotificationReadiness = {
+  browser: 'ready' | 'needs-permission';
+};
+
+type DeviceKind = 'ios' | 'android' | 'windows' | 'other';
+
+function detectDeviceKind(): DeviceKind {
+  const ua = navigator.userAgent || '';
+  if (/iPhone|iPad|iPod/i.test(ua) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)) return 'ios';
+  if (/Android/i.test(ua)) return 'android';
+  if (/Windows/i.test(ua)) return 'windows';
+  return 'other';
+}
+
+function isStandaloneWebApp() {
+  const nav = navigator as Navigator & { standalone?: boolean };
+  return window.matchMedia?.('(display-mode: standalone)').matches || nav.standalone === true;
+}
+
+const demoMiners: PreviewMiner[] = [
+  {
+    name: 'IceRiver KS0 Ultra',
+    worker: 'KSOPRO',
+    mode: 'local',
+    status: 'online',
+    hashrate: '359 GH/s',
+    temp: 61,
+    fan: 2870,
+    shares: 60,
+    uptime: '12h 42m',
+    zkasBlocks: 0,
+    kasBlocks: 0,
+    lastSeen: '8 sec ago',
+  },
+  {
+    name: 'Rental hashrate',
+    worker: 'MRR-RENTAL-01',
+    mode: 'rental',
+    status: 'online',
+    hashrate: '1.25 TH/s',
+    temp: null,
+    fan: null,
+    shares: 184,
+    uptime: '6h 18m',
+    zkasBlocks: 0,
+    kasBlocks: 0,
+    lastSeen: '8 sec ago',
+  },
+];
+
+function formatHashrate(hps: number | null) {
+  if (hps === null || !Number.isFinite(hps) || hps <= 0) return '—';
+  const units = ['H/s', 'KH/s', 'MH/s', 'GH/s', 'TH/s', 'PH/s'];
+  let value = hps;
+  let index = 0;
+  while (value >= 1000 && index < units.length - 1) {
+    value /= 1000;
+    index += 1;
+  }
+  const digits = value >= 100 ? 0 : value >= 10 ? 1 : 2;
+  return `${value.toFixed(digits)} ${units[index]}`;
+}
+
+function formatUptime(seconds: number | null) {
+  if (seconds === null || !Number.isFinite(seconds) || seconds < 0) return '—';
+  const whole = Math.floor(seconds);
+  const d = Math.floor(whole / 86400);
+  const h = Math.floor((whole % 86400) / 3600);
+  const m = Math.floor((whole % 3600) / 60);
+  if (d) return `${d}d ${h}h`;
+  if (h) return `${h}h ${m}m`;
+  return `${m}m`;
+}
+
+function ageLabel(timestamp: number | null | undefined) {
+  if (!timestamp) return 'unknown';
+  const ms = timestamp < 10_000_000_000 ? timestamp * 1000 : timestamp;
+  const seconds = Math.max(0, Math.floor((Date.now() - ms) / 1000));
+  if (seconds < 60) return `${seconds}s ago`;
+  if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`;
+  return `${Math.floor(seconds / 3600)}h ago`;
+}
+
+function telemetryAgeMs(timestamp: number | null | undefined) {
+  if (!timestamp) return Number.POSITIVE_INFINITY;
+  const ms = timestamp < 10_000_000_000 ? timestamp * 1000 : timestamp;
+  return Math.max(0, Date.now() - ms);
+}
+
+function chartPolyline(points: Array<number | null>, width = 520, height = 180) {
+  const finite = points.map((value, index) => ({ value, index })).filter((row): row is { value: number; index: number } => typeof row.value === 'number' && Number.isFinite(row.value));
+  if (finite.length < 2) return '';
+  const min = Math.min(...finite.map((row) => row.value));
+  const max = Math.max(...finite.map((row) => row.value));
+  const span = Math.max(1, max - min);
+  const maxIndex = Math.max(1, points.length - 1);
+  return finite.map((row) => {
+    const x = (row.index / maxIndex) * width;
+    const y = height - ((row.value - min) / span) * (height - 18) - 9;
+    return `${x.toFixed(1)},${y.toFixed(1)}`;
+  }).join(' ');
+}
+
+export function SoloAlertPreview() {
+  const [channels, setChannels] = useState<Record<AlertChannel, boolean>>({
+    browser: true,
+    telegram: true,
+    discord: true,
+  });
+  const [browserState, setBrowserState] = useState<'idle' | 'granted' | 'denied'>('idle');
+  const [threshold, setThreshold] = useState(70);
+  const [offlineMinutes, setOfflineMinutes] = useState(3);
+  const [selectedMiner, setSelectedMiner] = useState<PreviewMiner | null>(null);
+  const [detailTab, setDetailTab] = useState<DetailTab>('overview');
+  const [historyRange, setHistoryRange] = useState<HistoryRange>('1h');
+  const [privateHistory, setPrivateHistory] = useState<SoloHistoryPoint[]>([]);
+  const [celebration, setCelebration] = useState<BlockCelebration | null>(null);
+  const [blockHistory, setBlockHistory] = useState<BlockHistoryEvent[]>([]);
+  const [liveSnapshot, setLiveSnapshot] = useState<CommunityMiningSnapshot | null>(null);
+  const [liveError, setLiveError] = useState<string | null>(null);
+  const [readiness, setReadiness] = useState<NotificationReadiness>({
+    browser: typeof Notification !== 'undefined' && Notification.permission === 'granted' ? 'ready' : 'needs-permission',
+  });
+  const [deviceKind] = useState<DeviceKind>(() => detectDeviceKind());
+  const [standalone] = useState(() => isStandaloneWebApp());
+  const [iosAlertHelpOpen, setIosAlertHelpOpen] = useState(false);
+  const [pairingOpen, setPairingOpen] = useState(false);
+  const [pairingStep, setPairingStep] = useState<1 | 2 | 3>(1);
+  const [pairingMode, setPairingMode] = useState<MinerMode>('basic');
+  const [pairingName, setPairingName] = useState('');
+  const [pairingCode, setPairingCode] = useState('');
+  const [pairingBusy, setPairingBusy] = useState(false);
+  const [pairingError, setPairingError] = useState<string | null>(null);
+  const [privateDashboardToken, setPrivateDashboardToken] = useState(() => window.localStorage.getItem('zkas-solo-dashboard-token') || '');
+  const [privateTelemetry, setPrivateTelemetry] = useState<any>(null);
+  const previousBlocksRef = useRef<Record<string, { zkas: number; kas: number }> | null>(null);
+
+  const enabledCount = useMemo(() => Object.values(channels).filter(Boolean).length, [channels]);
+
+  const liveMiners = useMemo<PreviewMiner[]>(() => {
+    if (!liveSnapshot?.miners?.length) return demoMiners;
+    return liveSnapshot.miners.map((miner) => ({
+      name: miner.alias,
+      worker: miner.alias,
+      mode: 'basic',
+      status: miner.status,
+      hashrate: formatHashrate(miner.hashrateHps),
+      temp: null,
+      fan: null,
+      shares: Math.max(0, Math.floor(miner.acceptedShares ?? 0)),
+      uptime: formatUptime(miner.uptimeSeconds),
+      zkasBlocks: Math.max(0, Math.floor(miner.zkasBlocks ?? 0)),
+      kasBlocks: Math.max(0, Math.floor(miner.kasBlocks ?? 0)),
+      lastSeen: ageLabel(miner.lastSeenAt ?? liveSnapshot.updatedAt),
+    }));
+  }, [liveSnapshot]);
+
+  const totalShares = useMemo(() => liveMiners.reduce((sum, miner) => sum + miner.shares, 0), [liveMiners]);
+  const totalBlocks = (liveSnapshot?.lifetimeZkasBlocks ?? 0) + (liveSnapshot?.lifetimeKasBlocks ?? 0);
+  const onlineMiners = liveMiners.filter((miner) => miner.status === 'online').length;
+
+  useEffect(() => {
+    let stopped = false;
+    let timer = 0;
+
+    async function refresh() {
+      try {
+        const response = await fetch('/api/community-mining?gateway=community-107', { cache: 'no-store' });
+        if (!response.ok) throw new Error(`Live telemetry returned HTTP ${response.status}`);
+        const snapshot = await response.json() as CommunityMiningSnapshot;
+        if (stopped) return;
+
+        const previous = previousBlocksRef.current;
+        const next: Record<string, { zkas: number; kas: number }> = {};
+        for (const miner of snapshot.miners ?? []) {
+          const zkas = Math.max(0, Math.floor(miner.zkasBlocks ?? 0));
+          const kas = Math.max(0, Math.floor(miner.kasBlocks ?? 0));
+          next[miner.alias] = { zkas, kas };
+          const prior = previous?.[miner.alias];
+          if (prior && zkas > prior.zkas) {
+            recordBlockEvent({
+              chain: 'ZKAS',
+              worker: miner.alias,
+              hash: `live-event-${miner.alias}-zkas-${zkas}`,
+              reward: null,
+              time: new Date().toLocaleTimeString(),
+            }, 'live');
+          } else if (prior && kas > prior.kas) {
+            recordBlockEvent({
+              chain: 'KAS',
+              worker: miner.alias,
+              hash: `live-event-${miner.alias}-kas-${kas}`,
+              reward: 'Reward shown when bridge exposes it',
+              time: new Date().toLocaleTimeString(),
+            }, 'live');
+          }
+        }
+        previousBlocksRef.current = next;
+        setLiveSnapshot(snapshot);
+        setLiveError(null);
+      } catch (error) {
+        if (!stopped) setLiveError(error instanceof Error ? error.message : 'Live telemetry unavailable');
+      }
+    }
+
+    void refresh();
+    timer = window.setInterval(refresh, 15000);
+    return () => {
+      stopped = true;
+      window.clearInterval(timer);
+    };
+  }, []);
+
+  function toggle(channel: AlertChannel) {
+    setChannels((current) => ({ ...current, [channel]: !current[channel] }));
+  }
+
+  async function createPairing() {
+    setPairingBusy(true);
+    setPairingError(null);
+    try {
+      const response = await fetch('/api/solo-pairing?action=create', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ mode: pairingMode }),
+      });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result?.error || 'Could not create pairing code');
+      setPairingCode(result.pairingCode);
+      setPrivateDashboardToken(result.dashboardToken);
+      window.localStorage.setItem('zkas-solo-dashboard-token', result.dashboardToken);
+      setPairingStep(3);
+    } catch (error) {
+      setPairingError(error instanceof Error ? error.message : 'Could not create pairing code');
+    } finally {
+      setPairingBusy(false);
+    }
+  }
+
+  useEffect(() => {
+    if (!privateDashboardToken) return;
+    let stopped = false;
+    let timer = 0;
+    async function refreshPrivate() {
+      try {
+        const response = await fetch(`/api/solo-telemetry?range=${historyRange}`, {
+          headers: { Authorization: `Bearer ${privateDashboardToken}` },
+          cache: 'no-store',
+        });
+        if (!response.ok) return;
+        const result = await response.json();
+        if (!stopped) {
+          setPrivateTelemetry(result);
+          setPrivateHistory(Array.isArray(result.history) ? result.history : []);
+        }
+      } catch {}
+    }
+    void refreshPrivate();
+    timer = window.setInterval(refreshPrivate, 15000);
+    return () => {
+      stopped = true;
+      window.clearInterval(timer);
+    };
+  }, [privateDashboardToken, historyRange]);
+
+  function recordBlockEvent(event: BlockCelebration, source: 'live' | 'simulation') {
+    const activeChannels = (Object.entries(channels) as Array<[AlertChannel, boolean]>)
+      .filter(([, enabled]) => enabled)
+      .map(([channel]) => channel);
+    setCelebration(event);
+    setBlockHistory((current) => [{
+      ...event,
+      id: `${Date.now()}-${event.chain}-${event.worker}-${Math.random().toString(16).slice(2)}`,
+      source,
+      channels: activeChannels,
+    }, ...current].slice(0, 25));
+  }
+
+  function simulateBlock(chain: Chain, miner = demoMiners[0]) {
+    const suffix = Math.random().toString(16).slice(2, 14).padEnd(12, '0');
+    recordBlockEvent({
+      chain,
+      worker: miner.worker,
+      hash: `${chain.toLowerCase()}-preview-${suffix}`,
+      reward: chain === 'KAS' ? 'Reward shown when bridge exposes it' : null,
+      time: new Date().toLocaleTimeString(),
+    }, 'simulation');
+  }
+
+  async function testBrowserAlert() {
+    if (deviceKind === 'ios' && !isStandaloneWebApp()) {
+      setBrowserState('denied');
+      setReadiness((current) => ({ ...current, browser: 'needs-permission' }));
+      setIosAlertHelpOpen(true);
+      return;
+    }
+    if (typeof Notification === 'undefined') {
+      setBrowserState('denied');
+      setReadiness((current) => ({ ...current, browser: 'needs-permission' }));
+      return;
+    }
+    const permission = Notification.permission === 'default'
+      ? await Notification.requestPermission()
+      : Notification.permission;
+    setBrowserState(permission === 'granted' ? 'granted' : 'denied');
+    setReadiness((current) => ({ ...current, browser: permission === 'granted' ? 'ready' : 'needs-permission' }));
+    if (permission === 'granted') {
+      new Notification('ZKAS Solo Alert test', {
+        body: 'KSOPRO Solo Alert test · notification permission is working',
+      });
+    }
+  }
+
+  return (
+    <div className="solo-alert-preview">
+      <section className="solo-preview-banner">
+        <div>
+          <span className="solo-preview-kicker"><ShieldCheck size={16} /> COMMUNITY MINER PREVIEW · BUILD 09-29B</span>
+          <h2>ZKAS Solo Alert</h2>
+          <p>One dashboard for solo miners: live status, hashrate, shares, block alerts and optional ASIC health telemetry from a local read-only agent.</p>
+        </div>
+        <div className="solo-preview-live"><span /> Preview only · current mining page unchanged</div>
+      </section>
+
+      <section className="solo-section solo-device-test">
+        <div className="solo-section-head">
+          <div><span>DEVICE TEST</span><h3>Test Solo Alert on this device</h3></div>
+          <span className="solo-device-pill">{deviceKind === 'ios' ? 'iPhone / iPad' : deviceKind === 'android' ? 'Android' : deviceKind === 'windows' ? 'Windows' : 'Browser'}</span>
+        </div>
+        <div className="solo-device-grid">
+          <div className="solo-device-check">
+            <CheckCircle2 size={18} />
+            <div><b>Dashboard access</b><span>Ready — the private Solo Alert dashboard works in this browser.</span></div>
+          </div>
+          <div className="solo-device-check">
+            {deviceKind === 'ios' && !standalone ? <RadioTower size={18} /> : <CheckCircle2 size={18} />}
+            <div>
+              <b>Background alerts</b>
+              {deviceKind === 'ios' && !standalone
+                ? <span>Add ZKAS.stream to your Home Screen first, then open it from the new icon before enabling web-push alerts.</span>
+                : <span>{deviceKind === 'ios' ? 'Home Screen web app detected.' : 'This device can use browser notification support when web push is enabled.'}</span>}
+            </div>
+          </div>
+          <div className="solo-device-check">
+            <ShieldCheck size={18} />
+            <div><b>No mining PC required for viewing</b><span>Community Mining users can view their dashboard from this device. A local PC/agent is only needed for optional local ASIC health telemetry.</span></div>
+          </div>
+        </div>
+        {deviceKind === 'ios' && !standalone && (
+          <div className="solo-ios-steps">
+            <b>iPhone / iPad test:</b>
+            <span>Safari → Share → Add to Home Screen → Open the ZKAS.stream icon → return to Solo Alert.</span>
+          </div>
+        )}
+        <div className="solo-device-actions">
+          <button onClick={() => void testBrowserAlert()}><BellRing size={16} /> {deviceKind === 'ios' && !standalone ? 'Enable iPhone alerts' : 'Test notification permission'}</button>
+          <button onClick={() => simulateBlock('ZKAS')}><Trophy size={16} /> Test block screen</button>
+          <button onClick={() => { setPairingStep(1); setPairingOpen(true); }}><RadioTower size={16} /> Test pairing</button>
+        </div>
+      </section>
+
+      {!privateTelemetry?.paired && (
+        <section className="solo-section solo-setup-section solo-get-started">
+          <div className="solo-get-started-copy">
+            <span className="solo-preview-kicker"><RadioTower size={16} /> COMMUNITY SOLO ALERT</span>
+            <h3>Connect your miner</h3>
+            <p>One simple setup handles Basic, Local ASIC, and Rental / Remote miners. ASIC temperature and fan monitoring stays optional.</p>
+          </div>
+          <button className="solo-get-started-button" onClick={() => { setPairingStep(1); setPairingOpen(true); }}>
+            <RadioTower size={20} />
+            Pair a miner
+          </button>
+        </section>
+      )}
+
+      {privateTelemetry?.paired && (
+        <section className={`solo-section solo-private-feed ${!privateTelemetry.telemetry ? 'waiting' : telemetryAgeMs(privateTelemetry.telemetry.updatedAt) > 120000 ? 'stale' : 'live'}`}>
+          <div className="solo-section-head">
+            <div><span>MY PRIVATE SOLO ALERT</span><h3>{privateTelemetry.profile?.name || 'Paired miner'}</h3></div>
+            {!privateTelemetry.telemetry && <span className="solo-status-pill waiting"><RadioTower size={14} /> WAITING FOR FIRST REPORT</span>}
+            {privateTelemetry.telemetry && telemetryAgeMs(privateTelemetry.telemetry.updatedAt) <= 120000 && <span className="solo-status-pill online"><Wifi size={14} /> LIVE</span>}
+            {privateTelemetry.telemetry && telemetryAgeMs(privateTelemetry.telemetry.updatedAt) > 120000 && <span className="solo-status-pill offline"><WifiOff size={14} /> STALE / OFFLINE</span>}
+          </div>
+
+          {!privateTelemetry.telemetry ? (
+            <div className="solo-private-waiting">
+              <RadioTower size={23} />
+              <div><b>Paired successfully — waiting for Dual Alert</b><span>Leave Dual Alert running locally. The first sanitized telemetry report will appear here automatically.</span></div>
+            </div>
+          ) : (
+            <>
+              <div className="solo-block-center-grid">
+                <div className="solo-block-stat"><span>WORKER</span><b>{privateTelemetry.telemetry.worker || '—'}</b><small>Paired Dual Alert source</small></div>
+                <div className="solo-block-stat"><span>HASHRATE</span><b>{formatHashrate(privateTelemetry.telemetry.hashrateHps)}</b><small>Read-only telemetry</small></div>
+                <div className="solo-block-stat"><span>SHARES</span><b>{Math.floor(privateTelemetry.telemetry.acceptedShares || 0).toLocaleString()}</b><small>Accepted shares</small></div>
+                <div className="solo-block-stat"><span>BLOCKS</span><b>{Math.floor((privateTelemetry.telemetry.zkasBlocks || 0) + (privateTelemetry.telemetry.kasBlocks || 0)).toLocaleString()}</b><small>ZKAS + KAS</small></div>
+              </div>
+              <div className="solo-private-meta">
+                <span>Last report: <b>{ageLabel(privateTelemetry.telemetry.updatedAt)}</b></span>
+                <span>Source: <b>{privateTelemetry.telemetry.source || 'dual-alert'}</b></span>
+                <span>Mode: <b>{privateTelemetry.profile?.mode || 'basic'}</b></span>
+              </div>
+              <button
+                className="solo-private-details-button"
+                onClick={() => {
+                  setDetailTab('overview');
+                  setSelectedMiner({
+                    name: privateTelemetry.profile?.name || privateTelemetry.telemetry.worker || 'Paired miner',
+                    worker: privateTelemetry.telemetry.worker || privateTelemetry.profile?.name || 'Paired miner',
+                    mode: (privateTelemetry.profile?.mode || 'basic') as MinerMode,
+                    status: privateTelemetry.telemetry.status === 'offline' ? 'offline' : 'online',
+                    hashrate: formatHashrate(privateTelemetry.telemetry.hashrateHps),
+                    temp: privateTelemetry.telemetry.temperatureC ?? null,
+                    fan: privateTelemetry.telemetry.fanRpm ?? null,
+                    shares: Math.max(0, Math.floor(privateTelemetry.telemetry.acceptedShares || 0)),
+                    uptime: formatUptime(privateTelemetry.telemetry.uptimeSeconds),
+                    zkasBlocks: Math.max(0, Math.floor(privateTelemetry.telemetry.zkasBlocks || 0)),
+                    kasBlocks: Math.max(0, Math.floor(privateTelemetry.telemetry.kasBlocks || 0)),
+                    lastSeen: ageLabel(privateTelemetry.telemetry.updatedAt),
+                  });
+                }}
+              >
+                <Activity size={17} /> Open advanced miner details
+              </button>
+              {telemetryAgeMs(privateTelemetry.telemetry.updatedAt) > 120000 && (
+                <div className="solo-private-warning"><WifiOff size={17} /><span>No telemetry report has arrived for over 2 minutes. Block/share data shown above may be stale.</span></div>
+              )}
+            </>
+          )}
+        </section>
+      )}
+
+      <section className="solo-hero-grid">
+        <article className="solo-hero-card primary">
+          <div className="solo-card-icon"><RadioTower size={24} /></div>
+          <div><span>Connected miners</span><b>{onlineMiners} / {liveMiners.length}</b><small>{liveSnapshot ? 'Live Community Bridge telemetry' : 'Preview data until live feed connects'}</small></div>
+        </article>
+        <article className="solo-hero-card">
+          <div className="solo-card-icon"><Gauge size={24} /></div>
+          <div><span>Accepted shares</span><b>{totalShares.toLocaleString()}</b><small>Live bridge-reported total</small></div>
+        </article>
+        <article className="solo-hero-card">
+          <div className="solo-card-icon"><BellRing size={24} /></div>
+          <div><span>Alert channels</span><b>{enabledCount} enabled</b><small>Browser · Telegram · Discord</small></div>
+        </article>
+        <article className="solo-hero-card solo-block-card">
+          <div className="solo-card-icon"><Zap size={24} /></div>
+          <div><span>Blocks found</span><b>{totalBlocks.toLocaleString()}</b><small>ZKAS + KAS lifetime counters</small></div>
+          <button className="solo-mini-action" onClick={() => simulateBlock('ZKAS')}>Test block</button>
+        </article>
+      </section>
+
+      <section className="solo-section">
+        <div className="solo-section-head">
+          <div><span>MINERS</span><h3>Community miner fleet</h3></div>
+          <button className="solo-add-button" onClick={() => { setPairingStep(1); setPairingOpen(true); }}>+ Pair miner</button>
+        </div>
+
+        <div className="solo-miner-grid">
+          {liveMiners.map((miner) => {
+            const online = miner.status === 'online';
+            const hasAsicTelemetry = miner.mode === 'local' && miner.temp !== null && miner.fan !== null;
+            return (
+              <article className={`solo-miner-card ${online ? 'online' : 'offline'}`} key={miner.worker}>
+                <div className="solo-miner-top">
+                  <div className="solo-miner-name">
+                    <span className="solo-miner-avatar"><Cpu size={22} /></span>
+                    <div><b>{miner.name}</b><small>{miner.worker}</small></div>
+                  </div>
+                  <span className={`solo-status-pill ${online ? 'online' : 'offline'}`}>
+                    {online ? <Wifi size={14} /> : <WifiOff size={14} />}
+                    {online ? 'ONLINE' : 'OFFLINE'}
+                  </span>
+                </div>
+
+                <div className="solo-hashrate-block">
+                  <span>HASHRATE</span>
+                  <b>{miner.hashrate}</b>
+                  <small>{miner.mode === 'local' ? 'Bridge + optional ASIC telemetry' : 'Bridge telemetry · no ASIC access required'}</small>
+                </div>
+
+                <div className="solo-miner-stats">
+                  {hasAsicTelemetry && <>
+                    <div><Thermometer size={17} /><span>Temperature</span><b>{miner.temp}°C</b></div>
+                    <div><Fan size={17} /><span>Fan speed</span><b>{miner.fan === null ? '—' : `${miner.fan.toLocaleString()} RPM`}</b></div>
+                  </>}
+                  {!hasAsicTelemetry && <div className="solo-telemetry-optional"><ShieldCheck size={17} /><span>ASIC telemetry</span><b>Not required</b></div>}
+                  <div><CheckCircle2 size={17} /><span>Shares</span><b>{miner.shares}</b></div>
+                  <div><RadioTower size={17} /><span>Uptime</span><b>{miner.uptime}</b></div>
+                </div>
+
+                <div className="solo-miner-footer">
+                  <span>{miner.mode === 'local' ? `Bridge + ASIC update ${miner.lastSeen}` : `Bridge update ${miner.lastSeen}`}</span>
+                  <button onClick={() => { setDetailTab('overview'); setSelectedMiner(miner); }}>View details</button>
+                </div>
+              </article>
+            );
+          })}
+        </div>
+      </section>
+
+      <section className="solo-section solo-block-center">
+        <div className="solo-section-head">
+          <div><span>BLOCK CENTER</span><h3>Block alerts & history</h3></div>
+          <div className="solo-block-actions">
+            <button onClick={() => simulateBlock('ZKAS')}><Trophy size={16} /> Simulate ZKAS block</button>
+            <button onClick={() => simulateBlock('KAS')}><Coins size={16} /> Simulate KAS block</button>
+          </div>
+        </div>
+        <div className="solo-block-center-grid">
+          <div className="solo-block-stat">
+            <span>ZKAS BLOCKS</span>
+            <b>{(liveSnapshot?.lifetimeZkasBlocks ?? 0).toLocaleString()}</b>
+            <small>Preserved lifetime counter</small>
+          </div>
+          <div className="solo-block-stat">
+            <span>KAS BLOCKS</span>
+            <b>{(liveSnapshot?.lifetimeKasBlocks ?? 0).toLocaleString()}</b>
+            <small>Preserved lifetime counter</small>
+          </div>
+          <div className="solo-block-stat">
+            <span>LAST BLOCK</span>
+            <b>—</b>
+            <small>No block detected in this preview session</small>
+          </div>
+          <div className="solo-block-stat">
+            <span>ALERT DELIVERY</span>
+            <b>{enabledCount}/3</b>
+            <small>Enabled notification channels</small>
+          </div>
+        </div>
+        <div className={`solo-history-empty ${liveSnapshot ? 'live' : ''}`}>
+          <Activity size={20} />
+          <div>
+            <b>{liveSnapshot ? 'Live Community Bridge feed connected' : 'Connecting to live Community Bridge telemetry'}</b>
+            <span>{liveSnapshot ? `Last update ${ageLabel(liveSnapshot.updatedAt)} · ${liveSnapshot.miners.length} worker records` : (liveError ?? 'Waiting for the first telemetry snapshot.')}</span>
+          </div>
+        </div>
+        {blockHistory.length > 0 && (
+          <div className="solo-event-table" aria-label="Recent Solo Alert events">
+            {blockHistory.map((event) => (
+              <div className="solo-event-row" key={event.id}>
+                <span className={`solo-chain-chip ${event.chain.toLowerCase()}`}>{event.chain}</span>
+                <div className="solo-event-main">
+                  <b>{event.worker}</b>
+                  <small>{event.source === 'live' ? 'Live block counter increase' : 'Preview simulation'} · {event.time}</small>
+                </div>
+                <div className="solo-event-channels">
+                  {event.channels.includes('browser') && <span><Bell size={13} /> Browser</span>}
+                  {event.channels.includes('telegram') && <span><Send size={13} /> Telegram</span>}
+                  {event.channels.includes('discord') && <span><MessageCircle size={13} /> Discord</span>}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </section>
+
+      <section className="solo-bottom-grid">
+        <article className="solo-panel">
+          <div className="solo-panel-head"><div><span>ALERTS</span><h3>Notification center</h3></div><Bell size={22} /></div>
+          <p className="solo-muted">Choose how each miner should alert you when a block is found or the mining bridge goes offline. ASIC health alerts appear only when optional hardware telemetry is enabled.</p>
+
+          <div className="solo-alert-row">
+            <div className="solo-alert-label"><BellRing size={19} /><div><b>Browser alerts</b><small>Desktop and mobile browser notifications · {readiness.browser === 'ready' ? 'Ready' : 'Permission needed'}</small></div></div>
+            <button className={`solo-toggle ${channels.browser ? 'on' : ''}`} onClick={() => toggle('browser')} aria-label="Toggle browser alerts"><span /></button>
+          </div>
+          <div className="solo-alert-row">
+            <div className="solo-alert-label"><Send size={19} /><div><b>Telegram</b><small>Private bot notifications · configured in Dual Alert locally</small></div></div>
+            <button className={`solo-toggle ${channels.telegram ? 'on' : ''}`} onClick={() => toggle('telegram')} aria-label="Toggle Telegram alerts"><span /></button>
+          </div>
+          <div className="solo-alert-row">
+            <div className="solo-alert-label"><MessageCircle size={19} /><div><b>Discord</b><small>Webhook notifications · configured in Dual Alert locally</small></div></div>
+            <button className={`solo-toggle ${channels.discord ? 'on' : ''}`} onClick={() => toggle('discord')} aria-label="Toggle Discord alerts"><span /></button>
+          </div>
+
+          <div className="solo-alert-actions">
+            <button className="solo-test-button" onClick={() => void testBrowserAlert()}>
+              Test browser alert
+            </button>
+            <button className="solo-local-settings-button" onClick={() => window.open('http://127.0.0.1:3040', '_blank', 'noopener,noreferrer')}>
+              Open local Dual Alert settings
+            </button>
+          </div>
+          {browserState !== 'idle' && (
+            <div className={`solo-test-state ${browserState}`}>
+              {deviceKind === 'ios' && !standalone
+                ? 'On iPhone/iPad: Safari → Share → Add to Home Screen, then open ZKAS.stream from the new icon.'
+                : `Browser permission: ${browserState}`}
+            </div>
+          )}
+          <div className="solo-security-note"><ShieldCheck size={15} /><span>Telegram bot tokens and Discord webhook URLs never enter ZKAS.stream. They stay inside your local Dual Alert installation.</span></div>
+        </article>
+
+        <article className="solo-panel">
+          <div className="solo-panel-head"><div><span>OPTIONAL HEALTH RULES</span><h3>ASIC protection alerts</h3></div><Thermometer size={22} /></div>
+          <p className="solo-muted">Optional for locally accessible ASICs. Rental and basic users can ignore this section completely. The agent is read-only and never changes miner settings.</p>
+
+          <label className="solo-range-row">
+            <div><b>Temperature warning</b><span>Alert above {threshold}°C</span></div>
+            <input type="range" min="55" max="90" value={threshold} onChange={(e) => setThreshold(Number(e.target.value))} />
+          </label>
+
+          <label className="solo-range-row">
+            <div><b>Offline warning</b><span>Alert after {offlineMinutes} minute{offlineMinutes === 1 ? '' : 's'}</span></div>
+            <input type="range" min="1" max="15" value={offlineMinutes} onChange={(e) => setOfflineMinutes(Number(e.target.value))} />
+          </label>
+
+          <div className="solo-rule-list">
+            <div><CheckCircle2 size={16} /><span>Block found</span><b>Instant</b></div>
+            <div><CheckCircle2 size={16} /><span>Hashrate drop</span><b>Planned</b></div>
+            <div><CheckCircle2 size={16} /><span>Fan failure</span><b>Agent telemetry</b></div>
+          </div>
+        </article>
+
+        <article className="solo-panel agent">
+          <div className="solo-panel-head"><div><span>OPTIONAL LOCAL AGENT</span><h3>Read-only ASIC telemetry</h3></div><Cpu size={22} /></div>
+          <div className="solo-agent-diagram">
+            <div><Cpu size={21} /><b>ASIC</b><small>Local network</small></div>
+            <span>→</span>
+            <div><ShieldCheck size={21} /><b>Agent</b><small>Read only</small></div>
+            <span>→</span>
+            <div><RadioTower size={21} /><b>ZKAS.stream</b><small>Outbound HTTPS</small></div>
+          </div>
+          <p className="solo-muted">Only install this if you want hardware health data. No router port forwarding and no remote miner control. Rental miners do not need this agent.</p>
+          <div className="solo-agent-badges"><span>Temperature</span><span>Fan RPM</span><span>Hashrate</span><span>Uptime</span></div>
+          <button className="solo-agent-button">Download agent — coming next</button>
+        </article>
+      </section>
+
+      {iosAlertHelpOpen && (
+        <div className="solo-modal-backdrop" role="presentation" onMouseDown={() => setIosAlertHelpOpen(false)}>
+          <section className="solo-detail-modal solo-ios-help-modal" role="dialog" aria-modal="true" aria-label="Enable iPhone alerts" onMouseDown={(event) => event.stopPropagation()}>
+            <button className="solo-close-button" onClick={() => setIosAlertHelpOpen(false)} aria-label="Close iPhone alert instructions"><X size={20} /></button>
+            <div className="solo-ios-help-icon"><BellRing size={32} /></div>
+            <span className="solo-preview-kicker">IPHONE / IPAD ALERTS</span>
+            <h3 className="solo-pair-title">Add Solo Alert to your Home Screen</h3>
+            <p className="solo-muted">Apple only allows web-push notification permission for Home Screen web apps. You only have to do this once.</p>
+            <div className="solo-pair-instructions">
+              <div><span>1</span><p>Tap the <b>Share</b> button at the bottom of Safari — the square with the upward arrow.</p></div>
+              <div><span>2</span><p>Scroll down and tap <b>Add to Home Screen</b>.</p></div>
+              <div><span>3</span><p>Tap <b>Add</b>, then leave Safari.</p></div>
+              <div><span>4</span><p>Open <b>ZKAS.stream</b> from the new Home Screen icon.</p></div>
+              <div><span>5</span><p>Return to Solo Alert and tap <b>Enable iPhone alerts</b> again. iOS should then show the real notification permission prompt.</p></div>
+            </div>
+            <div className="solo-safe-box"><ShieldCheck size={20} /><div><b>Your dashboard stays private</b><span>Adding the site to your Home Screen does not give ZKAS.stream access to your phone or miner.</span></div></div>
+            <div className="solo-pair-footer"><span /><button onClick={() => setIosAlertHelpOpen(false)}>Got it</button></div>
+          </section>
+        </div>
+      )}
+
+      {pairingOpen && (
+        <div className="solo-modal-backdrop" role="presentation" onMouseDown={() => setPairingOpen(false)}>
+          <section className="solo-detail-modal solo-pair-modal" role="dialog" aria-modal="true" aria-label="Pair a miner" onMouseDown={(event) => event.stopPropagation()}>
+            <button className="solo-close-button" onClick={() => setPairingOpen(false)} aria-label="Close pairing"><X size={20} /></button>
+            <div className="solo-pair-progress">
+              <span className={pairingStep >= 1 ? 'active' : ''}>1</span><i />
+              <span className={pairingStep >= 2 ? 'active' : ''}>2</span><i />
+              <span className={pairingStep >= 3 ? 'active' : ''}>3</span>
+            </div>
+
+            {pairingStep === 1 && <>
+              <span className="solo-preview-kicker">PAIR MINER · STEP 1</span>
+              <h3 className="solo-pair-title">Choose your mining setup</h3>
+              <p className="solo-muted">You do not need ASIC access to use Solo Alert.</p>
+              <div className="solo-mode-grid">
+                <button className={`solo-mode-card ${pairingMode === 'basic' ? 'selected' : ''}`} onClick={() => setPairingMode('basic')}>
+                  <span className="solo-mode-icon"><BellRing size={23} /></span><b>Basic</b><small>Blocks, workers, shares and bridge status.</small><em>{pairingMode === 'basic' ? '✓ SELECTED' : 'TAP TO SELECT'}</em>
+                </button>
+                <button className={`solo-mode-card ${pairingMode === 'local' ? 'selected' : ''}`} onClick={() => setPairingMode('local')}>
+                  <span className="solo-mode-icon"><Cpu size={23} /></span><b>Local ASIC</b><small>Add optional temperature and fan monitoring.</small><em>{pairingMode === 'local' ? '✓ SELECTED' : 'TAP TO SELECT'}</em>
+                </button>
+                <button className={`solo-mode-card ${pairingMode === 'rental' ? 'selected' : ''}`} onClick={() => setPairingMode('rental')}>
+                  <span className="solo-mode-icon"><RadioTower size={23} /></span><b>Rental / Remote</b><small>No ASIC login or local miner access needed.</small><em>{pairingMode === 'rental' ? '✓ SELECTED' : 'TAP TO SELECT'}</em>
+                </button>
+              </div>
+              <div className="solo-pair-selection-note"><CheckCircle2 size={16} /><span><b>{pairingMode === 'basic' ? 'Basic' : pairingMode === 'local' ? 'Local ASIC' : 'Rental / Remote'}</b> selected</span></div>
+              <div className="solo-pair-footer"><span /><button onClick={() => setPairingStep(2)}>Continue with {pairingMode === 'basic' ? 'Basic' : pairingMode === 'local' ? 'Local ASIC' : 'Rental'}</button></div>
+            </>}
+
+            {pairingStep === 2 && <>
+              <span className="solo-preview-kicker">PAIR MINER · STEP 2</span>
+              <h3 className="solo-pair-title">Create your private pairing code <small className="solo-build-tag">09-29B</small></h3>
+              <p className="solo-muted">You will not see a list of other Community Mining workers. Your worker identity is attached only after your own mining connection claims this one-time code.</p>
+              <div className="solo-safe-box"><ShieldCheck size={20} /><div><b>Private worker discovery</b><span>The pairing code identifies your private dashboard. Your Community Mining connection supplies its own worker identity when it claims the code, so another user's miner never appears in your setup.</span></div></div>
+              <div className="solo-private-steps">
+                <div><span>1</span><p>Create the one-time code.</p></div>
+                <div><span>2</span><p>Enter it only in your Community Mining / Dual Alert setup.</p></div>
+                <div><span>3</span><p>Your worker is securely attached and then appears in your private dashboard.</p></div>
+              </div>
+              {pairingError && <div className="inline-error">{pairingError}</div>}
+              <div className="solo-pair-footer"><button className="secondary" onClick={() => setPairingStep(1)}>Back</button><button disabled={pairingBusy} onClick={() => void createPairing()}>{pairingBusy ? 'Creating…' : 'Create private pairing code'}</button></div>
+            </>}
+            {pairingStep === 3 && <>
+              <span className="solo-preview-kicker">PAIR MINER · STEP 3</span>
+              <h3 className="solo-pair-title">Connect Solo Alert</h3>
+              <p className="solo-muted">For normal users this is plug-and-play: run SETUP.cmd and paste the code when asked. The installer exchanges it for a miner-specific publisher token; your private dashboard token stays in this browser.</p>
+              <div className="solo-pair-code">
+                <span>ONE-TIME PAIRING CODE</span>
+                <b>{pairingCode}</b>
+                <small>Expires in 15 minutes · single use</small>
+              </div>
+              <div className="solo-pair-instructions">
+                <div><span>1</span><p>Download and extract the <b>ZKas Dual Alert</b> Windows package.</p></div>
+                <div><span>2</span><p>Double-click <b>SETUP.cmd</b> and approve the Windows prompt.</p></div>
+                <div><span>3</span><p>Paste this pairing code when setup asks for it. Bridge detection, startup and pairing happen automatically.</p></div>
+                {pairingMode === 'local' && <div><span>4</span><p>Optionally enable ASIC health monitoring later for temperature and fans.</p></div>}
+              </div>
+              <div className="solo-safe-box"><ShieldCheck size={20} /><div><b>Per-miner access</b><span>This pairing service uses separate publisher and dashboard tokens. Community users cannot read or publish another miner's telemetry without that miner's token.</span></div></div>
+              {privateTelemetry?.paired && <div className="solo-pair-connected"><CheckCircle2 size={18} /><span>Dual Alert paired successfully. Private telemetry can now flow to this dashboard.</span></div>}
+              <div className="solo-pair-footer"><button className="secondary" onClick={() => setPairingStep(2)}>Back</button><button onClick={() => setPairingOpen(false)}>Finish preview</button></div>
+            </>}
+          </section>
+        </div>
+      )}
+
+      {selectedMiner && (
+        <div className="solo-modal-backdrop" role="presentation" onMouseDown={() => setSelectedMiner(null)}>
+          <section className="solo-detail-modal solo-advanced-modal" role="dialog" aria-modal="true" aria-label={`${selectedMiner.worker} miner details`} onMouseDown={(event) => event.stopPropagation()}>
+            <button className="solo-close-button" onClick={() => setSelectedMiner(null)} aria-label="Close miner details"><X size={20} /></button>
+
+            <div className="solo-detail-heading">
+              <span className="solo-miner-avatar"><Cpu size={25} /></span>
+              <div>
+                <span className="solo-preview-kicker">SOLO ALERT · MINER DETAILS</span>
+                <h3>{selectedMiner.name}</h3>
+                <p>{selectedMiner.worker}</p>
+              </div>
+              <span className={`solo-status-pill ${selectedMiner.status === 'online' ? 'online' : 'offline'}`}>
+                {selectedMiner.status === 'online' ? <Wifi size={14} /> : <WifiOff size={14} />}
+                {selectedMiner.status.toUpperCase()}
+              </span>
+            </div>
+
+            <div className="solo-detail-metrics">
+              <div><span>HASHRATE</span><b>{selectedMiner.hashrate}</b><small>Latest reported rate</small></div>
+              <div><span>SHARES</span><b>{selectedMiner.shares.toLocaleString()}</b><small>Accepted shares</small></div>
+              <div><span>UPTIME</span><b>{selectedMiner.uptime}</b><small>Bridge session</small></div>
+              <div><span>BLOCKS</span><b>{selectedMiner.zkasBlocks + selectedMiner.kasBlocks}</b><small>ZKAS + KAS</small></div>
+            </div>
+
+            <nav className="solo-detail-tabs" aria-label="Miner detail sections">
+              {([
+                ['overview','Overview'],
+                ['trends','Trends'],
+                ['shares','Shares'],
+                ['blocks','Blocks'],
+                ['hardware','Hardware'],
+              ] as Array<[DetailTab,string]>).map(([key,label]) => (
+                <button key={key} className={detailTab === key ? 'active' : ''} onClick={() => setDetailTab(key)}>{label}</button>
+              ))}
+            </nav>
+
+            {detailTab === 'overview' && (
+              <div className="solo-advanced-grid">
+                <div className="solo-detail-panel">
+                  <div className="solo-panel-head"><div><span>SESSION</span><h3>Mining status</h3></div><Activity size={21} /></div>
+                  <div className="solo-detail-list">
+                    <div><span>Worker</span><b>{selectedMiner.worker}</b></div>
+                    <div><span>Status</span><b>{selectedMiner.status === 'online' ? 'Online' : 'Offline'}</b></div>
+                    <div><span>Last report</span><b>{selectedMiner.lastSeen}</b></div>
+                    <div><span>Monitoring</span><b>{selectedMiner.mode === 'local' ? 'Bridge + ASIC' : 'Community bridge'}</b></div>
+                  </div>
+                </div>
+                <div className="solo-detail-panel">
+                  <div className="solo-panel-head"><div><span>SOLO RESULTS</span><h3>Block summary</h3></div><Trophy size={21} /></div>
+                  <div className="solo-detail-list">
+                    <div><span>ZKAS blocks</span><b>{selectedMiner.zkasBlocks}</b></div>
+                    <div><span>KAS blocks</span><b>{selectedMiner.kasBlocks}</b></div>
+                    <div><span>Accepted shares</span><b>{selectedMiner.shares.toLocaleString()}</b></div>
+                    <div><span>Alert channels</span><b>{enabledCount} enabled</b></div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {detailTab === 'trends' && (
+              <div className="solo-trends-wrap">
+                <div className="solo-range-tabs">
+                  {(['1h','6h','24h','7d'] as HistoryRange[]).map((range) => (
+                    <button key={range} className={historyRange === range ? 'active' : ''} onClick={() => setHistoryRange(range)}>{range}</button>
+                  ))}
+                </div>
+                <div className="solo-trends-layout">
+                  <div className="solo-chart-card">
+                    <div className="solo-chart-head">
+                      <div><span>HASHRATE TREND</span><b>{selectedMiner.hashrate}</b></div>
+                      <small>{privateHistory.length} real samples</small>
+                    </div>
+                    {privateHistory.length >= 2 && chartPolyline(privateHistory.map((point) => point.h)) ? (
+                      <div className="solo-real-chart">
+                        <svg viewBox="0 0 520 180" preserveAspectRatio="none" role="img" aria-label="Hashrate history chart">
+                          <polyline points={chartPolyline(privateHistory.map((point) => point.h))} fill="none" vectorEffect="non-scaling-stroke" />
+                        </svg>
+                      </div>
+                    ) : (
+                      <div className="solo-trend-placeholder">
+                        <Activity size={28} />
+                        <b>Collecting real hashrate history</b>
+                        <span>At least two 5-minute telemetry samples are needed before a trend line is drawn.</span>
+                      </div>
+                    )}
+                  </div>
+                  <div className="solo-chart-card">
+                    <div className="solo-chart-head">
+                      <div><span>ACCEPTED SHARES</span><b>{selectedMiner.shares.toLocaleString()}</b></div>
+                      <small>{historyRange} window</small>
+                    </div>
+                    {privateHistory.length >= 2 && chartPolyline(privateHistory.map((point) => point.a)) ? (
+                      <div className="solo-real-chart shares">
+                        <svg viewBox="0 0 520 180" preserveAspectRatio="none" role="img" aria-label="Accepted shares history chart">
+                          <polyline points={chartPolyline(privateHistory.map((point) => point.a))} fill="none" vectorEffect="non-scaling-stroke" />
+                        </svg>
+                      </div>
+                    ) : (
+                      <div className="solo-trend-placeholder">
+                        <Gauge size={28} />
+                        <b>Collecting real share history</b>
+                        <span>Share growth will appear automatically as paired Community Mining telemetry accumulates.</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+                <div className="solo-history-note"><ShieldCheck size={18}/><span>Charts use only this paired miner's private telemetry. Other Community Mining workers are not included.</span></div>
+              </div>
+            )}
+
+            {detailTab === 'shares' && (
+              <div className="solo-advanced-grid">
+                <div className="solo-detail-panel">
+                  <div className="solo-panel-head"><div><span>SHARES</span><h3>Current session</h3></div><Gauge size={21} /></div>
+                  <div className="solo-detail-list">
+                    <div><span>Accepted</span><b>{selectedMiner.shares.toLocaleString()}</b></div>
+                    <div><span>Rejected</span><b>{privateTelemetry?.telemetry?.worker === selectedMiner.worker && privateTelemetry.telemetry.invalidShares != null ? Math.floor(privateTelemetry.telemetry.invalidShares).toLocaleString() : '—'}</b></div>
+                    <div><span>Stale</span><b>{privateTelemetry?.telemetry?.worker === selectedMiner.worker && privateTelemetry.telemetry.staleShares != null ? Math.floor(privateTelemetry.telemetry.staleShares).toLocaleString() : '—'}</b></div>
+                    <div><span>Efficiency</span><b>{privateTelemetry?.telemetry?.worker === selectedMiner.worker && privateTelemetry.telemetry.invalidShares != null && privateTelemetry.telemetry.staleShares != null ? (((selectedMiner.shares / Math.max(1, selectedMiner.shares + privateTelemetry.telemetry.invalidShares + privateTelemetry.telemetry.staleShares)) * 100).toFixed(2) + '%') : 'Waiting for bridge fields'}</b></div>
+                  </div>
+                </div>
+                <div className="solo-detail-panel">
+                  <div className="solo-panel-head"><div><span>QUALITY</span><h3>Share health</h3></div><CheckCircle2 size={21} /></div>
+                  <div className="solo-no-telemetry"><ShieldCheck size={22} /><div><b>No values invented</b><span>Reject/stale metrics will appear only when the paired Community Mining bridge reports them.</span></div></div>
+                </div>
+              </div>
+            )}
+
+            {detailTab === 'blocks' && (
+              <div className="solo-advanced-grid">
+                <div className="solo-detail-panel">
+                  <div className="solo-panel-head"><div><span>BLOCKS</span><h3>Solo mining results</h3></div><Trophy size={21} /></div>
+                  <div className="solo-detail-list">
+                    <div><span>ZKAS blocks</span><b>{selectedMiner.zkasBlocks}</b></div>
+                    <div><span>KAS blocks</span><b>{selectedMiner.kasBlocks}</b></div>
+                    <div><span>Total</span><b>{selectedMiner.zkasBlocks + selectedMiner.kasBlocks}</b></div>
+                    <div><span>KAS reward</span><b>When bridge exposes it</b></div>
+                  </div>
+                </div>
+                <div className="solo-detail-panel">
+                  <div className="solo-panel-head"><div><span>ALERT TEST</span><h3>Preview block alerts</h3></div><BellRing size={21} /></div>
+                  <div className="solo-detail-test-actions">
+                    <button onClick={() => simulateBlock('ZKAS', selectedMiner)}><Trophy size={16} /> Test ZKAS</button>
+                    <button onClick={() => simulateBlock('KAS', selectedMiner)}><Coins size={16} /> Test KAS</button>
+                  </div>
+                  <p className="solo-muted solo-detail-caption">Simulation only. Real counters are never changed by these buttons.</p>
+                </div>
+              </div>
+            )}
+
+            {detailTab === 'hardware' && (
+              <div className="solo-advanced-grid">
+                <div className="solo-detail-panel">
+                  <div className="solo-panel-head"><div><span>ASIC HEALTH</span><h3>{selectedMiner.mode === 'local' ? 'Read-only hardware telemetry' : 'Optional hardware monitoring'}</h3></div><Thermometer size={21} /></div>
+                  {selectedMiner.mode === 'local' ? (
+                    <div className="solo-health-gauges">
+                      <div><Thermometer size={18} /><span>Temperature</span><b>{selectedMiner.temp ?? '—'}{selectedMiner.temp !== null ? '°C' : ''}</b></div>
+                      <div><Fan size={18} /><span>Fan</span><b>{selectedMiner.fan === null ? '—' : `${selectedMiner.fan.toLocaleString()} RPM`}</b></div>
+                    </div>
+                  ) : (
+                    <div className="solo-no-telemetry"><ShieldCheck size={22} /><div><b>No local agent required</b><span>Basic and rental miners can use all core Solo Alert features without temperature or fan access.</span></div></div>
+                  )}
+                </div>
+                <div className="solo-detail-panel">
+                  <div className="solo-panel-head"><div><span>HOST HEALTH</span><h3>Optional bridge PC telemetry</h3></div><Cpu size={21} /></div>
+                  <div className="solo-detail-list">
+                    <div><span>CPU</span><b>Optional agent</b></div>
+                    <div><span>RAM</span><b>Optional agent</b></div>
+                    <div><span>Disk</span><b>Optional agent</b></div>
+                    <div><span>Node sync</span><b>Planned</b></div>
+                  </div>
+                </div>
+              </div>
+            )}
+          </section>
+        </div>
+      )}
+
+      {celebration && (
+        <div className="solo-block-overlay" role="dialog" aria-modal="true" aria-label={`${celebration.chain} block found preview`}>
+          <div className="solo-confetti" aria-hidden="true"><i /><i /><i /><i /><i /><i /><i /><i /></div>
+          <section className={`solo-block-celebration ${celebration.chain.toLowerCase()}`}>
+            <button className="solo-celebration-close" onClick={() => setCelebration(null)} aria-label="Close block alert"><X size={22} /></button>
+            <div className="solo-trophy-ring"><Trophy size={52} /></div>
+            <span className="solo-block-kicker">SOLO ALERT</span>
+            <h2>{celebration.chain} BLOCK FOUND!</h2>
+            <p>Your miner just reported a new {celebration.chain} block event.</p>
+            <div className="solo-celebration-grid">
+              <div><span>WORKER</span><b>{celebration.worker}</b></div>
+              <div><span>TIME</span><b>{celebration.time}</b></div>
+              <div className="wide"><span>BLOCK HASH / EVENT ID</span><b>{celebration.hash}</b></div>
+              {celebration.reward && <div className="wide"><span>KAS REWARD</span><b>{celebration.reward}</b></div>}
+            </div>
+            <div className="solo-delivery-row">
+              <span className={channels.browser ? 'sent' : ''}><Bell size={15} /> Browser</span>
+              <span className={channels.telegram ? 'sent' : ''}><Send size={15} /> Telegram</span>
+              <span className={channels.discord ? 'sent' : ''}><MessageCircle size={15} /> Discord</span>
+            </div>
+            <small>Preview simulation only — no mining counters or real block state were changed.</small>
+          </section>
+        </div>
+      )}
+    </div>
+  );
+}
