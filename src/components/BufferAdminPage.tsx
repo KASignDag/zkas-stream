@@ -4,7 +4,7 @@ type BufferChannel = { id: string; name?: string; displayName?: string; service?
 type BufferOrg = { id: string; name: string; channels: BufferChannel[] };
 type BufferStatus = { account?: { name?: string | null; timezone?: string | null }; organizations?: BufferOrg[] };
 type DailyPost = { time: string; text: string; imageUrl: string };
-const VISUAL_PACK_VERSION = '2026-10-08-a';
+const VISUAL_PACK_VERSION = '2026-10-08-b';
 
 const DAILY_POSTS: DailyPost[] = [
 
@@ -100,70 +100,68 @@ export function BufferAdminPage() {
     const subs=['REPLY IN ONE SENTENCE','DEFAULT · OPTIONAL · UNNECESSARY?','KASPA + ZKAS','WHAT FEATURE COMES FIRST?','MINING · OTC · MARKETS · EXPLORER','SAVINGS · SALARY · PURCHASES · SECURITY','POOL · SOLO · MERGED · COMMUNITY','WALLETS · MINERS · LIQUIDITY · AWARENESS','ONE HUB FOR NETWORK DATA','WHAT KEEPS YOU HERE?'];
 
     const bg=ctx.createLinearGradient(0,0,1200,675);
-    bg.addColorStop(0,'#041716');bg.addColorStop(.55,'#082326');bg.addColorStop(1,index%2?'#0c3030':'#13262f');
+    bg.addColorStop(0,'#031512');bg.addColorStop(.58,'#09272a');bg.addColorStop(1,'#0b3537');
     ctx.fillStyle=bg;ctx.fillRect(0,0,1200,675);
 
-    ctx.fillStyle='#edfdf9';ctx.font='800 62px system-ui';ctx.fillText(titles[index],70,108);
-    ctx.fillStyle='#46e2cb';ctx.font='700 24px system-ui';ctx.fillText(subs[index],74,150);
-    ctx.fillStyle='#8ca9a2';ctx.font='600 18px system-ui';ctx.fillText('ZKAS · '+dateLabel,74,626);
-    ctx.fillStyle='#46e2cb';ctx.font='800 23px system-ui';ctx.fillText('ZKAS.stream',968,626);
+    ctx.globalAlpha=.16;ctx.strokeStyle='#46e2cb';ctx.lineWidth=1.5;
+    for(let x=0;x<=1200;x+=80){ctx.beginPath();ctx.moveTo(x,190);ctx.lineTo(600+(x-600)*.55,675);ctx.stroke();}
+    for(let y=210;y<675;y+=58){ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(1200,y);ctx.stroke();}
+    ctx.globalAlpha=1;
+
+    ctx.fillStyle='#edfdf9';ctx.font='800 58px system-ui';ctx.fillText(titles[index],64,102);
+    ctx.fillStyle='#46e2cb';ctx.font='700 23px system-ui';ctx.fillText(subs[index],68,143);
+    ctx.fillStyle='#8ca9a2';ctx.font='600 18px system-ui';ctx.fillText('ZKAS · '+dateLabel,68,626);
+    ctx.fillStyle='#46e2cb';ctx.font='800 23px system-ui';ctx.fillText('ZKAS.stream',966,626);
 
     const panel=(x:number,y:number,w:number,h:number,r=18)=>{
-      ctx.fillStyle='rgba(7,31,32,.88)';ctx.strokeStyle='rgba(70,226,203,.75)';ctx.lineWidth=3;
+      ctx.fillStyle='rgba(6,31,33,.90)';ctx.strokeStyle='rgba(70,226,203,.82)';ctx.lineWidth=3;
       ctx.beginPath();ctx.roundRect(x,y,w,h,r);ctx.fill();ctx.stroke();
     };
     const dot=(x:number,y:number,r=10,fill='#46e2cb')=>{ctx.fillStyle=fill;ctx.beginPath();ctx.arc(x,y,r,0,Math.PI*2);ctx.fill();};
+    const label=(t:string,x:number,y:number,size=22)=>{ctx.fillStyle='#e8f9f5';ctx.font='800 '+size+'px system-ui';ctx.textAlign='center';ctx.fillText(t,x,y);ctx.textAlign='left';};
 
     if(index===0){
-      panel(120,215,400,270,24);
-      ['BALANCE','PAYMENTS','HISTORY'].forEach((t,i)=>{ctx.fillStyle='#e8f9f5';ctx.font='800 28px system-ui';ctx.fillText(t,165,285+i*72);ctx.fillStyle='#46e2cb';ctx.fillRect(375,263+i*72,88,16);});
-      ctx.strokeStyle='#46e2cb';ctx.lineWidth=8;ctx.beginPath();ctx.arc(790,355,145,Math.PI*.15,Math.PI*1.85);ctx.stroke();
-      ctx.fillStyle='#e8f9f5';ctx.font='900 92px system-ui';ctx.textAlign='center';ctx.fillText('?',790,388);ctx.textAlign='left';
+      dot(600,355,78);ctx.fillStyle='#082326';ctx.font='900 52px system-ui';ctx.textAlign='center';ctx.fillText('ZK',600,373);ctx.textAlign='left';
+      const items=[['PRIVACY',260,255],['MINING',940,255],['MARKETS',260,470],['COMMUNITY',940,470]];
+      items.forEach(([t,x,y])=>{ctx.strokeStyle='rgba(70,226,203,.58)';ctx.lineWidth=4;ctx.beginPath();ctx.moveTo(600,355);ctx.lineTo(Number(x),Number(y));ctx.stroke();panel(Number(x)-120,Number(y)-48,240,96,18);label(String(t),Number(x),Number(y)+8,22);});
     } else if(index===1){
-      ctx.strokeStyle='#46e2cb';ctx.lineWidth=6;
-      ctx.beginPath();ctx.moveTo(190,470);ctx.lineTo(370,300);ctx.lineTo(560,390);ctx.lineTo(760,235);ctx.lineTo(1000,330);ctx.stroke();
-      [[190,470],[370,300],[560,390],[760,235],[1000,330]].forEach(p=>dot(p[0],p[1],14));
-      panel(360,500,480,72,18);ctx.fillStyle='#e8f9f5';ctx.font='900 30px system-ui';ctx.textAlign='center';ctx.fillText('0 PREMINE · OPEN START',600,546);ctx.textAlign='left';
+      ctx.strokeStyle='#46e2cb';ctx.lineWidth=7;ctx.beginPath();ctx.moveTo(600,210);ctx.lineTo(755,270);ctx.lineTo(730,455);ctx.quadraticCurveTo(665,525,600,552);ctx.quadraticCurveTo(535,525,470,455);ctx.lineTo(445,270);ctx.closePath();ctx.stroke();
+      ctx.fillStyle='rgba(70,226,203,.10)';ctx.fill();
+      ctx.strokeStyle='#e8f9f5';ctx.lineWidth=9;ctx.beginPath();ctx.arc(600,340,48,Math.PI,0);ctx.stroke();ctx.strokeRect(548,340,104,110);
+      ['KEEP IT PRIVATE','REVEAL WHEN NEEDED','SHARE ON YOUR TERMS'].forEach((t,i)=>{panel(115,255+i*92,280,68,16);label(t,255,298+i*92,16);});
     } else if(index===2){
-      panel(195,220,315,300,34);ctx.fillStyle='#0c282c';ctx.fillRect(230,260,245,180);
-      ctx.strokeStyle='#46e2cb';ctx.lineWidth=4;ctx.strokeRect(230,260,245,180);
-      ctx.fillStyle='#e8f9f5';ctx.font='900 34px system-ui';ctx.textAlign='center';ctx.fillText('ZK',352,365);ctx.textAlign='left';
-      const items=[['QR',690,260],['BACKUP',895,260],['HISTORY',690,410],['LANGUAGE',895,410]];
-      items.forEach(([t,x,y])=>{panel(Number(x)-90,Number(y)-45,180,90,16);ctx.fillStyle='#e8f9f5';ctx.font='800 20px system-ui';ctx.textAlign='center';ctx.fillText(String(t),Number(x),Number(y)+7);});ctx.textAlign='left';
+      panel(160,255,300,230,28);panel(740,255,300,230,28);
+      dot(310,355,86,'#0f3d3f');dot(890,355,86,'#0f3d3f');
+      label('KASPA',310,367,30);label('ZKAS',890,367,30);
+      ctx.strokeStyle='#46e2cb';ctx.lineWidth=10;ctx.beginPath();ctx.moveTo(396,355);ctx.bezierCurveTo(500,240,700,470,804,355);ctx.stroke();
+      ctx.beginPath();ctx.moveTo(396,355);ctx.bezierCurveTo(500,470,700,240,804,355);ctx.stroke();
+      label('ONE MINING EFFORT · TWO NETWORKS',600,530,19);
     } else if(index===3){
-      const cards=[['NETWORK',165,245],['MINING',440,245],['MARKETS',715,245],['OTC',302,400],['TOOLS',577,400]];
-      cards.forEach(([t,x,y],i)=>{panel(Number(x),Number(y),220,110,18);ctx.fillStyle='#e8f9f5';ctx.font='800 24px system-ui';ctx.fillText(String(t),Number(x)+28,Number(y)+48);ctx.fillStyle='#46e2cb';ctx.fillRect(Number(x)+28,Number(y)+70,70+i*18,8);});
+      panel(440,215,320,330,34);ctx.strokeStyle='#46e2cb';ctx.lineWidth=4;ctx.strokeRect(485,260,230,175);label('ZKAS WALLET',600,352,28);
+      const cards=[['BACKUP',180,275],['QR PAY',900,275],['HISTORY',180,450],['ALERTS',900,450]];
+      cards.forEach(([t,x,y])=>{panel(Number(x)-105,Number(y)-46,210,92,16);label(String(t),Number(x),Number(y)+8,19);ctx.strokeStyle='rgba(70,226,203,.5)';ctx.lineWidth=3;ctx.beginPath();ctx.moveTo(Number(x)<600?Number(x)+105:Number(x)-105,Number(y));ctx.lineTo(Number(x)<600?440:760,Number(y));ctx.stroke();});
     } else if(index===4){
-      ctx.fillStyle='rgba(70,226,203,.10)';ctx.fillRect(90,220,470,300);
-      ctx.fillStyle='rgba(255,255,255,.04)';ctx.fillRect(640,220,470,300);
-      ctx.fillStyle='#46e2cb';ctx.font='900 34px system-ui';ctx.fillText('PUBLIC NETWORK',145,275);
-      ctx.fillStyle='#e8f9f5';ctx.font='700 24px system-ui';['HASHRATE','BLOCKS','MINERS','MARKETS'].forEach((t,i)=>ctx.fillText('• '+t,155,330+i*44));
-      ctx.fillStyle='#46e2cb';ctx.font='900 34px system-ui';ctx.fillText('PRIVATE FINANCES',695,275);
-      ctx.strokeStyle='#46e2cb';ctx.lineWidth=5;ctx.beginPath();ctx.arc(850,390,86,0,Math.PI*2);ctx.stroke();ctx.fillStyle='#e8f9f5';ctx.font='900 48px system-ui';ctx.textAlign='center';ctx.fillText('LOCK',850,405);ctx.textAlign='left';
+      const cards=[['MINING',115],['OTC',385],['MARKETS',655],['EXPLORER',925]];
+      cards.forEach(([t,x],i)=>{panel(Number(x),245,220,250,20);label(String(t),Number(x)+110,300,22);ctx.fillStyle='#46e2cb';for(let b=0;b<4;b++)ctx.fillRect(Number(x)+42+b*34,425-(b+i%2)*22,18,55+(b+i%2)*22);});
     } else if(index===5){
-      const rigs=[200,450,700,950];
-      rigs.forEach((x,i)=>{panel(x,280,180,180,16);ctx.fillStyle='#46e2cb';for(let r=0;r<3;r++)ctx.fillRect(x+28,315+r*40,124,12);ctx.fillStyle='#e8f9f5';ctx.font='800 20px system-ui';ctx.textAlign='center';ctx.fillText(['HOME','POOL','SOLO','COMMUNITY'][i],x+90,495);});ctx.textAlign='left';
+      const items=[['SAVINGS',255,280],['SALARY',255,450],['PURCHASES',945,280],['SECURITY',945,450]];
+      items.forEach(([t,x,y])=>{panel(Number(x)-135,Number(y)-50,270,100,18);label(String(t),Number(x),Number(y)+8,21);});
+      ctx.strokeStyle='#46e2cb';ctx.lineWidth=7;ctx.beginPath();ctx.moveTo(600,235);ctx.lineTo(735,285);ctx.lineTo(715,450);ctx.quadraticCurveTo(655,510,600,535);ctx.quadraticCurveTo(545,510,485,450);ctx.lineTo(465,285);ctx.closePath();ctx.stroke();label('PRIVATE',600,388,34);
     } else if(index===6){
-      panel(135,255,390,220,26);panel(675,255,390,220,26);
-      ctx.fillStyle='#46e2cb';ctx.font='900 42px system-ui';ctx.textAlign='center';ctx.fillText('OTC',330,335);ctx.fillText('EXCHANGE',870,335);
-      ctx.strokeStyle='#46e2cb';ctx.lineWidth=5;ctx.beginPath();ctx.moveTo(270,390);ctx.lineTo(390,390);ctx.stroke();
-      ctx.beginPath();ctx.moveTo(780,390);ctx.lineTo(960,390);ctx.stroke();
-      ctx.fillStyle='#e8f9f5';ctx.font='700 22px system-ui';ctx.fillText('DIRECT',330,435);ctx.fillText('ORDER BOOK',870,435);ctx.textAlign='left';
-      ctx.font='900 54px system-ui';ctx.fillStyle='#e8f9f5';ctx.fillText('VS',566,390);
+      const modes=[['POOL',180],['SOLO',420],['MERGED',660],['COMMUNITY',900]];
+      modes.forEach(([t,x],i)=>{panel(Number(x),270,200,200,20);ctx.fillStyle='#46e2cb';ctx.beginPath();ctx.arc(Number(x)+100,335,34,0,Math.PI*2);ctx.fill();label(String(t),Number(x)+100,430,19);ctx.strokeStyle='rgba(70,226,203,.45)';ctx.lineWidth=3;if(i<3){ctx.beginPath();ctx.moveTo(Number(x)+200,370);ctx.lineTo(Number(x)+240,370);ctx.stroke();}});
     } else if(index===7){
-      dot(600,360,72);ctx.fillStyle='#082326';ctx.font='900 42px system-ui';ctx.textAlign='center';ctx.fillText('ZK',600,375);
-      const nodes=[['WALLET',290,240],['ALERTS',910,240],['MINING',280,480],['EXPLORER',920,480],['MARKETS',600,540]];
-      nodes.forEach(([t,x,y])=>{ctx.strokeStyle='rgba(70,226,203,.65)';ctx.lineWidth=3;ctx.beginPath();ctx.moveTo(600,360);ctx.lineTo(Number(x),Number(y));ctx.stroke();dot(Number(x),Number(y),34,'#0f3d3f');ctx.fillStyle='#e8f9f5';ctx.font='800 17px system-ui';ctx.textAlign='center';ctx.fillText(String(t),Number(x),Number(y)+6);});ctx.textAlign='left';
+      const pillars=[['WALLETS',155,420,90],['MINERS',385,370,140],['LIQUIDITY',615,315,195],['AWARENESS',845,250,260]];
+      pillars.forEach(([t,x,y,h])=>{panel(Number(x),Number(y),190,Number(h),18);label(String(t),Number(x)+95,Number(y)+45,18);});
+      ctx.strokeStyle='#46e2cb';ctx.lineWidth=7;ctx.beginPath();ctx.moveTo(250,400);ctx.lineTo(480,345);ctx.lineTo(710,290);ctx.lineTo(940,225);ctx.stroke();ctx.beginPath();ctx.moveTo(940,225);ctx.lineTo(900,220);ctx.moveTo(940,225);ctx.lineTo(918,260);ctx.stroke();
     } else if(index===8){
-      for(let i=0;i<14;i++){const x=180+(i%7)*130,y=280+Math.floor(i/7)*170;dot(x,y,24,i%3===0?'#46e2cb':'#1a5a5f');}
-      ctx.strokeStyle='rgba(70,226,203,.45)';ctx.lineWidth=2;
-      for(let i=0;i<7;i++){ctx.beginPath();ctx.moveTo(180+i*130,280);ctx.lineTo(180+((i+2)%7)*130,450);ctx.stroke();}
-      panel(435,315,330,100,20);ctx.fillStyle='#e8f9f5';ctx.font='900 28px system-ui';ctx.textAlign='center';ctx.fillText('DROP YOUR FLAG',600,375);ctx.textAlign='left';
+      dot(600,365,82,'#0f3d3f');label('ZKAS.stream',600,374,25);
+      const nodes=[['NETWORK DATA',280,250],['MINING',920,250],['MARKETS',280,485],['EXPLORER',920,485],['OTC',600,540]];
+      nodes.forEach(([t,x,y])=>{ctx.strokeStyle='rgba(70,226,203,.58)';ctx.lineWidth=3;ctx.beginPath();ctx.moveTo(600,365);ctx.lineTo(Number(x),Number(y));ctx.stroke();panel(Number(x)-112,Number(y)-42,224,84,16);label(String(t),Number(x),Number(y)+7,17);});
     } else {
-      ctx.fillStyle='rgba(255,255,255,.04)';ctx.beginPath();ctx.moveTo(175,245);ctx.lineTo(1025,245);ctx.lineTo(940,455);ctx.lineTo(255,455);ctx.closePath();ctx.fill();
-      ctx.strokeStyle='#46e2cb';ctx.lineWidth=4;ctx.stroke();
-      ctx.fillStyle='#e8f9f5';ctx.font='900 48px system-ui';ctx.textAlign='center';ctx.fillText('“WHY ZKAS?”',600,330);
-      ctx.fillStyle='#46e2cb';ctx.font='800 28px system-ui';ctx.fillText('ONE SENTENCE',600,390);ctx.textAlign='left';
+      dot(600,360,78,'#0f3d3f');label('ZK',600,374,40);
+      for(let i=0;i<10;i++){const a=i/10*Math.PI*2,x=600+Math.cos(a)*310,y=360+Math.sin(a)*150;ctx.strokeStyle='rgba(70,226,203,.48)';ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(600,360);ctx.lineTo(x,y);ctx.stroke();dot(x,y,25,i%3===0?'#46e2cb':'#1c6267');}
+      panel(430,505,340,68,18);label('PRIVACY · MINING · KASPA · COMMUNITY',600,548,14);
     }
     return canvas;
   }
