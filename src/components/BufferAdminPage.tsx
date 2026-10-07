@@ -4,7 +4,7 @@ type BufferChannel = { id: string; name?: string; displayName?: string; service?
 type BufferOrg = { id: string; name: string; channels: BufferChannel[] };
 type BufferStatus = { account?: { name?: string | null; timezone?: string | null }; organizations?: BufferOrg[] };
 type DailyPost = { time: string; text: string; imageUrl: string };
-const VISUAL_PACK_VERSION = '2026-10-08-b';
+const VISUAL_PACK_VERSION = '2026-10-08-c';
 
 const DAILY_POSTS: DailyPost[] = [
 
@@ -200,7 +200,7 @@ export function BufferAdminPage() {
         const col=index%5,row=Math.floor(index/5);
         const sx=Math.round(col*bitmap.width/5),sy=Math.round(row*bitmap.height/2);
         const sw=Math.round((col+1)*bitmap.width/5)-sx,sh=Math.round((row+1)*bitmap.height/2)-sy;
-        const canvas=document.createElement('canvas');canvas.width=768;canvas.height=1280;
+        const canvas=document.createElement('canvas');canvas.width=1200;canvas.height=675;
         const ctx=canvas.getContext('2d');if(!ctx) throw new Error('Could not prepare image.');
         ctx.drawImage(bitmap,sx,sy,sw,sh,0,0,canvas.width,canvas.height);
         const blob=await new Promise<Blob>((resolve,reject)=>canvas.toBlob(value=>value?resolve(value):reject(new Error('Could not encode image.')),'image/jpeg',0.9));
@@ -211,6 +211,9 @@ export function BufferAdminPage() {
         setDailyPosts([...next]);
       }
       bitmap.close();
+      const urls=next.map(row=>row.imageUrl);
+      sessionStorage.setItem('zkas-buffer-visuals-'+VISUAL_PACK_VERSION+'-'+day,JSON.stringify(urls));
+      setVisualDay(day);
       setMessage('Visual pack matched: all 10 posts now have their corresponding custom image.');
     }catch(error){setMessage(error instanceof Error?error.message:'Visual-pack upload failed.');}
     finally{setPackBusy(false);}
