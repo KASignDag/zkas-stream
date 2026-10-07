@@ -4,20 +4,20 @@ type BufferChannel = { id: string; name?: string; displayName?: string; service?
 type BufferOrg = { id: string; name: string; channels: BufferChannel[] };
 type BufferStatus = { account?: { name?: string | null; timezone?: string | null }; organizations?: BufferOrg[] };
 type DailyPost = { time: string; text: string; imageUrl: string };
-const VISUAL_PACK_VERSION = '2026-09-29-a';
+const VISUAL_PACK_VERSION = '2026-10-08-a';
 
 const DAILY_POSTS: DailyPost[] = [
 
-  {time:'05:00',imageUrl:'',text:"🔐 Everyday privacy question\n\nShould every digital-money transaction be public forever?\n\nZKAS takes a different approach: privacy by default.\n\nShould privacy be default, optional, or unnecessary?\n\nReply below 👇\n\n#ZKAS #Privacy"},
-  {time:'06:54',imageUrl:'',text:"⚡ Why merge mining matters\n\nZKAS can be merge mined alongside Kaspa, letting the same mining work support both networks.\n\nMiners: is merge mining one of the reasons ZKAS caught your attention?\n\n#ZKAS #Kaspa #Mining"},
-  {time:'08:48',imageUrl:'',text:"📲 Wallet adoption check\n\nWhat would help ZKAS adoption most?\n\n• easier mobile wallet\n• better UX\n• more exchange access\n• merchant tools\n• education\n\nPick one 👇\n\n#ZKAS #Wallet #Crypto"},
-  {time:'10:42',imageUrl:'',text:"📊 What do you check first on ZKAS.stream?\n\n• mining data\n• OTC activity\n• exchange markets\n• explorer/network info\n• supply / market cap\n\nWhat’s your first stop?\n\nhttps://zkas.stream/\n\n#ZKAS"},
-  {time:'12:36',imageUrl:'',text:"🛡️ Privacy is normal.\n\nPeople want financial privacy for everyday reasons: salary, savings, purchases, business payments, and personal security.\n\nWhat’s the strongest real-world use case for private digital money?\n\n#ZKAS #Privacy"},
-  {time:'14:30',imageUrl:'',text:"⛏️ Community mining question\n\nZKAS miners can choose pool, solo, merged, or community mining.\n\nWhich setup fits you best right now?\n\n#ZKAS #Mining"},
-  {time:'16:24',imageUrl:'',text:"💡 Growth question\n\nWhat would help ZKAS grow most?\n\n• stronger wallets\n• more miners\n• better liquidity\n• more community tools\n• more awareness\n\nWhich matters most?\n\n#ZKAS #Crypto"},
-  {time:'18:18',imageUrl:'',text:"🌐 Why ZKAS.stream exists\n\nOne place to follow mining, markets, OTC activity, community tools, and live network data.\n\nWhich feature has been most useful to you?\n\nhttps://zkas.stream/\n\n#ZKAS"},
-  {time:'20:12',imageUrl:'',text:"🤝 Community check-in\n\nWhat keeps you following ZKAS?\n\n• privacy\n• mining\n• Kaspa connection\n• technology\n• community\n\nReply with your reason 👇\n\n#ZKAS #Kaspa"},
-  {time:'22:00',imageUrl:'',text:"🌙 End-of-day question\n\nFinish this sentence:\n\n“ZKAS matters because ________.”\n\nKeep it short. Best replies may get reposted 👇\n\n#ZKAS #Privacy #Kaspa"},
+  {time:'05:00',imageUrl:'',text:"⚡ Why ZKAS?\n\nPrivacy, mining, community, and a growing set of tools all matter — but everyone has a different reason for following.\n\nReply in one sentence: Why ZKAS? 👇\n\n#ZKAS #Kaspa"},
+  {time:'06:54',imageUrl:'',text:"🔐 Privacy by default\n\nShould financial privacy be built in, optional, or unnecessary?\n\nZKAS starts from the idea that your transaction history should not automatically be public.\n\nWhat’s your view? 👇\n\n#ZKAS #Privacy"},
+  {time:'08:48',imageUrl:'',text:"⛏️ Merge mining\n\nThe same mining effort can help support Kaspa and ZKAS.\n\nFor miners, that means two networks without choosing one over the other.\n\nWould merge mining make you more likely to mine ZKAS?\n\n#ZKAS #Kaspa #Mining"},
+  {time:'10:42',imageUrl:'',text:"📱 Wallet wishlist\n\nWhich wallet feature should come first?\n\n• simpler backup\n• better history\n• QR payments\n• address book\n• price alerts\n\nPick one — or suggest another 👇\n\n#ZKAS #Wallet"},
+  {time:'12:36',imageUrl:'',text:"📊 What do you check first on ZKAS.stream?\n\n• mining\n• OTC\n• markets\n• explorer\n• network data\n\nReply with your first stop 👇\n\nhttps://zkas.stream/\n\n#ZKAS"},
+  {time:'14:30',imageUrl:'',text:"🛡️ Privacy is normal.\n\nSavings, salary, purchases, and business payments are everyday reasons people may not want their full financial history public.\n\nWhat’s the strongest real-world case for privacy?\n\n#ZKAS #Privacy"},
+  {time:'16:24',imageUrl:'',text:"⛏️ Community mining\n\nPool, solo, merged, or community mining — different miners want different setups.\n\nWhich way would you choose to participate in ZKAS today?\n\n#ZKAS #Mining"},
+  {time:'18:18',imageUrl:'',text:"💡 What drives ZKAS growth most?\n\n• better wallets\n• more miners\n• deeper liquidity\n• more tools\n• more awareness\n\nWhich one should be the priority? 👇\n\n#ZKAS #Crypto"},
+  {time:'20:12',imageUrl:'',text:"🌐 Why ZKAS.stream?\n\nOne place for network data, mining, markets, OTC activity, explorer tools, and community features.\n\nWhat page or tool do you use most?\n\nhttps://zkas.stream/\n\n#ZKAS"},
+  {time:'22:00',imageUrl:'',text:"🤝 Community check-in\n\nWhat keeps you following ZKAS?\n\nPrivacy? Mining? Kaspa? Technology? Community?\n\nReply with the one reason that matters most to you 👇\n\n#ZKAS #Kaspa"},
 ];
 
 function tomorrowLocalDate(){
@@ -96,8 +96,8 @@ export function BufferAdminPage() {
     const canvas=document.createElement('canvas');canvas.width=1200;canvas.height=675;
     const ctx=canvas.getContext('2d');if(!ctx) throw new Error('Could not create visual.');
 
-    const titles=['EVERYDAY PRIVACY','MERGE MINING','WALLET ADOPTION','FIRST STOP?','PRIVACY IS NORMAL','COMMUNITY MINING','WHAT DRIVES GROWTH?','WHY ZKAS.stream?','WHY ARE YOU HERE?','ZKAS MATTERS BECAUSE...'];
-    const subs=['DEFAULT · OPTIONAL · UNNECESSARY?','KASPA + ZKAS','WHAT HELPS MOST?','WHAT DO YOU CHECK FIRST?','REAL-WORLD USE CASES','HOW DO YOU PARTICIPATE?','MINERS · WALLETS · LIQUIDITY · TOOLS','FOLLOW THE NETWORK','PRIVACY · MINING · COMMUNITY','FILL IN THE BLANK'];
+    const titles=['WHY ZKAS?','PRIVACY BY DEFAULT','MERGE MINING','WALLET WISHLIST','WHAT DO YOU CHECK FIRST?','PRIVACY IS NORMAL','COMMUNITY MINING','WHAT DRIVES GROWTH?','WHY ZKAS.stream?','COMMUNITY CHECK-IN'];
+    const subs=['REPLY IN ONE SENTENCE','DEFAULT · OPTIONAL · UNNECESSARY?','KASPA + ZKAS','WHAT FEATURE COMES FIRST?','MINING · OTC · MARKETS · EXPLORER','SAVINGS · SALARY · PURCHASES · SECURITY','POOL · SOLO · MERGED · COMMUNITY','WALLETS · MINERS · LIQUIDITY · AWARENESS','ONE HUB FOR NETWORK DATA','WHAT KEEPS YOU HERE?'];
 
     const bg=ctx.createLinearGradient(0,0,1200,675);
     bg.addColorStop(0,'#041716');bg.addColorStop(.55,'#082326');bg.addColorStop(1,index%2?'#0c3030':'#13262f');
