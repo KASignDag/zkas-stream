@@ -4,20 +4,20 @@ type BufferChannel = { id: string; name?: string; displayName?: string; service?
 type BufferOrg = { id: string; name: string; channels: BufferChannel[] };
 type BufferStatus = { account?: { name?: string | null; timezone?: string | null }; organizations?: BufferOrg[] };
 type DailyPost = { time: string; text: string; imageUrl: string };
-const VISUAL_PACK_VERSION = '2026-10-08-c';
+const VISUAL_PACK_VERSION = '2026-10-09-features-a';
 
 const DAILY_POSTS: DailyPost[] = [
 
-  {time:'05:00',imageUrl:'',text:"⚡ Why ZKAS?\n\nPrivacy, mining, community, and a growing set of tools all matter — but everyone has a different reason for following.\n\nReply in one sentence: Why ZKAS? 👇\n\n#ZKAS #Kaspa"},
-  {time:'06:54',imageUrl:'',text:"🔐 Privacy by default\n\nShould financial privacy be built in, optional, or unnecessary?\n\nZKAS starts from the idea that your transaction history should not automatically be public.\n\nWhat’s your view? 👇\n\n#ZKAS #Privacy"},
-  {time:'08:48',imageUrl:'',text:"⛏️ Merge mining\n\nThe same mining effort can help support Kaspa and ZKAS.\n\nFor miners, that means two networks without choosing one over the other.\n\nWould merge mining make you more likely to mine ZKAS?\n\n#ZKAS #Kaspa #Mining"},
-  {time:'10:42',imageUrl:'',text:"📱 Wallet wishlist\n\nWhich wallet feature should come first?\n\n• simpler backup\n• better history\n• QR payments\n• address book\n• price alerts\n\nPick one — or suggest another 👇\n\n#ZKAS #Wallet"},
-  {time:'12:36',imageUrl:'',text:"📊 What do you check first on ZKAS.stream?\n\n• mining\n• OTC\n• markets\n• explorer\n• network data\n\nReply with your first stop 👇\n\nhttps://zkas.stream/\n\n#ZKAS"},
-  {time:'14:30',imageUrl:'',text:"🛡️ Privacy is normal.\n\nSavings, salary, purchases, and business payments are everyday reasons people may not want their full financial history public.\n\nWhat’s the strongest real-world case for privacy?\n\n#ZKAS #Privacy"},
-  {time:'16:24',imageUrl:'',text:"⛏️ Community mining\n\nPool, solo, merged, or community mining — different miners want different setups.\n\nWhich way would you choose to participate in ZKAS today?\n\n#ZKAS #Mining"},
-  {time:'18:18',imageUrl:'',text:"💡 What drives ZKAS growth most?\n\n• better wallets\n• more miners\n• deeper liquidity\n• more tools\n• more awareness\n\nWhich one should be the priority? 👇\n\n#ZKAS #Crypto"},
-  {time:'20:12',imageUrl:'',text:"🌐 Why ZKAS.stream?\n\nOne place for network data, mining, markets, OTC activity, explorer tools, and community features.\n\nWhat page or tool do you use most?\n\nhttps://zkas.stream/\n\n#ZKAS"},
-  {time:'22:00',imageUrl:'',text:"🤝 Community check-in\n\nWhat keeps you following ZKAS?\n\nPrivacy? Mining? Kaspa? Technology? Community?\n\nReply with the one reason that matters most to you 👇\n\n#ZKAS #Kaspa"},
+  {time:'05:00',imageUrl:'',text:"🌐 ZKAS.stream feature tour #1\n\nLive network intelligence: follow blocks, hashrate, nodes and network activity from one place.\n\nWhich live stat do you watch most?\n\nhttps://zkas.stream/\n\n#ZKAS #Kaspa"},
+  {time:'06:54',imageUrl:'',text:"⛏️ ZKAS.stream feature tour #2\n\nMining tools: compare solo, pool, merged and community mining while following live mining activity.\n\nWhat setup are you running today? 👇\n\n#ZKAS #Mining"},
+  {time:'08:48',imageUrl:'',text:"🤝 ZKAS.stream feature tour #3\n\nOTC dashboard: completed trades, open orders and market activity in one view — with exchange data kept separate.\n\nDo you watch OTC or exchange markets more?\n\n#ZKAS #OTC"},
+  {time:'10:42',imageUrl:'',text:"📊 ZKAS.stream feature tour #4\n\nExchange markets: follow live ZKAS markets, price action, volume and market-cap data without bouncing between tabs.\n\nWhat market metric matters most to you?\n\n#ZKAS #Crypto"},
+  {time:'12:36',imageUrl:'',text:"🔎 ZKAS.stream feature tour #5\n\nExplorer tools help make the chain easier to read: network activity, blocks, supply data and DAG-style views in one place.\n\nWhat explorer feature do you use most?\n\n#ZKAS"},
+  {time:'14:30',imageUrl:'',text:"🧮 ZKAS.stream feature tour #6\n\nMining calculators help estimate ZKAS solo results, KAS theoretical returns and combined mining value.\n\nShould we add more calculators? If yes, which one? 👇\n\n#ZKAS #Mining"},
+  {time:'16:24',imageUrl:'',text:"🌍 ZKAS.stream feature tour #7\n\nNode map: see where ZKAS nodes are distributed around the world and compare regional activity.\n\nWhat region are you running a node from? 🌎\n\n#ZKAS #Nodes"},
+  {time:'18:18',imageUrl:'',text:"💱 ZKAS.stream feature tour #8\n\nConverters make it easy to check KAS and ZKAS values against USDT right from the site.\n\nWhat conversion pair should we add next?\n\n#ZKAS #Kaspa"},
+  {time:'20:12',imageUrl:'',text:"📱 ZKAS ecosystem feature tour #9\n\nStream Wallet is built as a non-custodial mobile wallet for ZKAS — create, restore, receive, send and scan without giving up control of your keys.\n\nWhat wallet feature should come next?\n\n#ZKAS"},
+  {time:'22:00',imageUrl:'',text:"⚡ ZKAS.stream feature tour #10\n\nNetwork data. Mining. OTC. Markets. Explorer. Calculators. Nodes. Converters. Wallet tools.\n\nWhich ZKAS feature should get the biggest upgrade next? 👇\n\nhttps://zkas.stream/\n\n#ZKAS"},
 ];
 
 function tomorrowLocalDate(){
@@ -96,8 +96,8 @@ export function BufferAdminPage() {
     const canvas=document.createElement('canvas');canvas.width=1200;canvas.height=675;
     const ctx=canvas.getContext('2d');if(!ctx) throw new Error('Could not create visual.');
 
-    const titles=['WHY ZKAS?','PRIVACY BY DEFAULT','MERGE MINING','WALLET WISHLIST','WHAT DO YOU CHECK FIRST?','PRIVACY IS NORMAL','COMMUNITY MINING','WHAT DRIVES GROWTH?','WHY ZKAS.stream?','COMMUNITY CHECK-IN'];
-    const subs=['REPLY IN ONE SENTENCE','DEFAULT · OPTIONAL · UNNECESSARY?','KASPA + ZKAS','WHAT FEATURE COMES FIRST?','MINING · OTC · MARKETS · EXPLORER','SAVINGS · SALARY · PURCHASES · SECURITY','POOL · SOLO · MERGED · COMMUNITY','WALLETS · MINERS · LIQUIDITY · AWARENESS','ONE HUB FOR NETWORK DATA','WHAT KEEPS YOU HERE?'];
+    const titles=['LIVE NETWORK','MINING TOOLS','OTC DASHBOARD','EXCHANGE MARKETS','EXPLORER TOOLS','MINING CALCULATOR','NODE MAP','KAS + ZKAS CONVERTER','STREAM WALLET','ALL ZKAS FEATURES'];
+    const subs=['BLOCKS · HASHRATE · NODES','SOLO · POOL · MERGED · COMMUNITY','TRADES · ORDERS · ACTIVITY','PRICE · VOLUME · MARKET CAP','BLOCKS · SUPPLY · DAG','SOLO · KAS · COMBINED VALUE','GLOBAL NETWORK VIEW','USDT CONVERSIONS','NON-CUSTODIAL MOBILE WALLET','NETWORK · MINING · MARKETS · TOOLS'];
 
     const bg=ctx.createLinearGradient(0,0,1200,675);
     bg.addColorStop(0,'#031512');bg.addColorStop(.58,'#09272a');bg.addColorStop(1,'#0b3537');
