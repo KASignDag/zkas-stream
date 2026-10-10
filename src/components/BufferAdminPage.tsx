@@ -4,20 +4,20 @@ type BufferChannel = { id: string; name?: string; displayName?: string; service?
 type BufferOrg = { id: string; name: string; channels: BufferChannel[] };
 type BufferStatus = { account?: { name?: string | null; timezone?: string | null }; organizations?: BufferOrg[] };
 type DailyPost = { time: string; text: string; imageUrl: string };
-const VISUAL_PACK_VERSION = '2026-10-09-features-a';
+const VISUAL_PACK_VERSION = '2026-10-10-zkas-only-a';
 
 const DAILY_POSTS: DailyPost[] = [
 
-  {time:'05:00',imageUrl:'',text:"🌐 ZKAS.stream feature tour #1\n\nLive network intelligence: follow blocks, hashrate, nodes and network activity from one place.\n\nWhich live stat do you watch most?\n\nhttps://zkas.stream/\n\n#ZKAS #Kaspa"},
-  {time:'06:54',imageUrl:'',text:"⛏️ ZKAS.stream feature tour #2\n\nMining tools: compare solo, pool, merged and community mining while following live mining activity.\n\nWhat setup are you running today? 👇\n\n#ZKAS #Mining"},
-  {time:'08:48',imageUrl:'',text:"🤝 ZKAS.stream feature tour #3\n\nOTC dashboard: completed trades, open orders and market activity in one view — with exchange data kept separate.\n\nDo you watch OTC or exchange markets more?\n\n#ZKAS #OTC"},
-  {time:'10:42',imageUrl:'',text:"📊 ZKAS.stream feature tour #4\n\nExchange markets: follow live ZKAS markets, price action, volume and market-cap data without bouncing between tabs.\n\nWhat market metric matters most to you?\n\n#ZKAS #Crypto"},
-  {time:'12:36',imageUrl:'',text:"🔎 ZKAS.stream feature tour #5\n\nExplorer tools help make the chain easier to read: network activity, blocks, supply data and DAG-style views in one place.\n\nWhat explorer feature do you use most?\n\n#ZKAS"},
-  {time:'14:30',imageUrl:'',text:"🧮 ZKAS.stream feature tour #6\n\nMining calculators help estimate ZKAS solo results, KAS theoretical returns and combined mining value.\n\nShould we add more calculators? If yes, which one? 👇\n\n#ZKAS #Mining"},
-  {time:'16:24',imageUrl:'',text:"🌍 ZKAS.stream feature tour #7\n\nNode map: see where ZKAS nodes are distributed around the world and compare regional activity.\n\nWhat region are you running a node from? 🌎\n\n#ZKAS #Nodes"},
-  {time:'18:18',imageUrl:'',text:"💱 ZKAS.stream feature tour #8\n\nConverters make it easy to check KAS and ZKAS values against USDT right from the site.\n\nWhat conversion pair should we add next?\n\n#ZKAS #Kaspa"},
-  {time:'20:12',imageUrl:'',text:"📱 ZKAS ecosystem feature tour #9\n\nStream Wallet is built as a non-custodial mobile wallet for ZKAS — create, restore, receive, send and scan without giving up control of your keys.\n\nWhat wallet feature should come next?\n\n#ZKAS"},
-  {time:'22:00',imageUrl:'',text:"⚡ ZKAS.stream feature tour #10\n\nNetwork data. Mining. OTC. Markets. Explorer. Calculators. Nodes. Converters. Wallet tools.\n\nWhich ZKAS feature should get the biggest upgrade next? 👇\n\nhttps://zkas.stream/\n\n#ZKAS"},
+  {time:'05:00',imageUrl:'',text:"Privacy should not be an extra feature.\n\nZKAS is built with privacy by default, giving users more control over how they use digital money.\n\nIn a world where everything gets tracked, does financial privacy matter more than ever? 👇\n\n#ZKAS #Privacy"},
+  {time:'06:54',imageUrl:'',text:"ZKAS can be merge mined alongside Kaspa, helping miners support two networks with the same work.\n\nThat means stronger security, more opportunity, and a growing ecosystem.\n\nWould merge mining make you more likely to mine ZKAS? ⛏️\n\n#ZKAS #Kaspa #Mining"},
+  {time:'08:48',imageUrl:'',text:"No premine. No early private stash.\n\nZKAS launched with open participation from the start.\n\nFair launch still matters in crypto — maybe now more than ever.\n\nDo you think fair launch is a big deal when judging a project? 👇\n\n#ZKAS #Crypto"},
+  {time:'10:42',imageUrl:'',text:"Stream Wallet brings a non-custodial mobile wallet experience to ZKAS.\n\nCreate, restore, receive, send, and scan — while keeping control of your own keys.\n\nWhat wallet feature should come next? 🔐\n\n#ZKAS #Wallet"},
+  {time:'12:36',imageUrl:'',text:"A strong network is built by real people participating.\n\nZKAS community mining gives miners a simple way to help support the network together.\n\nAre you currently mining, watching, or just learning about ZKAS? 👇\n\n#ZKAS #Mining #Community"},
+  {time:'14:30',imageUrl:'',text:"Not every trade fits inside a standard order book.\n\nOTC access gives the ZKAS ecosystem another route for direct market activity.\n\nDo you prefer using OTC or exchange trading when dealing with smaller-cap projects? 🤝\n\n#ZKAS #OTC #Crypto"},
+  {time:'16:24',imageUrl:'',text:"Broader market access can help any ecosystem grow through better visibility, more liquidity, and easier discovery.\n\nAs ZKAS grows, what matters most to you: liquidity, accessibility, or exposure?\n\n#ZKAS #Crypto #Exchanges"},
+  {time:'18:18',imageUrl:'',text:"A resilient network needs strong infrastructure.\n\nEvery node helps make ZKAS more decentralized, distributed, and always-on.\n\nIf you could contribute one way, would it be by running a node, miner, or wallet? 🌍\n\n#ZKAS #Nodes #Decentralization"},
+  {time:'20:12',imageUrl:'',text:"Good infrastructure matters.\n\nA strong blockchain explorer helps users follow blocks, transactions, and network activity in real time.\n\nWhen you open an explorer, what do you check first: blocks, transactions, or hashrate?\n\n#ZKAS #Blockchain"},
+  {time:'22:00',imageUrl:'',text:"Why ZKAS?\n\n✅ Privacy by default\n✅ Merge mining\n✅ Community participation\n✅ Growing ecosystem utility\n\nIf you had to explain ZKAS in one sentence, what would you say? 👇\n\n#ZKAS #Crypto #Community"},
 ];
 
 function tomorrowLocalDate(){
