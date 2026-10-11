@@ -4,20 +4,20 @@ type BufferChannel = { id: string; name?: string; displayName?: string; service?
 type BufferOrg = { id: string; name: string; channels: BufferChannel[] };
 type BufferStatus = { account?: { name?: string | null; timezone?: string | null }; organizations?: BufferOrg[] };
 type DailyPost = { time: string; text: string; imageUrl: string };
-const VISUAL_PACK_VERSION = '2026-10-10-zkas-only-a';
+const VISUAL_PACK_VERSION = '2026-10-12-whitepaper-tech-a';
 
 const DAILY_POSTS: DailyPost[] = [
 
-  {time:'05:00',imageUrl:'',text:"Privacy should not be an extra feature.\n\nZKAS is built with privacy by default, giving users more control over how they use digital money.\n\nIn a world where everything gets tracked, does financial privacy matter more than ever? 👇\n\n#ZKAS #Privacy"},
-  {time:'06:54',imageUrl:'',text:"ZKAS can be merge mined alongside Kaspa, helping miners support two networks with the same work.\n\nThat means stronger security, more opportunity, and a growing ecosystem.\n\nWould merge mining make you more likely to mine ZKAS? ⛏️\n\n#ZKAS #Kaspa #Mining"},
-  {time:'08:48',imageUrl:'',text:"No premine. No early private stash.\n\nZKAS launched with open participation from the start.\n\nFair launch still matters in crypto — maybe now more than ever.\n\nDo you think fair launch is a big deal when judging a project? 👇\n\n#ZKAS #Crypto"},
-  {time:'10:42',imageUrl:'',text:"Stream Wallet brings a non-custodial mobile wallet experience to ZKAS.\n\nCreate, restore, receive, send, and scan — while keeping control of your own keys.\n\nWhat wallet feature should come next? 🔐\n\n#ZKAS #Wallet"},
-  {time:'12:36',imageUrl:'',text:"A strong network is built by real people participating.\n\nZKAS community mining gives miners a simple way to help support the network together.\n\nAre you currently mining, watching, or just learning about ZKAS? 👇\n\n#ZKAS #Mining #Community"},
-  {time:'14:30',imageUrl:'',text:"Not every trade fits inside a standard order book.\n\nOTC access gives the ZKAS ecosystem another route for direct market activity.\n\nDo you prefer using OTC or exchange trading when dealing with smaller-cap projects? 🤝\n\n#ZKAS #OTC #Crypto"},
-  {time:'16:24',imageUrl:'',text:"Broader market access can help any ecosystem grow through better visibility, more liquidity, and easier discovery.\n\nAs ZKAS grows, what matters most to you: liquidity, accessibility, or exposure?\n\n#ZKAS #Crypto #Exchanges"},
-  {time:'18:18',imageUrl:'',text:"A resilient network needs strong infrastructure.\n\nEvery node helps make ZKAS more decentralized, distributed, and always-on.\n\nIf you could contribute one way, would it be by running a node, miner, or wallet? 🌍\n\n#ZKAS #Nodes #Decentralization"},
-  {time:'20:12',imageUrl:'',text:"Good infrastructure matters.\n\nA strong blockchain explorer helps users follow blocks, transactions, and network activity in real time.\n\nWhen you open an explorer, what do you check first: blocks, transactions, or hashrate?\n\n#ZKAS #Blockchain"},
-  {time:'22:00',imageUrl:'',text:"Why ZKAS?\n\n✅ Privacy by default\n✅ Merge mining\n✅ Community participation\n✅ Growing ecosystem utility\n\nIf you had to explain ZKAS in one sentence, what would you say? 👇\n\n#ZKAS #Crypto #Community"},
+  {time:'05:00',imageUrl:'',text:"🔐 Private by construction\n\nZKAS does not rely on an optional privacy mode. Normal transfers are shielded by default, with sender, recipient and amount hidden by construction.\n\nPrivacy is the default — not a switch.\n\n#ZKAS #Privacy"},
+  {time:'06:54',imageUrl:'',text:"⚡ Why GHOSTDAG matters\n\nZKAS uses a Kaspa-derived GHOSTDAG BlockDAG, allowing blocks to be produced in parallel and ordered into one accepted history.\n\nParallel PoW. One consensus history.\n\n#ZKAS #GHOSTDAG #Kaspa"},
+  {time:'08:48',imageUrl:'',text:"🧠 Orchard + Halo 2\n\nZKAS uses Orchard shielded transactions and Halo 2 zero-knowledge proofs.\n\nThat means private transactions without relying on a trusted setup ceremony.\n\n#ZKAS #ZeroKnowledge #Privacy"},
+  {time:'10:42',imageUrl:'',text:"⏱️ 1-second block target\n\nZKAS targets roughly 1 block per second while keeping normal transfers shielded.\n\nThe goal: privacy without making settlement feel slow.\n\n#ZKAS #BlockDAG #PoW"},
+  {time:'12:36',imageUrl:'',text:"⛏️ Merge mining with Kaspa\n\nZKAS uses the same kHeavyHash proof-of-work algorithm as Kaspa, enabling miners to support both networks with the same hashing effort.\n\nOne mining effort. Two networks.\n\n#ZKAS #Kaspa #Mining"},
+  {time:'14:30',imageUrl:'',text:"🛡️ No transparent fallback\n\nZKAS has no transparent transfer type for normal payments.\n\nThe shielded pool is the system — privacy is built into the architecture, not added later.\n\n#ZKAS #Privacy"},
+  {time:'16:24',imageUrl:'',text:"🔁 How ZKAS stops double-spends privately\n\nNullifiers prevent a shielded note from being spent twice without revealing the original note itself.\n\nPrivate spending, with uniqueness enforced on-chain.\n\n#ZKAS #Cryptography"},
+  {time:'18:18',imageUrl:'',text:"⛏️ No premine\n\nThe ZKAS genesis coinbase is unspendable, and issuance begins through proof-of-work mining rather than a spendable genesis allocation.\n\nPoW issuance from the start.\n\n#ZKAS #PoW #Mining"},
+  {time:'20:12',imageUrl:'',text:"📐 Supply integrity without public balances\n\nZKAS enforces supply integrity through consensus rules even though ordinary balances are not publicly exposed.\n\nPrivate ledger. Verifiable rules.\n\n#ZKAS #Privacy #Crypto"},
+  {time:'22:00',imageUrl:'',text:"🌐 What is ZKAS solving?\n\nZKAS combines GHOSTDAG parallel PoW, Orchard privacy, Halo 2 proofs and kHeavyHash merge mining into one private-by-default BlockDAG.\n\nThat combination is the core technical idea.\n\n#ZKAS"},
 ];
 
 function tomorrowLocalDate(){
