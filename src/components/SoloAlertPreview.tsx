@@ -534,7 +534,9 @@ export function SoloAlertPreview() {
       <section id="solo-section-workers" className={`solo-section solo-app-section ${appSection === 'workers' ? 'active' : ''}`}>
         <div className="solo-section-head">
           <div><span>WORKERS</span><h3>My paired workers</h3></div>
-          <button className="solo-add-button" onClick={() => { setPairingStep(1); setPairingOpen(true); }}>+ Pair miner</button>
+          {privateTelemetry?.paired && (
+            <button className="solo-add-button" onClick={() => { setPairingStep(1); setPairingOpen(true); }}>+ Add another miner</button>
+          )}
         </div>
 
         <div className="solo-miner-grid">
