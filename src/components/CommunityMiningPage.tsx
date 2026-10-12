@@ -135,8 +135,8 @@ export function CommunityMiningPage() {
           <div className="community-mining__eyebrow"><Zap size={16} /> ZKAS + KAS SOLO MERGE MINING</div>
           <h2>Community Merge Mining</h2>
           <p>
-            Live, privacy-safe mining telemetry from the ZKAS.stream community gateway. Compatible ASICs can solo merge-mine
-            ZKAS and KAS with the same hashrate while each miner keeps control of their own ZKAS and Kaspa payout addresses.
+            Live mining telemetry from the ZKAS.stream community gateway. The public page shows miner aliases and performance
+            stats; wallet addresses and miner IP addresses are not displayed publicly.
           </p>
         </div>
         <button className="community-mining__refresh" type="button" onClick={() => void refresh()}>
@@ -165,7 +165,7 @@ export function CommunityMiningPage() {
       <div className="community-mining__panel">
         <div className="community-mining__panel-head">
           <div><Activity size={18} /> Live miners</div>
-          <span>Wallet addresses and IP addresses are never displayed.</span>
+          <span>Wallet addresses and miner IP addresses are not displayed on this public dashboard.</span>
         </div>
 
         {state === 'error' && <div className="community-mining__empty">Mining snapshot is temporarily unavailable.</div>}
