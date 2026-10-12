@@ -17,7 +17,8 @@ type MinerRow = {
   kasBeforeRestart: number | null;
   zkasSinceRestart: number | null;
   kasSinceRestart: number | null;
-  kasPayoutSet: boolean;
+  kasPayoutStatus?: 'miner' | 'fallback' | 'unknown';
+  kasPayoutSet: boolean | null;
 };
 
 type MiningSnapshot = {
@@ -75,6 +76,14 @@ function fmtNumber(value: number | null) {
   return value === null || !Number.isFinite(value)
     ? '—'
     : new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 }).format(value);
+}
+
+function payoutLabel(miner: MinerRow) {
+  const status = miner.kasPayoutStatus
+    ?? (miner.kasPayoutSet === true ? 'miner' : miner.kasPayoutSet === false ? 'fallback' : 'unknown');
+  if (status === 'miner') return 'Miner wallet';
+  if (status === 'fallback') return 'Pool fallback';
+  return 'Verify KAS password';
 }
 
 export function CommunityMiningPage() {
@@ -204,7 +213,7 @@ export function CommunityMiningPage() {
                     <td className="community-mining__rewards"><span>ZKAS {fmtNumber(miner.zkasBlocks)}</span><span>KAS {fmtNumber(miner.kasBlocks)}</span></td>
                     <td className="community-mining__rewards"><span>ZKAS {fmtNumber(miner.zkasBeforeRestart)}</span><span>KAS {fmtNumber(miner.kasBeforeRestart)}</span></td>
                     <td className="community-mining__rewards"><span>ZKAS {fmtNumber(miner.zkasSinceRestart)}</span><span>KAS {fmtNumber(miner.kasSinceRestart)}</span></td>
-                    <td><span className={`community-mining__payout ${miner.kasPayoutSet ? 'is-set' : ''}`}>{miner.kasPayoutSet ? 'Miner wallet' : 'Pool fallback'}</span></td>
+                    <td><span className={`community-mining__payout ${miner.kasPayoutStatus === 'miner' || miner.kasPayoutSet === true ? 'is-set' : ''}`}>{payoutLabel(miner)}</span></td>
                   </tr>
                 ))}
               </tbody>
@@ -218,6 +227,7 @@ export function CommunityMiningPage() {
         <div><span>URL</span><code>stratum+tcp://mine.zkas.stream:&lt;port&gt;</code></div>
         <div><span>User / worker</span><code>zkas:&lt;YOUR_ZKAS_ADDRESS&gt;.&lt;WORKER&gt;</code></div>
         <div><span>Password</span><code>kaspa:&lt;YOUR_KAS_ADDRESS&gt;</code></div>
+        <p>KAS rewards go directly to the miner only when the Stratum password is a valid full <code>kaspa:</code> address. If payout telemetry is unavailable, the dashboard shows “Verify KAS password” instead of guessing.</p>
         <p>The public hostname and production port will be published after the external gateway test is complete. Until then, this page is showing the live private-gateway test feed.</p>
       </div>
 

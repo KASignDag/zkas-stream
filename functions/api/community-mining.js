@@ -61,10 +61,20 @@ function cleanAlias(value) {
   return /^[A-Za-z0-9._-]{1,32}$/.test(alias) ? alias : null;
 }
 
+function payoutStatus(value) {
+  if (value?.kasPayoutStatus === 'miner' || value?.kasPayoutStatus === 'fallback') {
+    return value.kasPayoutStatus;
+  }
+  if (value?.kasPayoutStatus === 'unknown') return 'unknown';
+  if (typeof value?.kasPayoutSet === 'boolean') return value.kasPayoutSet ? 'miner' : 'fallback';
+  return 'unknown';
+}
+
 function cleanMiner(value) {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
   const alias = cleanAlias(value.alias);
   if (!alias) return null;
+  const cleanPayoutStatus = payoutStatus(value);
   return {
     alias,
     status: value.status === 'online' || value.status === 'attention' ? value.status : 'offline',
@@ -76,7 +86,8 @@ function cleanMiner(value) {
     lastShareAt: finiteNonNegative(value.lastShareAt),
     zkasBlocks: finiteNonNegative(value.zkasBlocks),
     kasBlocks: finiteNonNegative(value.kasBlocks),
-    kasPayoutSet: value.kasPayoutSet === true,
+    kasPayoutStatus: cleanPayoutStatus,
+    kasPayoutSet: cleanPayoutStatus === 'miner' ? true : cleanPayoutStatus === 'fallback' ? false : null,
   };
 }
 
@@ -166,6 +177,7 @@ function preserveGatewayTotals(state) {
 
 function historicalMinerRow(alias, saved) {
   const last = saved?.lastSnapshot && typeof saved.lastSnapshot === 'object' ? saved.lastSnapshot : {};
+  const savedPayoutStatus = payoutStatus(saved);
   return {
     alias,
     status: 'offline',
@@ -185,7 +197,8 @@ function historicalMinerRow(alias, saved) {
     kasBeforeRestart: counterValue(saved?.sessionBaseline?.kas),
     zkasSinceRestart: Math.max(0, counterValue(saved?.zkas?.total) - counterValue(saved?.sessionBaseline?.zkas)),
     kasSinceRestart: Math.max(0, counterValue(saved?.kas?.total) - counterValue(saved?.sessionBaseline?.kas)),
-    kasPayoutSet: saved?.kasPayoutSet === true,
+    kasPayoutStatus: savedPayoutStatus,
+    kasPayoutSet: savedPayoutStatus === 'miner' ? true : savedPayoutStatus === 'fallback' ? false : null,
   };
 }
 
@@ -251,6 +264,7 @@ function applyLifetimeBlockCounters(state, gateway, miners, bridgeStartedAt) {
       zkas,
       kas,
       sessionBaseline,
+      kasPayoutStatus: miner.kasPayoutStatus,
       kasPayoutSet: miner.kasPayoutSet,
       lastSnapshot,
       lastSeenAt,
@@ -273,7 +287,7 @@ function applyLifetimeBlockCounters(state, gateway, miners, bridgeStartedAt) {
 
   const currentAliases = new Set(published.map((miner) => miner.alias));
   for (const [alias, saved] of Object.entries(state.miners)) {
-    if (!currentAliases.has(alias) && (counterValue(saved?.zkas?.total) > 0 || counterValue(saved?.kas?.total) > 0)) {
+    if (!currentAliases.has(alias)) {
       published.push(historicalMinerRow(alias, saved));
     }
   }

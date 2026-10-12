@@ -90,27 +90,15 @@ function Get-WorkerIps($seriesSets, [string]$worker) {
 }
 
 function Get-PublicAlias($seriesSets, [string]$worker) {
-  # Public API aliases intentionally use a small, URL-safe character set.
-  # ASIC firmware and rental services may include characters such as "#" in
-  # worker names. Replace each unsupported run instead of allowing one worker
-  # to make the API reject the collector's entire snapshot.
-  $base = [regex]::Replace($worker.Trim(), '[^A-Za-z0-9._-]+', '-')
-  if ([string]::IsNullOrWhiteSpace($base)) { $base = 'miner' }
-
   $wallet = Get-WorkerWallet $seriesSets $worker
-  if ([string]::IsNullOrWhiteSpace($wallet) -or $wallet -notmatch '([A-Za-z0-9]{3})$') {
-    if ($base.Length -gt 32) { $base = $base.Substring(0, 32) }
-    return $base
-  }
+  if ([string]::IsNullOrWhiteSpace($wallet) -or $wallet -notmatch '([A-Za-z0-9]{3})$') { return $worker }
 
   $suffix = $Matches[1].ToLowerInvariant()
-  if ($base.EndsWith("-$suffix", [StringComparison]::OrdinalIgnoreCase)) {
-    if ($base.Length -le 32) { return $base }
-    $base = $base.Substring(0, $base.Length - 4)
-  }
+  if ($worker.EndsWith("-$suffix", [StringComparison]::OrdinalIgnoreCase)) { return $worker }
 
   # API aliases are limited to 32 characters. Preserve as much of the worker
   # name as possible while reserving four characters for "-xyz".
+  $base = $worker.Trim()
   if ($base.Length -gt 28) { $base = $base.Substring(0, 28) }
   return "$base-$suffix"
 }
@@ -273,7 +261,17 @@ function Build-Snapshot([string]$text) {
       $kas = Sum-SessionMax $kasAcceptedLegacy $worker
     }
 
-    $payoutSet = (Max-WorkerValue $kasPayoutSet $worker) -ge 1
+    # Bridge versions before 1.0.12 exposed ks_worker_kas_payout_set.
+    # ZKrise bridge 1.0.12 does not, so absence must be reported as unknown
+    # rather than being interpreted as the operator/pool fallback.
+    $workerPayoutRows = @($kasPayoutSet | Where-Object { [string]$_.Labels['worker'] -eq $worker })
+    $payoutStatus = if ($workerPayoutRows.Count -eq 0) {
+      'unknown'
+    } elseif ((Max-WorkerValue $workerPayoutRows $worker) -ge 1) {
+      'miner'
+    } else {
+      'fallback'
+    }
 
     Add-WorkerWorkSample $worker $nowSec $acceptedShares $difficultyNow $now
     $hashrate = Get-RollingHashrate $worker
@@ -296,7 +294,8 @@ function Build-Snapshot([string]$text) {
       lastShareAt = $(if ($lastShareAt.ContainsKey($worker)) { [int64]$lastShareAt[$worker] } else { $null })
       zkasBlocks = [math]::Round($zkas, 0)
       kasBlocks = [math]::Round($kas, 0)
-      kasPayoutSet = [bool]$payoutSet
+      kasPayoutStatus = $payoutStatus
+      kasPayoutSet = $(if ($payoutStatus -eq 'miner') { $true } elseif ($payoutStatus -eq 'fallback') { $false } else { $null })
     }
   }
 
