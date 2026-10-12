@@ -11,7 +11,7 @@ param(
 
 $ErrorActionPreference = 'Stop'
 $Two32 = [math]::Pow(2, 32)
-$previous = @{}
+$previousSessions = @{}
 $workTotals = @{}
 $history = @{}
 $lastShareAt = @{}
@@ -125,6 +125,40 @@ function Max-WorkerValue($series, [string]$worker) {
   return $max
 }
 
+function Get-WorkerShareSessions($validSeries, $difficultySeries, [string]$worker) {
+  $sessions = @{}
+
+  # Bridge 1.0.12 can expose the share counter and assigned difficulty as
+  # separate metric rows for the same TCP connection (one row may have an
+  # empty miner label). The IP label includes the remote port, so it is the
+  # stable key that keeps one connection's shares paired with its difficulty.
+  foreach ($row in $validSeries) {
+    if ([string]$row.Labels['worker'] -ne $worker) { continue }
+    $key = [string]$row.Labels['ip']
+    if ([string]::IsNullOrWhiteSpace($key)) { continue }
+    if (-not $sessions.ContainsKey($key)) {
+      $sessions[$key] = @{ Shares = 0.0; Difficulty = 0.0 }
+    }
+    if ($row.Value -gt [double]$sessions[$key].Shares) {
+      $sessions[$key].Shares = [double]$row.Value
+    }
+  }
+
+  foreach ($row in $difficultySeries) {
+    if ([string]$row.Labels['worker'] -ne $worker) { continue }
+    $key = [string]$row.Labels['ip']
+    if ([string]::IsNullOrWhiteSpace($key)) { continue }
+    if (-not $sessions.ContainsKey($key)) {
+      $sessions[$key] = @{ Shares = 0.0; Difficulty = 0.0 }
+    }
+    if ($row.Value -gt [double]$sessions[$key].Difficulty) {
+      $sessions[$key].Difficulty = [double]$row.Value
+    }
+  }
+
+  return $sessions
+}
+
 function Min-WorkerStart($series, [string]$worker, [double]$currentDifficulty) {
   if ($currentDifficulty -le 0) { return $null }
   $min = $null
@@ -143,57 +177,53 @@ function Reset-WorkerHashrate([string]$worker) {
 function Add-WorkerWorkSample(
   [string]$worker,
   [double]$nowSec,
-  [double]$acceptedShares,
-  [double]$difficultyNow,
+  $sessions,
   [int64]$nowMs
 ) {
   if (-not $workTotals.ContainsKey($worker) -or -not $history.ContainsKey($worker)) {
     Reset-WorkerHashrate $worker
   }
 
-  if ($previous.ContainsKey($worker)) {
-    $prior = $previous[$worker]
-    $deltaShares = $acceptedShares - [double]$prior.Shares
+  foreach ($sessionKey in $sessions.Keys) {
+    $stateKey = "$worker|$sessionKey"
+    $current = $sessions[$sessionKey]
 
-    # Bridge restarts can reset cumulative counters. Start a fresh window rather
-    # than turning the reset into negative work or a false hashrate spike.
-    if ($deltaShares -lt 0) {
-      Reset-WorkerHashrate $worker
-      $deltaShares = 0
-    }
+    if ($previousSessions.ContainsKey($stateKey)) {
+      $prior = $previousSessions[$stateKey]
+      $deltaShares = [double]$current.Shares - [double]$prior.Shares
 
-    if ($deltaShares -gt 0) {
-      $priorDifficulty = [double]$prior.Difficulty
-      $intervalDifficulty = 0.0
+      # A counter reset applies only to this connection. Do not discard valid
+      # work accumulated by the worker's other active connections.
+      if ($deltaShares -lt 0) { $deltaShares = 0 }
 
-      # Vardiff may change between scrapes. With 15-second sampling we usually
-      # see the transition quickly; using the midpoint of the two assigned
-      # difficulties is a better estimate than pretending the whole interval
-      # used either endpoint. If only one endpoint is usable, use that one.
-      if ($priorDifficulty -gt 0 -and $difficultyNow -gt 0) {
-        $intervalDifficulty = ($priorDifficulty + $difficultyNow) / 2.0
-      } elseif ($difficultyNow -gt 0) {
-        $intervalDifficulty = $difficultyNow
-      } elseif ($priorDifficulty -gt 0) {
-        $intervalDifficulty = $priorDifficulty
+      if ($deltaShares -gt 0) {
+        $priorDifficulty = [double]$prior.Difficulty
+        $difficultyNow = [double]$current.Difficulty
+        $intervalDifficulty = 0.0
+
+        if ($priorDifficulty -gt 0 -and $difficultyNow -gt 0) {
+          $intervalDifficulty = ($priorDifficulty + $difficultyNow) / 2.0
+        } elseif ($difficultyNow -gt 0) {
+          $intervalDifficulty = $difficultyNow
+        } elseif ($priorDifficulty -gt 0) {
+          $intervalDifficulty = $priorDifficulty
+        }
+
+        if ($intervalDifficulty -gt 0) {
+          $workTotals[$worker] = [double]$workTotals[$worker] + ($deltaShares * $intervalDifficulty)
+        }
+        $lastShareAt[$worker] = $nowMs
       }
-
-      if ($intervalDifficulty -gt 0) {
-        $workTotals[$worker] = [double]$workTotals[$worker] + ($deltaShares * $intervalDifficulty)
-      }
+    } elseif ([double]$current.Shares -gt 0) {
+      # Existing shares predate this collector sample and cannot be timed.
       $lastShareAt[$worker] = $nowMs
     }
-  } elseif ($acceptedShares -gt 0) {
-    # We know the miner was already working before the collector started, but we
-    # cannot time those older shares accurately. Mark it active and begin the
-    # hashrate window from this sample instead of inventing historical work.
-    $lastShareAt[$worker] = $nowMs
-  }
 
-  $previous[$worker] = @{
-    Shares = $acceptedShares
-    Difficulty = $difficultyNow
-    Time = $nowSec
+    $previousSessions[$stateKey] = @{
+      Shares = [double]$current.Shares
+      Difficulty = [double]$current.Difficulty
+      Time = $nowSec
+    }
   }
 
   $samples = $history[$worker]
@@ -240,6 +270,7 @@ function Build-Snapshot([string]$text) {
   foreach ($worker in ($workers | Sort-Object)) {
     $publicAlias = Get-PublicAlias $identitySeries $worker
     $acceptedShares = Sum-SessionMax $valid $worker
+    $shareSessions = Get-WorkerShareSessions $valid $currentDiff $worker
     $difficultyNow = Max-WorkerValue $currentDiff $worker
 
     $invalidShares = 0.0
@@ -273,7 +304,7 @@ function Build-Snapshot([string]$text) {
       'fallback'
     }
 
-    Add-WorkerWorkSample $worker $nowSec $acceptedShares $difficultyNow $now
+    Add-WorkerWorkSample $worker $nowSec $shareSessions $now
     $hashrate = Get-RollingHashrate $worker
 
     $startSec = Min-WorkerStart $start $worker $difficultyNow
