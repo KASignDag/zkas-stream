@@ -16,6 +16,18 @@ if ([string]::IsNullOrWhiteSpace($secret)) {
 }
 if ([string]::IsNullOrWhiteSpace($secret)) { throw 'MINING_INGEST_SECRET is not set.' }
 
+function Get-OwnerKey([string]$wallet) {
+    if ([string]::IsNullOrWhiteSpace($wallet)) { return $null }
+    $normalized = $wallet.Trim().ToLowerInvariant()
+    $bytes = [Text.Encoding]::UTF8.GetBytes($normalized)
+    $sha = [Security.Cryptography.SHA256]::Create()
+    try {
+        return (($sha.ComputeHash($bytes) | ForEach-Object { $_.ToString('x2') }) -join '')
+    } finally {
+        $sha.Dispose()
+    }
+}
+
 $previousDiff = @{}
 $previousHashrate = @{}
 $previousShares = @{}
@@ -90,6 +102,7 @@ while ($true) {
 
             $worker = [string]$shareRow.Labels['worker']
             $wallet = [string]$shareRow.Labels['wallet']
+            $ownerKey = Get-OwnerKey $wallet
             $suffix = if ($wallet.Length -ge 3) { $wallet.Substring($wallet.Length - 3) } else { '107' }
             $alias = ($worker + '-' + $suffix) -replace '[^A-Za-z0-9._-]','-'
             if ($alias.Length -gt 32) { $alias = $alias.Substring(0,32) }
@@ -124,6 +137,7 @@ while ($true) {
 
             $miners += [ordered]@{
                 alias = $alias
+                ownerKey = $ownerKey
                 status = 'online'
                 hashrateHps = [double]$hashrate
                 uptimeSeconds = [double]$uptime
