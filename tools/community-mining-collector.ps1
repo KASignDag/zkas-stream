@@ -54,6 +54,29 @@ function Get-Series([string]$text, [string]$metric) {
   return $rows
 }
 
+function Get-OwnerKey([string]$wallet) {
+  if ([string]::IsNullOrWhiteSpace($wallet)) { return $null }
+  $normalized = $wallet.Trim().ToLowerInvariant()
+  $bytes = [Text.Encoding]::UTF8.GetBytes($normalized)
+  $sha = [Security.Cryptography.SHA256]::Create()
+  try {
+    return (($sha.ComputeHash($bytes) | ForEach-Object { $_.ToString('x2') }) -join '')
+  } finally {
+    $sha.Dispose()
+  }
+}
+
+function Worker-Wallet($series, [string]$worker) {
+  foreach ($row in $series) {
+    if ([string]$row.Labels['worker'] -ne $worker) { continue }
+    foreach ($key in @('wallet','zkas_wallet','address')) {
+      $value = [string]$row.Labels[$key]
+      if (-not [string]::IsNullOrWhiteSpace($value)) { return $value }
+    }
+  }
+  return $null
+}
+
 function Get-WorkersFromSeries($seriesSets) {
   $set = [System.Collections.Generic.HashSet[string]]::new([StringComparer]::OrdinalIgnoreCase)
   foreach ($series in $seriesSets) {
@@ -201,6 +224,7 @@ function Build-Snapshot([string]$text) {
   foreach ($worker in ($workers | Sort-Object)) {
     $acceptedShares = Sum-SessionMax $valid $worker
     $difficultyNow = Max-WorkerValue $currentDiff $worker
+    $ownerKey = Get-OwnerKey (Worker-Wallet $valid $worker)
 
     $invalidShares = 0.0
     $staleShares = 0.0
@@ -233,6 +257,7 @@ function Build-Snapshot([string]$text) {
 
     $miners += [ordered]@{
       alias = $worker
+      ownerKey = $ownerKey
       status = $(if ($online) { 'online' } else { 'offline' })
       hashrateHps = $(if ($null -eq $hashrate) { $null } else { [math]::Round($hashrate, 0) })
       uptimeSeconds = $(if ($null -eq $uptime) { $null } else { [math]::Round($uptime, 0) })
@@ -273,7 +298,7 @@ Write-Host "Community mining collector"
 Write-Host "Metrics:  $MetricsUrl"
 Write-Host "Endpoint: $Endpoint"
 Write-Host ("Hashrate: vardiff-aware share work, rolling {0}s window, minimum {1}s sample" -f $HashrateWindowSeconds, $HashrateMinSampleSeconds)
-Write-Host 'Privacy: wallet and IP labels are parsed locally and never included in the posted JSON.'
+Write-Host 'Privacy: wallet and IP labels are parsed locally; only a one-way SHA-256 ownership key is posted, never the wallet or IP.'
 
 while ($true) {
   try {
