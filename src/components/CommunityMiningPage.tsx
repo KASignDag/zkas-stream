@@ -83,7 +83,7 @@ function payoutLabel(miner: MinerRow) {
     ?? (miner.kasPayoutSet === true ? 'miner' : miner.kasPayoutSet === false ? 'fallback' : 'unknown');
   if (status === 'miner') return 'Miner wallet';
   if (status === 'fallback') return 'Pool fallback';
-  return 'Verify KAS password';
+  return 'Miner wallet';
 }
 
 export function CommunityMiningPage() {
@@ -227,7 +227,7 @@ export function CommunityMiningPage() {
         <div><span>URL</span><code>stratum+tcp://mine.zkas.stream:&lt;port&gt;</code></div>
         <div><span>User / worker</span><code>zkas:&lt;YOUR_ZKAS_ADDRESS&gt;.&lt;WORKER&gt;</code></div>
         <div><span>Password</span><code>kaspa:&lt;YOUR_KAS_ADDRESS&gt;</code></div>
-        <p>KAS rewards go directly to the miner only when the Stratum password is a valid full <code>kaspa:</code> address. If payout telemetry is unavailable, the dashboard shows “Verify KAS password” instead of guessing.</p>
+        <p>KAS payout display assumes the miner password contains a valid full <code>kaspa:</code> address. Bridge v1.0.12 no longer reports payout confirmation.</p>
         <p>The public hostname and production port will be published after the external gateway test is complete. Until then, this page is showing the live private-gateway test feed.</p>
       </div>
 
