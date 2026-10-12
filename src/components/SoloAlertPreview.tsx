@@ -466,7 +466,7 @@ export function SoloAlertPreview() {
       {privateTelemetry?.paired && (
         <section className={`solo-section solo-private-feed solo-app-section ${appSection === 'miner' ? 'active' : ''} ${!privateTelemetry.telemetry ? 'waiting' : telemetryAgeMs(privateTelemetry.telemetry.updatedAt) > 120000 ? 'stale' : 'live'}`}>
           <div className="solo-section-head">
-            <div><span>MY PRIVATE SOLO ALERT</span><h3>{privateTelemetry.profile?.name || 'Paired miner'}</h3></div>
+            <div><span>MY PRIVATE SOLO ALERT</span><h3>{privateTelemetry.profile?.name || 'Connected miner'}</h3></div>
             {!privateTelemetry.telemetry && <span className="solo-status-pill waiting"><RadioTower size={14} /> WAITING FOR FIRST REPORT</span>}
             {privateTelemetry.telemetry && telemetryAgeMs(privateTelemetry.telemetry.updatedAt) <= 120000 && <span className="solo-status-pill online"><Wifi size={14} /> LIVE</span>}
             {privateTelemetry.telemetry && telemetryAgeMs(privateTelemetry.telemetry.updatedAt) > 120000 && <span className="solo-status-pill offline"><WifiOff size={14} /> STALE / OFFLINE</span>}
@@ -495,8 +495,8 @@ export function SoloAlertPreview() {
                 onClick={() => {
                   setDetailTab('overview');
                   setSelectedMiner({
-                    name: privateTelemetry.profile?.name || privateTelemetry.telemetry.worker || 'Paired miner',
-                    worker: privateTelemetry.telemetry.worker || privateTelemetry.profile?.name || 'Paired miner',
+                    name: privateTelemetry.profile?.name || privateTelemetry.telemetry.worker || 'Connected miner',
+                    worker: privateTelemetry.telemetry.worker || privateTelemetry.profile?.name || 'Connected miner',
                     mode: (privateTelemetry.profile?.mode || 'basic') as MinerMode,
                     status: privateTelemetry.telemetry.status === 'offline' ? 'offline' : 'online',
                     hashrate: formatHashrate(privateTelemetry.telemetry.hashrateHps),
