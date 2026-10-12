@@ -766,22 +766,28 @@ export function SoloAlertPreview() {
             </div>
 
             {pairingStep === 1 && <>
-              <span className="solo-preview-kicker">PAIR MINER · STEP 1</span>
-              <h3 className="solo-pair-title">Choose your mining setup</h3>
-              <p className="solo-muted">You do not need ASIC access to use Solo Alert.</p>
+              <span className="solo-preview-kicker">CONNECT MINER · STEP 1</span>
+              <h3 className="solo-pair-title">Choose how you want to connect</h3>
+              <p className="solo-muted">Most Community Mining users should start with <b>Basic</b>. You can add hardware monitoring later.</p>
               <div className="solo-mode-grid">
                 <button className={`solo-mode-card ${pairingMode === 'basic' ? 'selected' : ''}`} onClick={() => setPairingMode('basic')}>
-                  <span className="solo-mode-icon"><BellRing size={23} /></span><b>Basic</b><small>Blocks, workers, shares and bridge status.</small><em>{pairingMode === 'basic' ? '✓ SELECTED' : 'TAP TO SELECT'}</em>
+                  <span className="solo-mode-icon"><BellRing size={23} /></span>
+                  <div className="solo-mode-copy"><div className="solo-mode-title-row"><b>Basic</b><span className="solo-recommended-badge">Recommended</span></div><small>Use your Community Mining address to view workers, hashrate, shares, uptime and blocks. No miner-PC install required.</small></div>
+                  <em>{pairingMode === 'basic' ? '✓ SELECTED' : 'TAP TO SELECT'}</em>
                 </button>
                 <button className={`solo-mode-card ${pairingMode === 'local' ? 'selected' : ''}`} onClick={() => setPairingMode('local')}>
-                  <span className="solo-mode-icon"><Cpu size={23} /></span><b>Local ASIC</b><small>Add optional temperature and fan monitoring.</small><em>{pairingMode === 'local' ? '✓ SELECTED' : 'TAP TO SELECT'}</em>
+                  <span className="solo-mode-icon"><Cpu size={23} /></span>
+                  <div className="solo-mode-copy"><div className="solo-mode-title-row"><b>Local ASIC</b><span className="solo-optional-badge">Optional</span></div><small>Start with the normal dashboard, then optionally add read-only temperature, fan and host-health telemetry later.</small></div>
+                  <em>{pairingMode === 'local' ? '✓ SELECTED' : 'TAP TO SELECT'}</em>
                 </button>
                 <button className={`solo-mode-card ${pairingMode === 'rental' ? 'selected' : ''}`} onClick={() => setPairingMode('rental')}>
-                  <span className="solo-mode-icon"><RadioTower size={23} /></span><b>Rental / Remote</b><small>No ASIC login or local miner access needed.</small><em>{pairingMode === 'rental' ? '✓ SELECTED' : 'TAP TO SELECT'}</em>
+                  <span className="solo-mode-icon"><RadioTower size={23} /></span>
+                  <div className="solo-mode-copy"><div className="solo-mode-title-row"><b>Rental / Remote</b></div><small>For rentals or miners you do not control locally. No ASIC login or hardware access required.</small></div>
+                  <em>{pairingMode === 'rental' ? '✓ SELECTED' : 'TAP TO SELECT'}</em>
                 </button>
               </div>
-              <div className="solo-pair-selection-note"><CheckCircle2 size={16} /><span><b>{pairingMode === 'basic' ? 'Basic' : pairingMode === 'local' ? 'Local ASIC' : 'Rental / Remote'}</b> selected</span></div>
-              <div className="solo-pair-footer"><span /><button onClick={() => setPairingStep(2)}>Continue with {pairingMode === 'basic' ? 'Basic' : pairingMode === 'local' ? 'Local ASIC' : 'Rental'}</button></div>
+              <div className="solo-pair-selection-note"><CheckCircle2 size={18} /><span><b>{pairingMode === 'basic' ? 'Basic selected' : pairingMode === 'local' ? 'Local ASIC selected' : 'Rental / Remote selected'}</b><small>{pairingMode === 'basic' ? 'Recommended · no miner-PC install required' : pairingMode === 'local' ? 'Normal dashboard first · hardware agent optional later' : 'No local ASIC access required'}</small></span></div>
+              <div className="solo-pair-footer"><span /><button onClick={() => setPairingStep(2)}>Continue with {pairingMode === 'basic' ? 'Basic' : pairingMode === 'local' ? 'Local ASIC' : 'Rental / Remote'}</button></div>
             </>}
 
             {pairingStep === 2 && <>
