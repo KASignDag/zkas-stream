@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
-  Activity, Bell, BellRing, CheckCircle2, Coins, Cpu, Fan, Gauge, MessageCircle, RadioTower,
+  Activity, Bell, BellRing, CheckCircle2, Coins, Cpu, Fan, Gauge, Link2, Menu, MessageCircle, RadioTower,
   Send, ShieldCheck, Thermometer, Trophy, Wifi, WifiOff, X, Zap
 } from 'lucide-react';
 import './solo-alert-preview.css';
