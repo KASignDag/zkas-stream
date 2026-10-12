@@ -61,12 +61,12 @@ function cleanAlias(value) {
   return /^[A-Za-z0-9._-]{1,32}$/.test(alias) ? alias : null;
 }
 
-function payoutStatus(value) {
+function payoutStatus(value, { allowLegacy = true } = {}) {
   if (value?.kasPayoutStatus === 'miner' || value?.kasPayoutStatus === 'fallback') {
     return value.kasPayoutStatus;
   }
   if (value?.kasPayoutStatus === 'unknown') return 'unknown';
-  if (typeof value?.kasPayoutSet === 'boolean') return value.kasPayoutSet ? 'miner' : 'fallback';
+  if (allowLegacy && typeof value?.kasPayoutSet === 'boolean') return value.kasPayoutSet ? 'miner' : 'fallback';
   return 'unknown';
 }
 
@@ -74,7 +74,10 @@ function cleanMiner(value) {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
   const alias = cleanAlias(value.alias);
   if (!alias) return null;
-  const cleanPayoutStatus = payoutStatus(value);
+  // A legacy collector sends only kasPayoutSet. With bridge 1.0.12 that
+  // Boolean is false merely because the payout metric is absent, so it is
+  // not safe evidence of fallback routing for a new snapshot.
+  const cleanPayoutStatus = payoutStatus(value, { allowLegacy: false });
   return {
     alias,
     status: value.status === 'online' || value.status === 'attention' ? value.status : 'offline',
