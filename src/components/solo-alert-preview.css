@@ -264,3 +264,28 @@
 .solo-workers-empty svg{color:#2ec9aa}.solo-workers-empty b,.solo-workers-empty span{display:block}.solo-workers-empty b{color:var(--text);margin-bottom:3px}
 .solo-workers-empty button{border:0;border-radius:11px;padding:10px 13px;background:#23c8a7;color:#06251f;font-weight:850;cursor:pointer}
 @media(max-width:650px){.solo-workers-empty{grid-template-columns:auto 1fr}.solo-workers-empty button{grid-column:1/-1;width:100%}}
+
+/* Make remote-connect address input obvious before focus. */
+.solo-pair-field input{
+  min-height:54px;
+  border:1.5px solid rgba(77,224,193,.38);
+  background:#10242d;
+  color:#f2fffc;
+  box-shadow:inset 0 0 0 1px rgba(255,255,255,.018);
+}
+.solo-pair-field input::placeholder{
+  color:#819c96;
+  opacity:1;
+}
+.solo-pair-field input:hover{
+  border-color:rgba(77,224,193,.58);
+}
+.solo-pair-field input:focus{
+  outline:none;
+  border-color:#4be0c0;
+  box-shadow:0 0 0 3px rgba(75,224,192,.14);
+  background:#0f2830;
+}
+.solo-pair-field>span{
+  color:#bcd4ce;
+}
