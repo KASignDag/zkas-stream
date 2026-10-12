@@ -61,12 +61,19 @@ function cleanAlias(value) {
   return /^[A-Za-z0-9._-]{1,32}$/.test(alias) ? alias : null;
 }
 
+function cleanOwnerKey(value) {
+  if (typeof value !== 'string') return null;
+  const key = value.trim().toLowerCase();
+  return /^[a-f0-9]{64}$/.test(key) ? key : null;
+}
+
 function cleanMiner(value) {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
   const alias = cleanAlias(value.alias);
   if (!alias) return null;
   return {
     alias,
+    ownerKey: cleanOwnerKey(value.ownerKey),
     status: value.status === 'online' ? 'online' : 'offline',
     hashrateHps: finiteNonNegative(value.hashrateHps),
     uptimeSeconds: finiteNonNegative(value.uptimeSeconds),
@@ -280,7 +287,8 @@ function applyLifetimeBlockCounters(state, gateway, miners, bridgeStartedAt) {
 function publicSnapshot(snapshot, gateway) {
   if (!snapshot) return { schemaVersion: 1, gateway, updatedAt: null, gatewayOnline: false, miners: [], lifetimeZkasBlocks: 0, lifetimeKasBlocks: 0 };
   const { _counterState, ...safe } = snapshot;
-  return { ...safe, gateway };
+  const miners = (Array.isArray(safe.miners) ? safe.miners : []).map(({ ownerKey, ...miner }) => miner);
+  return { ...safe, miners, gateway };
 }
 
 export async function onRequest(context) {
