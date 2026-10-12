@@ -113,12 +113,47 @@ export async function onRequest(context) {
     const dashboardHash = await digest(supplied);
     const dashboard = await store.get(`solo-dashboard:${dashboardHash}`, 'json');
     if (!dashboard) return json({ error: 'unauthorized' }, 401);
-    const telemetry = await store.get(`solo-telemetry:${dashboardHash}`, 'json');
     const url = new URL(request.url);
     const range = url.searchParams.get('range');
+    let telemetry = await store.get(`solo-telemetry:${dashboardHash}`, 'json');
+    let workers = [];
     let history = null;
 
-    if (range && HISTORY_WINDOWS[range]) {
+    if (Array.isArray(dashboard.workers) && dashboard.workers.length) {
+      for (const ref of dashboard.workers) {
+        const storageKey = ref.gateway === 'community-107' ? 'community-mining:v1:community-107' : 'community-mining:v1';
+        const snapshot = await store.get(storageKey, 'json');
+        const miner = (Array.isArray(snapshot?.miners) ? snapshot.miners : []).find((row) => row?.alias === ref.alias);
+        if (miner) {
+          const { ownerKey, ...safeMiner } = miner;
+          workers.push({ ...safeMiner, gateway: ref.gateway });
+        }
+      }
+      if (workers.length) {
+        telemetry = {
+          schemaVersion: 2,
+          updatedAt: Math.max(...workers.map((worker) => Number(worker.lastSeenAt || worker.lastShareAt || 0)), Date.now()),
+          name: workers[0].alias,
+          mode: dashboard.mode || 'basic',
+          status: workers.some((worker) => worker.status === 'online') ? 'online' : 'offline',
+          worker: workers[0].alias,
+          hashrateHps: workers.reduce((sum, worker) => sum + (Number(worker.hashrateHps) || 0), 0),
+          uptimeSeconds: Math.max(...workers.map((worker) => Number(worker.uptimeSeconds) || 0)),
+          acceptedShares: workers.reduce((sum, worker) => sum + (Number(worker.acceptedShares) || 0), 0),
+          invalidShares: workers.reduce((sum, worker) => sum + (Number(worker.invalidShares) || 0), 0),
+          staleShares: workers.reduce((sum, worker) => sum + (Number(worker.staleShares) || 0), 0),
+          zkasBlocks: workers.reduce((sum, worker) => sum + (Number(worker.zkasBlocks) || 0), 0),
+          kasBlocks: workers.reduce((sum, worker) => sum + (Number(worker.kasBlocks) || 0), 0),
+          source: 'community-mining',
+        };
+      }
+      if (range && HISTORY_WINDOWS[range] && dashboard.workers[0]) {
+        const first = dashboard.workers[0];
+        const saved = await store.get(`solo-community-history:${first.gateway}:${first.alias}`, 'json');
+        const cutoff = Date.now() - HISTORY_WINDOWS[range];
+        history = (Array.isArray(saved?.points) ? saved.points : []).filter((point) => Number(point?.t) >= cutoff);
+      }
+    } else if (range && HISTORY_WINDOWS[range]) {
       const saved = await store.get(`solo-history:${dashboardHash}`, 'json');
       const cutoff = Date.now() - HISTORY_WINDOWS[range];
       history = (Array.isArray(saved?.points) ? saved.points : []).filter((point) => Number(point?.t) >= cutoff);
@@ -127,8 +162,9 @@ export async function onRequest(context) {
     return json({
       ok: true,
       paired: dashboard.status === 'claimed',
-      profile: { name: dashboard.name, mode: dashboard.mode },
+      profile: { name: dashboard.name || telemetry?.worker || 'Community miner', mode: dashboard.mode || 'basic' },
       telemetry: telemetry || null,
+      workers,
       historyRange: range && HISTORY_WINDOWS[range] ? range : null,
       history,
     });
