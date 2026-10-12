@@ -57,6 +57,9 @@ function Get-Series([string]$text, [string]$metric) {
 function Get-OwnerKey([string]$wallet) {
   if ([string]::IsNullOrWhiteSpace($wallet)) { return $null }
   $normalized = $wallet.Trim().ToLowerInvariant()
+  if ($normalized.StartsWith('zkas:')) { $normalized = $normalized.Substring(5) }
+  $dot = $normalized.LastIndexOf('.')
+  if ($dot -gt 0) { $normalized = $normalized.Substring(0, $dot) }
   $bytes = [Text.Encoding]::UTF8.GetBytes($normalized)
   $sha = [Security.Cryptography.SHA256]::Create()
   try {
