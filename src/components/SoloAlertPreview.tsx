@@ -203,8 +203,8 @@ export function SoloAlertPreview() {
   const [pairingOpen, setPairingOpen] = useState(false);
   const [pairingStep, setPairingStep] = useState<1 | 2 | 3>(1);
   const [pairingMode, setPairingMode] = useState<MinerMode>('basic');
-  const [pairingName, setPairingName] = useState('');
-  const [pairingCode, setPairingCode] = useState('');
+  const [miningAddress, setMiningAddress] = useState(() => window.localStorage.getItem('zkas-solo-mining-address') || '');
+  const [connectedWorkers, setConnectedWorkers] = useState<string[]>([]);
   const [pairingBusy, setPairingBusy] = useState(false);
   const [pairingError, setPairingError] = useState<string | null>(null);
   const [privateDashboardToken, setPrivateDashboardToken] = useState(() => window.localStorage.getItem('zkas-solo-dashboard-token') || '');
@@ -296,23 +296,32 @@ export function SoloAlertPreview() {
     setChannels((current) => ({ ...current, [channel]: !current[channel] }));
   }
 
-  async function createPairing() {
+  async function connectCommunityMiner() {
+    const address = miningAddress.trim();
+    if (!address) {
+      setPairingError('Enter the ZKAS address you use for Community Mining.');
+      return;
+    }
     setPairingBusy(true);
     setPairingError(null);
     try {
-      const response = await fetch('/api/solo-pairing?action=create', {
+      const normalized = address.toLowerCase();
+      const digestBytes = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(normalized));
+      const ownerKey = Array.from(new Uint8Array(digestBytes), (byte) => byte.toString(16).padStart(2, '0')).join('');
+      const response = await fetch('/api/solo-connect', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ mode: pairingMode }),
+        body: JSON.stringify({ ownerKey, mode: pairingMode }),
       });
       const result = await response.json();
-      if (!response.ok) throw new Error(result?.error || 'Could not create pairing code');
-      setPairingCode(result.pairingCode);
+      if (!response.ok) throw new Error(result?.message || result?.error || 'Could not find your Community Mining worker');
       setPrivateDashboardToken(result.dashboardToken);
+      setConnectedWorkers(Array.isArray(result.workers) ? result.workers.map((worker: any) => String(worker.alias || '')).filter(Boolean) : []);
       window.localStorage.setItem('zkas-solo-dashboard-token', result.dashboardToken);
+      window.localStorage.setItem('zkas-solo-mining-address', address);
       setPairingStep(3);
     } catch (error) {
-      setPairingError(error instanceof Error ? error.message : 'Could not create pairing code');
+      setPairingError(error instanceof Error ? error.message : 'Could not connect your Community Mining worker');
     } finally {
       setPairingBusy(false);
     }
@@ -449,7 +458,7 @@ export function SoloAlertPreview() {
           </div>
           <button className="solo-get-started-button" onClick={() => { setPairingStep(1); setPairingOpen(true); }}>
             <RadioTower size={20} />
-            Pair a miner
+            Connect a miner
           </button>
         </section>
       )}
@@ -466,12 +475,12 @@ export function SoloAlertPreview() {
           {!privateTelemetry.telemetry ? (
             <div className="solo-private-waiting">
               <RadioTower size={23} />
-              <div><b>Paired successfully — waiting for Dual Alert</b><span>Leave Dual Alert running locally. The first sanitized telemetry report will appear here automatically.</span></div>
+              <div><b>Connected successfully — waiting for Community Mining telemetry</b><span>Your Community Mining worker will appear here automatically as telemetry updates.</span></div>
             </div>
           ) : (
             <>
               <div className="solo-block-center-grid">
-                <div className="solo-block-stat"><span>WORKER</span><b>{privateTelemetry.telemetry.worker || '—'}</b><small>Paired Dual Alert source</small></div>
+                <div className="solo-block-stat"><span>WORKER</span><b>{privateTelemetry.telemetry.worker || '—'}</b><small>Private Community Mining source</small></div>
                 <div className="solo-block-stat"><span>HASHRATE</span><b>{formatHashrate(privateTelemetry.telemetry.hashrateHps)}</b><small>Read-only telemetry</small></div>
                 <div className="solo-block-stat"><span>SHARES</span><b>{Math.floor(privateTelemetry.telemetry.acceptedShares || 0).toLocaleString()}</b><small>Accepted shares</small></div>
                 <div className="solo-block-stat"><span>BLOCKS</span><b>{Math.floor((privateTelemetry.telemetry.zkasBlocks || 0) + (privateTelemetry.telemetry.kasBlocks || 0)).toLocaleString()}</b><small>ZKAS + KAS</small></div>
@@ -535,7 +544,7 @@ export function SoloAlertPreview() {
         <div className="solo-section-head">
           <div><span>WORKERS</span><h3>My paired workers</h3></div>
           {privateTelemetry?.paired && (
-            <button className="solo-add-button" onClick={() => { setPairingStep(1); setPairingOpen(true); }}>+ Add another miner</button>
+            <button className="solo-add-button" onClick={() => { setPairingStep(1); setPairingOpen(true); }}>+ Connect another miner</button>
           )}
         </div>
 
@@ -760,7 +769,7 @@ export function SoloAlertPreview() {
 
       {pairingOpen && (
         <div className="solo-modal-backdrop" role="presentation" onMouseDown={() => setPairingOpen(false)}>
-          <section className="solo-detail-modal solo-pair-modal" role="dialog" aria-modal="true" aria-label="Pair a miner" onMouseDown={(event) => event.stopPropagation()}>
+          <section className="solo-detail-modal solo-pair-modal" role="dialog" aria-modal="true" aria-label="Connect a miner" onMouseDown={(event) => event.stopPropagation()}>
             <button className="solo-close-button" onClick={() => setPairingOpen(false)} aria-label="Close pairing"><X size={20} /></button>
             <div className="solo-pair-progress">
               <span className={pairingStep >= 1 ? 'active' : ''}>1</span><i />
@@ -788,38 +797,44 @@ export function SoloAlertPreview() {
             </>}
 
             {pairingStep === 2 && <>
-              <span className="solo-preview-kicker">PAIR MINER · STEP 2</span>
-              <h3 className="solo-pair-title">Create your private pairing code <small className="solo-build-tag">09-29B</small></h3>
-              <p className="solo-muted">You will not see a list of other Community Mining workers. Your worker identity is attached only after your own mining connection claims this one-time code.</p>
-              <div className="solo-safe-box"><ShieldCheck size={20} /><div><b>Private worker discovery</b><span>The pairing code identifies your private dashboard. Your Community Mining connection supplies its own worker identity when it claims the code, so another user's miner never appears in your setup.</span></div></div>
+              <span className="solo-preview-kicker">CONNECT MINER · STEP 2</span>
+              <h3 className="solo-pair-title">Enter your Community Mining ZKAS address</h3>
+              <p className="solo-muted">Use the same ZKAS address you mine with on the ZKAS.stream Community Mining bridge. No account or miner-PC install is required.</p>
+              <label className="solo-pair-field">
+                <span>Your ZKAS mining address</span>
+                <input
+                  value={miningAddress}
+                  onChange={(event) => setMiningAddress(event.target.value)}
+                  placeholder="Paste your ZKAS address"
+                  autoCapitalize="none"
+                  autoCorrect="off"
+                  spellCheck={false}
+                />
+              </label>
+              <div className="solo-safe-box"><ShieldCheck size={20} /><div><b>Address stays private</b><span>The address is saved only on this device. Your browser sends a one-way SHA-256 hash to match your Community Mining worker; the plaintext address is not uploaded.</span></div></div>
               <div className="solo-private-steps">
-                <div><span>1</span><p>Create the one-time code.</p></div>
-                <div><span>2</span><p>Enter it only in your Community Mining / Dual Alert setup.</p></div>
-                <div><span>3</span><p>Your worker is securely attached and then appears in your private dashboard.</p></div>
+                <div><span>1</span><p>Paste the ZKAS address already used by your Community Mining connection.</p></div>
+                <div><span>2</span><p>Your browser hashes it locally and asks ZKAS.stream for only matching worker(s).</p></div>
+                <div><span>3</span><p>Your private Solo Alert dashboard opens on this device.</p></div>
               </div>
               {pairingError && <div className="inline-error">{pairingError}</div>}
-              <div className="solo-pair-footer"><button className="secondary" onClick={() => setPairingStep(1)}>Back</button><button disabled={pairingBusy} onClick={() => void createPairing()}>{pairingBusy ? 'Creating…' : 'Create private pairing code'}</button></div>
+              <div className="solo-pair-footer"><button className="secondary" onClick={() => setPairingStep(1)}>Back</button><button disabled={!miningAddress.trim() || pairingBusy} onClick={() => void connectCommunityMiner()}>{pairingBusy ? 'Connecting…' : 'Connect my miner'}</button></div>
             </>}
+
             {pairingStep === 3 && <>
-              <span className="solo-preview-kicker">PAIR MINER · STEP 3</span>
-              <h3 className="solo-pair-title">Connect Solo Alert</h3>
-              <p className="solo-muted">For normal users this is plug-and-play: run SETUP.cmd and paste the code when asked. The installer exchanges it for a miner-specific publisher token; your private dashboard token stays in this browser.</p>
-              <div className="solo-pair-code">
-                <span>ONE-TIME PAIRING CODE</span>
-                <b>{pairingCode}</b>
-                <small>Expires in 15 minutes · single use</small>
-              </div>
+              <span className="solo-preview-kicker">CONNECTED · STEP 3</span>
+              <h3 className="solo-pair-title">Your Solo Alert dashboard is ready</h3>
+              <p className="solo-muted">No Windows installation is required for normal Community Mining monitoring. You can use this dashboard from iPhone, iPad, Android, Windows or Mac.</p>
+              <div className="solo-pair-connected"><CheckCircle2 size={20} /><span>{connectedWorkers.length ? `${connectedWorkers.length} Community Mining worker${connectedWorkers.length === 1 ? '' : 's'} connected: ${connectedWorkers.join(', ')}` : 'Community Mining worker connected.'}</span></div>
               <div className="solo-pair-instructions">
-                <div><span>1</span><p>Download and extract the <b>ZKas Dual Alert</b> Windows package.</p></div>
-                <div><span>2</span><p>Double-click <b>SETUP.cmd</b> and approve the Windows prompt.</p></div>
-                <div><span>3</span><p>Paste this pairing code when setup asks for it. Bridge detection, startup and pairing happen automatically.</p></div>
-                {pairingMode === 'local' && <div><span>4</span><p>Optionally enable ASIC health monitoring later for temperature and fans.</p></div>}
+                <div><span>1</span><p>Use <b>My Miner</b> for live hashrate, shares, uptime and blocks.</p></div>
+                <div><span>2</span><p>Use <b>Trends</b> for private 1h / 6h / 24h / 7d history as samples accumulate.</p></div>
+                <div><span>3</span><p>Enable browser, Telegram or Discord alerts under <b>Alerts</b>.</p></div>
+                {pairingMode === 'local' && <div><span>4</span><p>Optional: add the read-only local hardware agent later for temperature, fans and host health.</p></div>}
               </div>
-              <div className="solo-safe-box"><ShieldCheck size={20} /><div><b>Per-miner access</b><span>This pairing service uses separate publisher and dashboard tokens. Community users cannot read or publish another miner's telemetry without that miner's token.</span></div></div>
-              {privateTelemetry?.paired && <div className="solo-pair-connected"><CheckCircle2 size={18} /><span>Dual Alert paired successfully. Private telemetry can now flow to this dashboard.</span></div>}
-              <div className="solo-pair-footer"><button className="secondary" onClick={() => setPairingStep(2)}>Back</button><button onClick={() => setPairingOpen(false)}>Finish preview</button></div>
-            </>}
-          </section>
+              <div className="solo-safe-box"><ShieldCheck size={20} /><div><b>Private by default</b><span>Only workers matching your locally hashed mining address are attached to this dashboard.</span></div></div>
+              <div className="solo-pair-footer"><button className="secondary" onClick={() => setPairingStep(2)}>Back</button><button onClick={() => { setPairingOpen(false); setAppSection('miner'); }}>Open My Miner</button></div>
+            </>}          </section>
         </div>
       )}
 
