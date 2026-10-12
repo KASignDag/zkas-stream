@@ -23,7 +23,7 @@
 .rabid-heading .subname{font-size:11px;letter-spacing:.14em;color:#9ab6bf;margin:5px 0 0}
 .rabid-chips{display:flex;gap:8px;flex-wrap:wrap;margin-top:16px}
 .rabid-chips span{border:1px solid #315367;border-radius:999px;color:#d6e7ef;background:#0b1722;font-size:12px;padding:7px 11px}
-.rabid-banner{width:calc(100% - 46px);margin:16px 23px 0;display:block;height:auto;border-radius:12px}
+.rabid-banner{width:calc(100% - 46px);height:clamp(170px,20vw,260px);margin:16px 23px 0;display:block;object-fit:cover;object-position:center 48%;border-radius:12px}
 .rabid-stats{padding:18px 23px 22px}
 .rabid-statsbox{border:1px solid #21495e;background:#0a1622;border-radius:14px;padding:17px}
 .rabid-statline{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:13px;font-size:12px}
@@ -40,7 +40,7 @@
 .rabid-connect div{padding:10px;border-radius:8px;background:#07131c;color:#b7ccd3}
 .rabid-choice .rabid-link{display:block;text-align:center;padding:12px;background:#5fdbca;border-radius:9px;color:#07282c;font-weight:800;text-decoration:none;margin-top:14px}
 @media(max-width:1000px){.rabid-statgrid{grid-template-columns:repeat(3,minmax(0,1fr))}}
-@media(max-width:680px){.rabid-statgrid{grid-template-columns:repeat(2,minmax(0,1fr))}.rabid-connect{grid-template-columns:1fr}.rabid-banner{width:calc(100% - 28px);margin:12px 14px 0}.rabid-heading,.rabid-stats{padding-left:14px;padding-right:14px}}
+@media(max-width:680px){.rabid-statgrid{grid-template-columns:repeat(2,minmax(0,1fr))}.rabid-connect{grid-template-columns:1fr}.rabid-banner{width:calc(100% - 28px);height:150px;margin:12px 14px 0}.rabid-heading,.rabid-stats{padding-left:14px;padding-right:14px}}
 </style>
 </head>
 <body><header><div class="brand">ZKAS<span>.stream</span></div><a class="back" href="/">← Intelligence</a></header><main>
@@ -85,7 +85,7 @@
  async function updateRabid(){
   if(busy||document.hidden)return;
   busy=true;
-  const ctrl=new AbortController(),timer=setTimeout(()=>ctrl.abort(),12000);
+  const ctrl=new AbortController(),timer=setTimeout(()=>ctrl.abort(),35000);
   try{
     const response=await fetch(endpoint,{signal:ctrl.signal,cache:'no-store'});
     if(!response.ok)throw Error('HTTP '+response.status);
@@ -100,7 +100,7 @@
     put('rbZkasBlocks',Number.isFinite(d.coins.ZKAS?.blocks_submitted_24h)?d.coins.ZKAS.blocks_submitted_24h.toLocaleString():'—');
     put('rbKasState',d.coins.KAS?.synced?'KAS synced':'KAS status unavailable');
     put('rbZkasState',d.coins.ZKAS?.synced?'ZKAS synced':'ZKAS status unavailable');
-    put('rbUpdated','Updated '+new Date().toLocaleTimeString()+' · refresh every 60s');
+    put('rbUpdated','Live · updated '+new Date().toLocaleTimeString()+' · refresh every 60s');
   }catch(e){
     put('rbUpdated','Rabid API unavailable · check pool website');
     for(const id of ['rbHash','rbHash24','rbMiners','rbWorkers','rbSolo','rbKasBlocks','rbZkasBlocks'])put(id,'—');
