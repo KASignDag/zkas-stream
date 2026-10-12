@@ -78,14 +78,14 @@
 
 /* Independent read-only Rabid Pool dashboard. Does not touch community bridge telemetry. */
 (function(){
- const endpoint='https://pool.rabidmining.com/api/pool/kas/summary';
+ const endpoint='/api/rabid-pool';
  const put=(id,value)=>{const el=document.getElementById(id);if(el)el.textContent=value===null||value===undefined?'—':String(value)};
  const h=n=>{if(!Number.isFinite(n))return '—';return n>=1e15?(n/1e15).toFixed(2)+' PH/s':n>=1e12?(n/1e12).toFixed(2)+' TH/s':n>=1e9?(n/1e9).toFixed(2)+' GH/s':Math.round(n)+' H/s'};
  let busy=false;
  async function updateRabid(){
   if(busy||document.hidden)return;
   busy=true;
-  const ctrl=new AbortController(),timer=setTimeout(()=>ctrl.abort(),35000);
+  const ctrl=new AbortController(),timer=setTimeout(()=>ctrl.abort(),45000);
   try{
     const response=await fetch(endpoint,{signal:ctrl.signal,cache:'no-store'});
     if(!response.ok)throw Error('HTTP '+response.status);
@@ -100,7 +100,7 @@
     put('rbZkasBlocks',Number.isFinite(d.coins.ZKAS?.blocks_submitted_24h)?d.coins.ZKAS.blocks_submitted_24h.toLocaleString():'—');
     put('rbKasState',d.coins.KAS?.synced?'KAS synced':'KAS status unavailable');
     put('rbZkasState',d.coins.ZKAS?.synced?'ZKAS synced':'ZKAS status unavailable');
-    put('rbUpdated','Live · updated '+new Date().toLocaleTimeString()+' · refresh every 60s');
+    put('rbUpdated',(d.stale?'Last known · ':'Live · ')+'updated '+new Date(d.fetchedAt||Date.now()).toLocaleTimeString()+' · refresh every 60s');
   }catch(e){
     put('rbUpdated','Rabid API unavailable · check pool website');
     for(const id of ['rbHash','rbHash24','rbMiners','rbWorkers','rbSolo','rbKasBlocks','rbZkasBlocks'])put(id,'—');
