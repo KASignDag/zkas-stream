@@ -259,3 +259,8 @@
   .solo-bottom-grid{display:contents}
   .solo-more-grid{grid-template-columns:1fr}
 }
+
+.solo-workers-empty{grid-column:1/-1;display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:12px;padding:18px;border:1px dashed var(--line);border-radius:16px;background:var(--panel-soft);color:var(--muted)}
+.solo-workers-empty svg{color:#2ec9aa}.solo-workers-empty b,.solo-workers-empty span{display:block}.solo-workers-empty b{color:var(--text);margin-bottom:3px}
+.solo-workers-empty button{border:0;border-radius:11px;padding:10px 13px;background:#23c8a7;color:#06251f;font-weight:850;cursor:pointer}
+@media(max-width:650px){.solo-workers-empty{grid-template-columns:auto 1fr}.solo-workers-empty button{grid-column:1/-1;width:100%}}
