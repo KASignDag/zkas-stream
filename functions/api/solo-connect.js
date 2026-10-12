@@ -29,6 +29,10 @@ function validOwnerKey(value) {
   return typeof value === 'string' && /^[a-f0-9]{64}$/.test(value.toLowerCase());
 }
 
+function safeMode(value) {
+  return ['basic', 'local', 'rental'].includes(value) ? value : 'basic';
+}
+
 function safeMiner(miner, gateway) {
   return {
     gateway,
@@ -58,6 +62,7 @@ export async function onRequest(context) {
   let body;
   try { body = await request.json(); } catch { return json({ error: 'invalid_json' }, 400); }
   const ownerKey = typeof body?.ownerKey === 'string' ? body.ownerKey.trim().toLowerCase() : '';
+  const mode = safeMode(body?.mode);
   if (!validOwnerKey(ownerKey)) return json({ error: 'invalid_owner_key' }, 400);
 
   const matches = [];
@@ -80,7 +85,7 @@ export async function onRequest(context) {
   await store.put(`solo-dashboard:${dashboardHash}`, JSON.stringify({
     schemaVersion: 2,
     status: 'claimed',
-    mode: 'basic',
+    mode,
     ownerKey,
     workers: matches.map((miner) => ({ gateway: miner.gateway, alias: miner.alias })),
     createdAt: Date.now(),
