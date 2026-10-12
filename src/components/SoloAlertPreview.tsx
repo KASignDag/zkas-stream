@@ -9,6 +9,7 @@ type AlertChannel = 'browser' | 'telegram' | 'discord';
 type MinerMode = 'basic' | 'local' | 'rental';
 type Chain = 'ZKAS' | 'KAS';
 type DetailTab = 'overview' | 'trends' | 'shares' | 'blocks' | 'hardware';
+type AppSection = 'miner' | 'workers' | 'trends' | 'alerts' | 'connect' | 'more';
 type HistoryRange = '1h' | '6h' | '24h' | '7d';
 
 type PreviewMiner = {
@@ -186,6 +187,7 @@ export function SoloAlertPreview() {
   const [offlineMinutes, setOfflineMinutes] = useState(3);
   const [selectedMiner, setSelectedMiner] = useState<PreviewMiner | null>(null);
   const [detailTab, setDetailTab] = useState<DetailTab>('overview');
+  const [appSection, setAppSection] = useState<AppSection>('miner');
   const [historyRange, setHistoryRange] = useState<HistoryRange>('1h');
   const [privateHistory, setPrivateHistory] = useState<SoloHistoryPoint[]>([]);
   const [celebration, setCelebration] = useState<BlockCelebration | null>(null);
@@ -210,6 +212,11 @@ export function SoloAlertPreview() {
   const previousBlocksRef = useRef<Record<string, { zkas: number; kas: number }> | null>(null);
 
   const enabledCount = useMemo(() => Object.values(channels).filter(Boolean).length, [channels]);
+
+  function navigateApp(next: AppSection) {
+    setAppSection(next);
+    requestAnimationFrame(() => document.getElementById(`solo-section-${next}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' }));
+  }
 
   const liveMiners = useMemo<PreviewMiner[]>(() => {
     if (!liveSnapshot?.miners?.length) return demoMiners;
@@ -387,7 +394,7 @@ export function SoloAlertPreview() {
 
   return (
     <div className="solo-alert-preview">
-      <section className="solo-preview-banner">
+      <section id="solo-section-miner" className={`solo-preview-banner solo-app-section ${appSection === 'miner' ? 'active' : ''}`}>
         <div>
           <span className="solo-preview-kicker"><ShieldCheck size={16} /> COMMUNITY MINER PREVIEW · BUILD 09-29B</span>
           <h2>ZKAS Solo Alert</h2>
@@ -396,7 +403,7 @@ export function SoloAlertPreview() {
         <div className="solo-preview-live"><span /> Preview only · current mining page unchanged</div>
       </section>
 
-      <section className="solo-section solo-device-test">
+      <section className={`solo-section solo-device-test solo-app-section ${appSection === 'more' ? 'active' : ''}`}>
         <div className="solo-section-head">
           <div><span>DEVICE TEST</span><h3>Test Solo Alert on this device</h3></div>
           <span className="solo-device-pill">{deviceKind === 'ios' ? 'iPhone / iPad' : deviceKind === 'android' ? 'Android' : deviceKind === 'windows' ? 'Windows' : 'Browser'}</span>
@@ -434,7 +441,7 @@ export function SoloAlertPreview() {
       </section>
 
       {!privateTelemetry?.paired && (
-        <section className="solo-section solo-setup-section solo-get-started">
+        <section className={`solo-section solo-setup-section solo-get-started solo-app-section ${appSection === 'connect' ? 'active' : ''}`}>
           <div className="solo-get-started-copy">
             <span className="solo-preview-kicker"><RadioTower size={16} /> COMMUNITY SOLO ALERT</span>
             <h3>Connect your miner</h3>
@@ -448,7 +455,7 @@ export function SoloAlertPreview() {
       )}
 
       {privateTelemetry?.paired && (
-        <section className={`solo-section solo-private-feed ${!privateTelemetry.telemetry ? 'waiting' : telemetryAgeMs(privateTelemetry.telemetry.updatedAt) > 120000 ? 'stale' : 'live'}`}>
+        <section className={`solo-section solo-private-feed solo-app-section ${appSection === 'miner' ? 'active' : ''} ${!privateTelemetry.telemetry ? 'waiting' : telemetryAgeMs(privateTelemetry.telemetry.updatedAt) > 120000 ? 'stale' : 'live'}`}>
           <div className="solo-section-head">
             <div><span>MY PRIVATE SOLO ALERT</span><h3>{privateTelemetry.profile?.name || 'Paired miner'}</h3></div>
             {!privateTelemetry.telemetry && <span className="solo-status-pill waiting"><RadioTower size={14} /> WAITING FOR FIRST REPORT</span>}
@@ -504,7 +511,7 @@ export function SoloAlertPreview() {
         </section>
       )}
 
-      <section className="solo-hero-grid">
+      <section className={`solo-hero-grid solo-app-section ${appSection === 'miner' ? 'active' : ''}`}>
         <article className="solo-hero-card primary">
           <div className="solo-card-icon"><RadioTower size={24} /></div>
           <div><span>Connected miners</span><b>{onlineMiners} / {liveMiners.length}</b><small>{liveSnapshot ? 'Live Community Bridge telemetry' : 'Preview data until live feed connects'}</small></div>
@@ -524,9 +531,9 @@ export function SoloAlertPreview() {
         </article>
       </section>
 
-      <section className="solo-section">
+      <section id="solo-section-workers" className={`solo-section solo-app-section ${appSection === 'workers' ? 'active' : ''}`}>
         <div className="solo-section-head">
-          <div><span>MINERS</span><h3>Community miner fleet</h3></div>
+          <div><span>WORKERS</span><h3>My paired workers</h3></div>
           <button className="solo-add-button" onClick={() => { setPairingStep(1); setPairingOpen(true); }}>+ Pair miner</button>
         </div>
 
@@ -573,7 +580,7 @@ export function SoloAlertPreview() {
         </div>
       </section>
 
-      <section className="solo-section solo-block-center">
+      <section id="solo-section-trends" className={`solo-section solo-block-center solo-app-section ${appSection === 'trends' ? 'active' : ''}`}>
         <div className="solo-section-head">
           <div><span>BLOCK CENTER</span><h3>Block alerts & history</h3></div>
           <div className="solo-block-actions">
@@ -631,7 +638,7 @@ export function SoloAlertPreview() {
       </section>
 
       <section className="solo-bottom-grid">
-        <article className="solo-panel">
+        <article id="solo-section-alerts" className={`solo-panel solo-app-section ${appSection === 'alerts' ? 'active' : ''}`}>
           <div className="solo-panel-head"><div><span>ALERTS</span><h3>Notification center</h3></div><Bell size={22} /></div>
           <p className="solo-muted">Choose how each miner should alert you when a block is found or the mining bridge goes offline. ASIC health alerts appear only when optional hardware telemetry is enabled.</p>
 
@@ -666,7 +673,7 @@ export function SoloAlertPreview() {
           <div className="solo-security-note"><ShieldCheck size={15} /><span>Telegram bot tokens and Discord webhook URLs never enter ZKAS.stream. They stay inside your local Dual Alert installation.</span></div>
         </article>
 
-        <article className="solo-panel">
+        <article className={`solo-panel solo-app-section ${appSection === 'alerts' ? 'active' : ''}`}>
           <div className="solo-panel-head"><div><span>OPTIONAL HEALTH RULES</span><h3>ASIC protection alerts</h3></div><Thermometer size={22} /></div>
           <p className="solo-muted">Optional for locally accessible ASICs. Rental and basic users can ignore this section completely. The agent is read-only and never changes miner settings.</p>
 
@@ -687,7 +694,7 @@ export function SoloAlertPreview() {
           </div>
         </article>
 
-        <article className="solo-panel agent">
+        <article id="solo-section-connect" className={`solo-panel agent solo-app-section ${appSection === 'connect' ? 'active' : ''}`}>
           <div className="solo-panel-head"><div><span>OPTIONAL LOCAL AGENT</span><h3>Read-only ASIC telemetry</h3></div><Cpu size={22} /></div>
           <div className="solo-agent-diagram">
             <div><Cpu size={21} /><b>ASIC</b><small>Local network</small></div>
@@ -701,6 +708,32 @@ export function SoloAlertPreview() {
           <button className="solo-agent-button">Download agent — coming next</button>
         </article>
       </section>
+
+      <section id="solo-section-more" className={`solo-section solo-more-panel solo-app-section ${appSection === 'more' ? 'active' : ''}`}>
+        <div className="solo-section-head"><div><span>MORE</span><h3>App & privacy</h3></div><ShieldCheck size={22} /></div>
+        <div className="solo-more-grid">
+          <div><b>Private pairing</b><span>Only your paired worker is shown in your private dashboard.</span></div>
+          <div><b>Home Screen app</b><span>Install on iPhone/iPad/Android for an app-like experience and alerts.</span></div>
+          <div><b>Local ASIC telemetry</b><span>Optional. Basic and rental miners do not need a local agent.</span></div>
+          <div><b>Preview build</b><span>Solo Alert Community App preview.</span></div>
+        </div>
+      </section>
+
+      <nav className="solo-mobile-nav" aria-label="Solo Alert app navigation">
+        {([
+          ['miner','My Miner',RadioTower],
+          ['workers','Workers',Cpu],
+          ['trends','Trends',Activity],
+          ['alerts','Alerts',BellRing],
+          ['connect','Connect',Link2],
+          ['more','More',Menu],
+        ] as Array<[AppSection,string,typeof RadioTower]>).map(([key,label,Icon]) => (
+          <button key={key} className={appSection === key ? 'active' : ''} onClick={() => navigateApp(key)}>
+            <Icon size={19} />
+            <span>{label}</span>
+          </button>
+        ))}
+      </nav>
 
       {iosAlertHelpOpen && (
         <div className="solo-modal-backdrop" role="presentation" onMouseDown={() => setIosAlertHelpOpen(false)}>
