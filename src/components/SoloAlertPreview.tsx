@@ -146,6 +146,18 @@ function telemetryAgeMs(timestamp: number | null | undefined) {
   return Math.max(0, Date.now() - ms);
 }
 
+function normalizeZkasMiningAddress(value: string) {
+  let normalized = value.trim().toLowerCase();
+  if (normalized.startsWith('zkas:')) normalized = normalized.slice(5);
+  const workerSeparator = normalized.lastIndexOf('.');
+  if (workerSeparator > 0) normalized = normalized.slice(0, workerSeparator);
+  return normalized.trim();
+}
+
+function looksLikeKaspaAddress(value: string) {
+  return value.trim().toLowerCase().startsWith('kaspa:');
+}
+
 function chartPolyline(points: Array<number | null>, width = 520, height = 180) {
   const finite = points.map((value, index) => ({ value, index })).filter((row): row is { value: number; index: number } => typeof row.value === 'number' && Number.isFinite(row.value));
   if (finite.length < 2) return '';
@@ -283,13 +295,21 @@ export function SoloAlertPreview() {
   async function connectCommunityMiner() {
     const address = miningAddress.trim();
     if (!address) {
-      setPairingError('Enter the ZKAS address you use for Community Mining.');
+      setPairingError('Enter the ZKAS address from your Community Mining username.');
+      return;
+    }
+    if (looksLikeKaspaAddress(address)) {
+      setPairingError('That is your KAS payout address. Enter the ZKAS address from the Community Mining username instead.');
+      return;
+    }
+    const normalized = normalizeZkasMiningAddress(address);
+    if (!normalized) {
+      setPairingError('Enter a valid ZKAS Community Mining address.');
       return;
     }
     setPairingBusy(true);
     setPairingError(null);
     try {
-      const normalized = address.toLowerCase();
       const digestBytes = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(normalized));
       const ownerKey = Array.from(new Uint8Array(digestBytes), (byte) => byte.toString(16).padStart(2, '0')).join('');
       const response = await fetch('/api/solo-connect', {
@@ -302,7 +322,7 @@ export function SoloAlertPreview() {
       setPrivateDashboardToken(result.dashboardToken);
       setConnectedWorkers(Array.isArray(result.workers) ? result.workers.map((worker: any) => String(worker.alias || '')).filter(Boolean) : []);
       window.localStorage.setItem('zkas-solo-dashboard-token', result.dashboardToken);
-      window.localStorage.setItem('zkas-solo-mining-address', address);
+      window.localStorage.setItem('zkas-solo-mining-address', normalized);
       setPairingStep(3);
     } catch (error) {
       setPairingError(error instanceof Error ? error.message : 'Could not connect your Community Mining worker');
@@ -792,14 +812,14 @@ export function SoloAlertPreview() {
 
             {pairingStep === 2 && <>
               <span className="solo-preview-kicker">CONNECT MINER · STEP 2</span>
-              <h3 className="solo-pair-title">Enter your Community Mining ZKAS address</h3>
-              <p className="solo-muted">Use the same ZKAS address you mine with on the ZKAS.stream Community Mining bridge. No account or miner-PC install is required.</p>
+              <h3 className="solo-pair-title">Enter your ZKAS mining address</h3>
+              <p className="solo-muted">Use the ZKAS address from your Community Mining <b>username</b> — not the <code>kaspa:</code> payout address used as the password.</p>
               <label className="solo-pair-field">
-                <span>Your ZKAS mining address</span>
+                <span>ZKAS address from your Community Mining username</span>
                 <input
                   value={miningAddress}
                   onChange={(event) => setMiningAddress(event.target.value)}
-                  placeholder="Paste your ZKAS address"
+                  placeholder="Paste the ZKAS address — not kaspa:..."
                   autoCapitalize="none"
                   autoCorrect="off"
                   spellCheck={false}
@@ -807,7 +827,7 @@ export function SoloAlertPreview() {
               </label>
               <div className="solo-safe-box"><ShieldCheck size={20} /><div><b>Address stays private</b><span>The address is saved only on this device. Your browser sends a one-way SHA-256 hash to match your Community Mining worker; the plaintext address is not uploaded.</span></div></div>
               <div className="solo-private-steps">
-                <div><span>1</span><p>Paste the ZKAS address already used by your Community Mining connection.</p></div>
+                <div><span>1</span><p>From <b>zkas:&lt;ZKAS_ADDRESS&gt;.&lt;WORKER&gt;</b>, paste only the ZKAS address portion.</p></div>
                 <div><span>2</span><p>Your browser hashes it locally and asks ZKAS.stream for only matching worker(s).</p></div>
                 <div><span>3</span><p>Your private Solo Alert dashboard opens on this device.</p></div>
               </div>
