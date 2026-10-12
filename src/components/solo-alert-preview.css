@@ -289,3 +289,64 @@
 .solo-pair-field>span{
   color:#bcd4ce;
 }
+
+/* Make the selected connection mode unmistakable. */
+.solo-mode-card{
+  opacity:.72;
+  border-width:1.5px;
+  transition:transform .16s ease,border-color .16s ease,box-shadow .16s ease,background .16s ease,opacity .16s ease;
+}
+.solo-mode-card:hover{
+  opacity:.9;
+  transform:translateY(-2px);
+  border-color:rgba(75,224,192,.42);
+}
+.solo-mode-card.selected{
+  opacity:1;
+  transform:translateY(-2px) scale(1.015);
+  background:linear-gradient(180deg,rgba(35,200,167,.24),rgba(18,56,50,.96));
+  border:2px solid #35d6b5;
+  box-shadow:0 0 0 3px rgba(53,214,181,.10),0 12px 32px rgba(20,160,133,.20);
+}
+.solo-mode-card.selected .solo-mode-icon{
+  background:#1e5a50;
+  color:#7ff6dc;
+  box-shadow:0 0 0 3px rgba(75,224,192,.08);
+}
+.solo-mode-copy{min-width:0}
+.solo-mode-title-row{display:flex;align-items:center;gap:7px;flex-wrap:wrap}
+.solo-recommended-badge,.solo-optional-badge{
+  display:inline-flex;
+  align-items:center;
+  padding:3px 7px;
+  border-radius:999px;
+  font-size:8px;
+  font-weight:900;
+  letter-spacing:.08em;
+  text-transform:uppercase;
+}
+.solo-recommended-badge{background:rgba(75,224,192,.16);color:#76efd4}
+.solo-optional-badge{background:rgba(255,255,255,.07);color:#a9c2bc}
+.solo-mode-card.selected em{
+  display:inline-flex;
+  align-items:center;
+  width:max-content;
+  padding:5px 8px;
+  border-radius:999px;
+  background:#35d6b5;
+  color:#05241e;
+  font-weight:950;
+  letter-spacing:.08em;
+}
+.solo-pair-selection-note{
+  margin-top:14px;
+  padding:10px 12px;
+  border:1px solid rgba(75,224,192,.28);
+  border-radius:12px;
+  background:rgba(43,205,172,.08);
+}
+.solo-pair-selection-note span{display:block}
+.solo-pair-selection-note small{display:block;margin-top:2px;color:#aac3bd;font-weight:600}
+@media(max-width:560px){
+  .solo-mode-card.selected{transform:none}
+}
