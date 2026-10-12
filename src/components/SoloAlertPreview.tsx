@@ -92,36 +92,20 @@ function isStandaloneWebApp() {
   return window.matchMedia?.('(display-mode: standalone)').matches || nav.standalone === true;
 }
 
-const demoMiners: PreviewMiner[] = [
-  {
-    name: 'IceRiver KS0 Ultra',
-    worker: 'KSOPRO',
-    mode: 'local',
-    status: 'online',
-    hashrate: '359 GH/s',
-    temp: 61,
-    fan: 2870,
-    shares: 60,
-    uptime: '12h 42m',
-    zkasBlocks: 0,
-    kasBlocks: 0,
-    lastSeen: '8 sec ago',
-  },
-  {
-    name: 'Rental hashrate',
-    worker: 'MRR-RENTAL-01',
-    mode: 'rental',
-    status: 'online',
-    hashrate: '1.25 TH/s',
-    temp: null,
-    fan: null,
-    shares: 184,
-    uptime: '6h 18m',
-    zkasBlocks: 0,
-    kasBlocks: 0,
-    lastSeen: '8 sec ago',
-  },
-];
+const simulationMiner: PreviewMiner = {
+  name: 'Solo Alert test miner',
+  worker: 'TEST-WORKER',
+  mode: 'basic',
+  status: 'online',
+  hashrate: '—',
+  temp: null,
+  fan: null,
+  shares: 0,
+  uptime: '—',
+  zkasBlocks: 0,
+  kasBlocks: 0,
+  lastSeen: 'now',
+};
 
 function formatHashrate(hps: number | null) {
   if (hps === null || !Number.isFinite(hps) || hps <= 0) return '—';
@@ -219,7 +203,7 @@ export function SoloAlertPreview() {
   }
 
   const liveMiners = useMemo<PreviewMiner[]>(() => {
-    if (!liveSnapshot?.miners?.length) return demoMiners;
+    if (!liveSnapshot?.miners?.length) return [];
     return liveSnapshot.miners.map((miner) => ({
       name: miner.alias,
       worker: miner.alias,
@@ -366,7 +350,7 @@ export function SoloAlertPreview() {
     }, ...current].slice(0, 25));
   }
 
-  function simulateBlock(chain: Chain, miner = demoMiners[0]) {
+  function simulateBlock(chain: Chain, miner = simulationMiner) {
     const suffix = Math.random().toString(16).slice(2, 14).padEnd(12, '0');
     recordBlockEvent({
       chain,
@@ -405,7 +389,7 @@ export function SoloAlertPreview() {
     <div className="solo-alert-preview">
       <section id="solo-section-miner" className={`solo-preview-banner solo-app-section ${appSection === 'miner' ? 'active' : ''}`}>
         <div>
-          <span className="solo-preview-kicker"><ShieldCheck size={16} /> COMMUNITY MINER PREVIEW · BUILD 09-29B</span>
+          <span className="solo-preview-kicker"><ShieldCheck size={16} /> COMMUNITY MINER PREVIEW</span>
           <h2>ZKAS Solo Alert</h2>
           <p>One private dashboard for Community Mining: live status, hashrate, shares, blocks and alerts from any phone, tablet or computer. Local hardware telemetry is optional.</p>
         </div>
@@ -523,11 +507,11 @@ export function SoloAlertPreview() {
       <section className={`solo-hero-grid solo-app-section ${appSection === 'miner' ? 'active' : ''}`}>
         <article className="solo-hero-card primary">
           <div className="solo-card-icon"><RadioTower size={24} /></div>
-          <div><span>Connected miners</span><b>{onlineMiners} / {liveMiners.length}</b><small>{liveSnapshot ? 'Live Community Bridge telemetry' : 'Preview data until live feed connects'}</small></div>
+          <div><span>Connected miners</span><b>{liveMiners.length ? `${onlineMiners} / ${liveMiners.length}` : '—'}</b><small>{liveSnapshot?.miners?.length ? 'Live Community Mining telemetry' : 'Connect a miner to begin'}</small></div>
         </article>
         <article className="solo-hero-card">
           <div className="solo-card-icon"><Gauge size={24} /></div>
-          <div><span>Accepted shares</span><b>{totalShares.toLocaleString()}</b><small>Live bridge-reported total</small></div>
+          <div><span>Accepted shares</span><b>{liveMiners.length ? totalShares.toLocaleString() : '—'}</b><small>{liveMiners.length ? 'Live bridge-reported total' : 'Waiting for your connected worker'}</small></div>
         </article>
         <article className="solo-hero-card">
           <div className="solo-card-icon"><BellRing size={24} /></div>
@@ -535,7 +519,7 @@ export function SoloAlertPreview() {
         </article>
         <article className="solo-hero-card solo-block-card">
           <div className="solo-card-icon"><Zap size={24} /></div>
-          <div><span>Blocks found</span><b>{totalBlocks.toLocaleString()}</b><small>ZKAS + KAS lifetime counters</small></div>
+          <div><span>Blocks found</span><b>{liveMiners.length ? totalBlocks.toLocaleString() : '—'}</b><small>{liveMiners.length ? 'ZKAS + KAS lifetime counters' : 'Waiting for your connected worker'}</small></div>
           <button className="solo-mini-action" onClick={() => simulateBlock('ZKAS')}>Test block</button>
         </article>
       </section>
@@ -549,6 +533,13 @@ export function SoloAlertPreview() {
         </div>
 
         <div className="solo-miner-grid">
+          {!liveMiners.length && !privateTelemetry?.paired && (
+            <div className="solo-workers-empty">
+              <RadioTower size={24} />
+              <div><b>No miner connected yet</b><span>Use Connect a miner to attach only your Community Mining worker(s) to this dashboard.</span></div>
+              <button onClick={() => { setPairingStep(1); setPairingOpen(true); }}>Connect a miner</button>
+            </div>
+          )}
           {liveMiners.map((miner) => {
             const online = miner.status === 'online';
             const hasAsicTelemetry = miner.mode === 'local' && miner.temp !== null && miner.fan !== null;
@@ -624,8 +615,8 @@ export function SoloAlertPreview() {
         <div className={`solo-history-empty ${liveSnapshot ? 'live' : ''}`}>
           <Activity size={20} />
           <div>
-            <b>{liveSnapshot ? 'Live Community Bridge feed connected' : 'Connecting to live Community Bridge telemetry'}</b>
-            <span>{liveSnapshot ? `Last update ${ageLabel(liveSnapshot.updatedAt)} · ${liveSnapshot.miners.length} worker records` : (liveError ?? 'Waiting for the first telemetry snapshot.')}</span>
+            <b>{liveSnapshot?.miners?.length ? 'Live Community Mining feed connected' : 'Waiting for your connected Community Mining worker'}</b>
+            <span>{liveSnapshot?.miners?.length ? `Last update ${ageLabel(liveSnapshot.updatedAt)} · ${liveSnapshot.miners.length} worker record${liveSnapshot.miners.length === 1 ? '' : 's'}` : (liveError ?? 'Connect a miner to begin private monitoring.')}</span>
           </div>
         </div>
         {blockHistory.length > 0 && (
