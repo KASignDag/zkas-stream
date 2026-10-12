@@ -179,8 +179,8 @@ function chartPolyline(points: Array<number | null>, width = 520, height = 180) 
 export function SoloAlertPreview() {
   const [channels, setChannels] = useState<Record<AlertChannel, boolean>>({
     browser: true,
-    telegram: true,
-    discord: true,
+    telegram: false,
+    discord: false,
   });
   const [browserState, setBrowserState] = useState<'idle' | 'granted' | 'denied'>('idle');
   const [threshold, setThreshold] = useState(70);
@@ -407,7 +407,7 @@ export function SoloAlertPreview() {
         <div>
           <span className="solo-preview-kicker"><ShieldCheck size={16} /> COMMUNITY MINER PREVIEW · BUILD 09-29B</span>
           <h2>ZKAS Solo Alert</h2>
-          <p>One dashboard for solo miners: live status, hashrate, shares, block alerts and optional ASIC health telemetry from a local read-only agent.</p>
+          <p>One private dashboard for Community Mining: live status, hashrate, shares, blocks and alerts from any phone, tablet or computer. Local hardware telemetry is optional.</p>
         </div>
         <div className="solo-preview-live"><span /> Preview only · current mining page unchanged</div>
       </section>
@@ -445,7 +445,7 @@ export function SoloAlertPreview() {
         <div className="solo-device-actions">
           <button onClick={() => void testBrowserAlert()}><BellRing size={16} /> {deviceKind === 'ios' && !standalone ? 'Enable iPhone alerts' : 'Test notification permission'}</button>
           <button onClick={() => simulateBlock('ZKAS')}><Trophy size={16} /> Test block screen</button>
-          <button onClick={() => { setPairingStep(1); setPairingOpen(true); }}><RadioTower size={16} /> Test pairing</button>
+          <button onClick={() => { setPairingStep(1); setPairingOpen(true); }}><RadioTower size={16} /> Test connect flow</button>
         </div>
       </section>
 
@@ -454,7 +454,7 @@ export function SoloAlertPreview() {
           <div className="solo-get-started-copy">
             <span className="solo-preview-kicker"><RadioTower size={16} /> COMMUNITY SOLO ALERT</span>
             <h3>Connect your miner</h3>
-            <p>One simple setup handles Basic, Local ASIC, and Rental / Remote miners. ASIC temperature and fan monitoring stays optional.</p>
+            <p>Connect from this device using the same ZKAS address already used for Community Mining. No account or miner-PC install is required. Hardware monitoring stays optional.</p>
           </div>
           <button className="solo-get-started-button" onClick={() => { setPairingStep(1); setPairingOpen(true); }}>
             <RadioTower size={20} />
@@ -488,7 +488,7 @@ export function SoloAlertPreview() {
               <div className="solo-private-meta">
                 <span>Last report: <b>{ageLabel(privateTelemetry.telemetry.updatedAt)}</b></span>
                 <span>Source: <b>{privateTelemetry.telemetry.source || 'dual-alert'}</b></span>
-                <span>Mode: <b>{privateTelemetry.profile?.mode || 'basic'}</b></span>
+                <span>Mode: <b>{privateTelemetry.profile?.mode === 'local' ? 'Local ASIC' : privateTelemetry.profile?.mode === 'rental' ? 'Rental / Remote' : 'Basic'}</b></span>
               </div>
               <button
                 className="solo-private-details-button"
@@ -531,7 +531,7 @@ export function SoloAlertPreview() {
         </article>
         <article className="solo-hero-card">
           <div className="solo-card-icon"><BellRing size={24} /></div>
-          <div><span>Alert channels</span><b>{enabledCount} enabled</b><small>Browser · Telegram · Discord</small></div>
+          <div><span>Alert channels</span><b>{enabledCount} enabled</b><small>Browser live · Telegram/Discord optional integrations</small></div>
         </article>
         <article className="solo-hero-card solo-block-card">
           <div className="solo-card-icon"><Zap size={24} /></div>
@@ -658,20 +658,17 @@ export function SoloAlertPreview() {
             <button className={`solo-toggle ${channels.browser ? 'on' : ''}`} onClick={() => toggle('browser')} aria-label="Toggle browser alerts"><span /></button>
           </div>
           <div className="solo-alert-row">
-            <div className="solo-alert-label"><Send size={19} /><div><b>Telegram</b><small>Private bot notifications · configured in Dual Alert locally</small></div></div>
-            <button className={`solo-toggle ${channels.telegram ? 'on' : ''}`} onClick={() => toggle('telegram')} aria-label="Toggle Telegram alerts"><span /></button>
+            <div className="solo-alert-label"><Send size={19} /><div><b>Telegram</b><small>Optional cloud alert integration · coming next</small></div></div>
+            <button className="solo-toggle" disabled aria-label="Telegram alerts coming next"><span /></button>
           </div>
           <div className="solo-alert-row">
-            <div className="solo-alert-label"><MessageCircle size={19} /><div><b>Discord</b><small>Webhook notifications · configured in Dual Alert locally</small></div></div>
-            <button className={`solo-toggle ${channels.discord ? 'on' : ''}`} onClick={() => toggle('discord')} aria-label="Toggle Discord alerts"><span /></button>
+            <div className="solo-alert-label"><MessageCircle size={19} /><div><b>Discord</b><small>Optional cloud alert integration · coming next</small></div></div>
+            <button className="solo-toggle" disabled aria-label="Discord alerts coming next"><span /></button>
           </div>
 
           <div className="solo-alert-actions">
             <button className="solo-test-button" onClick={() => void testBrowserAlert()}>
               Test browser alert
-            </button>
-            <button className="solo-local-settings-button" onClick={() => window.open('http://127.0.0.1:3040', '_blank', 'noopener,noreferrer')}>
-              Open local Dual Alert settings
             </button>
           </div>
           {browserState !== 'idle' && (
@@ -681,7 +678,7 @@ export function SoloAlertPreview() {
                 : `Browser permission: ${browserState}`}
             </div>
           )}
-          <div className="solo-security-note"><ShieldCheck size={15} /><span>Telegram bot tokens and Discord webhook URLs never enter ZKAS.stream. They stay inside your local Dual Alert installation.</span></div>
+          <div className="solo-security-note"><ShieldCheck size={15} /><span>Normal Community Mining monitoring works entirely through ZKAS.stream. No local alert program is required.</span></div>
         </article>
 
         <article className={`solo-panel solo-app-section ${appSection === 'alerts' ? 'active' : ''}`}>
@@ -706,7 +703,7 @@ export function SoloAlertPreview() {
         </article>
 
         <article id="solo-section-connect" className={`solo-panel agent solo-app-section ${appSection === 'connect' ? 'active' : ''}`}>
-          <div className="solo-panel-head"><div><span>OPTIONAL LOCAL AGENT</span><h3>Read-only ASIC telemetry</h3></div><Cpu size={22} /></div>
+          <div className="solo-panel-head"><div><span>OPTIONAL HARDWARE ADD-ON</span><h3>Read-only ASIC health telemetry</h3></div><Cpu size={22} /></div>
           <div className="solo-agent-diagram">
             <div><Cpu size={21} /><b>ASIC</b><small>Local network</small></div>
             <span>→</span>
@@ -714,18 +711,18 @@ export function SoloAlertPreview() {
             <span>→</span>
             <div><RadioTower size={21} /><b>ZKAS.stream</b><small>Outbound HTTPS</small></div>
           </div>
-          <p className="solo-muted">Only install this if you want hardware health data. No router port forwarding and no remote miner control. Rental miners do not need this agent.</p>
+          <p className="solo-muted">Not needed for normal Solo Alert. Install this later only if you want local ASIC temperature, fan and host-health data. No router port forwarding or remote miner control.</p>
           <div className="solo-agent-badges"><span>Temperature</span><span>Fan RPM</span><span>Hashrate</span><span>Uptime</span></div>
-          <button className="solo-agent-button">Download agent — coming next</button>
+          <button className="solo-agent-button" disabled>Optional hardware agent — coming next</button>
         </article>
       </section>
 
       <section id="solo-section-more" className={`solo-section solo-more-panel solo-app-section ${appSection === 'more' ? 'active' : ''}`}>
         <div className="solo-section-head"><div><span>MORE</span><h3>App & privacy</h3></div><ShieldCheck size={22} /></div>
         <div className="solo-more-grid">
-          <div><b>Private pairing</b><span>Only your paired worker is shown in your private dashboard.</span></div>
+          <div><b>Private connection</b><span>Your address is hashed locally and only matching Community Mining workers are attached to this dashboard.</span></div>
           <div><b>Home Screen app</b><span>Install on iPhone/iPad/Android for an app-like experience and alerts.</span></div>
-          <div><b>Local ASIC telemetry</b><span>Optional. Basic and rental miners do not need a local agent.</span></div>
+          <div><b>Hardware telemetry</b><span>Optional add-on only. Basic and rental monitoring works without a local agent.</span></div>
           <div><b>Preview build</b><span>Solo Alert Community App preview.</span></div>
         </div>
       </section>
