@@ -284,6 +284,43 @@ function applyLifetimeBlockCounters(state, gateway, miners, bridgeStartedAt) {
   };
 }
 
+const SOLO_HISTORY_BUCKET_MS = 5 * 60 * 1000;
+const SOLO_HISTORY_MAX_POINTS = 7 * 24 * 12;
+
+function soloHistoryPoint(miner, now) {
+  return {
+    t: now,
+    h: finiteNonNegative(miner.hashrateHps),
+    a: finiteNonNegative(miner.acceptedShares),
+    i: finiteNonNegative(miner.invalidShares),
+    s: finiteNonNegative(miner.staleShares),
+    z: finiteNonNegative(miner.zkasBlocks),
+    k: finiteNonNegative(miner.kasBlocks),
+    u: finiteNonNegative(miner.uptimeSeconds),
+  };
+}
+
+async function saveSoloHistory(store, gateway, miners, now) {
+  const jobs = [];
+  for (const miner of miners) {
+    if (!miner?.ownerKey || !miner?.alias) continue;
+    const key = `solo-community-history:${gateway}:${miner.alias}`;
+    jobs.push((async () => {
+      const saved = (await store.get(key, 'json')) || { schemaVersion: 1, points: [] };
+      const points = Array.isArray(saved.points) ? saved.points : [];
+      const point = soloHistoryPoint(miner, now);
+      const currentBucket = Math.floor(now / SOLO_HISTORY_BUCKET_MS);
+      const lastBucket = points.length ? Math.floor(Number(points[points.length - 1]?.t || 0) / SOLO_HISTORY_BUCKET_MS) : -1;
+      if (currentBucket === lastBucket && points.length) points[points.length - 1] = point;
+      else points.push(point);
+      await store.put(key, JSON.stringify({ schemaVersion: 1, points: points.slice(-SOLO_HISTORY_MAX_POINTS) }), {
+        expirationTtl: 60 * 60 * 24 * 8,
+      });
+    })());
+  }
+  await Promise.all(jobs);
+}
+
 function publicSnapshot(snapshot, gateway) {
   if (!snapshot) return { schemaVersion: 1, gateway, updatedAt: null, gatewayOnline: false, miners: [], lifetimeZkasBlocks: 0, lifetimeKasBlocks: 0 };
   const { _counterState, ...safe } = snapshot;
@@ -338,7 +375,10 @@ export async function onRequest(context) {
     // One KV write per telemetry update. Counter state and permanent gateway
     // lifetime totals are stored privately inside the snapshot and stripped
     // from all public GET responses except the published lifetime totals.
-    await store.put(storageKey, JSON.stringify(snapshot));
+    await Promise.all([
+      store.put(storageKey, JSON.stringify(snapshot)),
+      saveSoloHistory(store, gateway, counted.miners, snapshot.updatedAt),
+    ]);
     return json({ ok: true, gateway, miners: counted.miners.length, updatedAt: snapshot.updatedAt });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
