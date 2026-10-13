@@ -1,0 +1,183 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#061713">
+  <meta name="robots" content="noindex, nofollow">
+  <meta name="referrer" content="no-referrer">
+  <title>Stream Pool · ZKAS.stream design preview</title>
+  <style>
+    :root{color-scheme:dark;--bg:#061713;--panel:#0c221c;--panel2:#102a23;--text:#f1faf5;--muted:#a3bdb1;--line:#274238;--accent:#57e4b0;--gold:#eec989;--mono:ui-monospace,SFMono-Regular,Consolas,monospace}
+    *{box-sizing:border-box}html{scroll-behavior:smooth}body{margin:0;background:var(--bg);color:var(--text);font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;font-size:15px;line-height:1.55}button,input,select{font:inherit}button,a,input,select{touch-action:manipulation}button{cursor:pointer}button:disabled{cursor:default;opacity:.55}a{color:var(--accent);text-underline-offset:4px}button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible,summary:focus-visible{outline:3px solid var(--accent);outline-offset:4px}[hidden]{display:none!important}.wrap{max-width:1260px;width:calc(100% - 64px);margin:auto}
+    header{border-bottom:1px solid var(--line);background:#081b15}.header-inner{display:flex;align-items:center;justify-content:space-between;gap:20px;padding:22px 0}.brand{color:var(--text);text-decoration:none;font-size:22px;letter-spacing:-.07em;font-weight:850}.brand span{color:var(--accent);font-weight:400}.header-links{display:flex;align-items:center;gap:22px;font-size:13px}.header-links a{color:var(--muted);text-decoration:none}.preview-chip{font-size:11px;font-weight:750;letter-spacing:.06em;text-transform:uppercase;border:1px solid #6a5a39;background:#352d1d;color:var(--gold);border-radius:6px;padding:6px 10px;white-space:nowrap}
+    main{padding:36px 0 70px}.preview-note{display:flex;align-items:center;gap:18px;border:1px solid #5c5135;background:#221f15;border-radius:12px;padding:14px 18px;color:#ead7b5;font-size:13px}.preview-note strong{color:var(--gold);white-space:nowrap}.hero{display:grid;grid-template-columns:1.6fr 1fr;gap:60px;padding:46px 0 36px;align-items:center}.eyebrow{font:700 11px var(--mono);letter-spacing:.13em;color:var(--accent);text-transform:uppercase}.hero h1{font-size:clamp(40px,5.4vw,68px);letter-spacing:-.065em;line-height:1.05;margin:18px 0}.hero p{max-width:570px;color:var(--muted);font-size:16px;margin:0}.hero-actions{display:flex;gap:12px;flex-wrap:wrap;margin-top:26px}.btn{display:inline-flex;align-items:center;justify-content:center;min-height:44px;border:1px solid var(--line);border-radius:9px;padding:11px 18px;color:var(--text);background:var(--panel);text-decoration:none;font-weight:700;font-size:13px}.btn.primary{border-color:var(--accent);background:var(--accent);color:#062117}.architecture{border:1px solid var(--line);background:var(--panel);border-radius:16px;padding:22px}.architecture-label{font:650 11px var(--mono);color:var(--muted);letter-spacing:.1em;text-transform:uppercase}.coin-pair{display:flex;gap:12px;margin:18px 0}.coin{display:flex;gap:12px;align-items:center;background:#071914;border:1px solid var(--line);border-radius:10px;padding:13px 15px;flex:1}.coin .symbol{font:800 16px var(--mono);color:var(--accent)}.coin b{font-size:14px}.coin small{display:block;color:var(--muted);font-size:11px}.architecture p{font-size:13px;color:var(--muted);margin-bottom:0}.architecture .tag{color:var(--gold);font-size:11px;font-family:var(--mono)}
+    .tabs{display:flex;gap:25px;border-bottom:1px solid var(--line);overflow:auto;margin-bottom:25px}.tab{border:0;border-bottom:3px solid transparent;background:none;color:var(--muted);padding:15px 2px;font-size:14px;font-weight:650;white-space:nowrap;min-height:48px}.tab[aria-selected="true"]{color:var(--accent);border-bottom-color:var(--accent)}.section-heading{display:flex;align-items:center;justify-content:space-between;gap:15px;margin:0 0 18px}.section-heading h2{font-size:22px;letter-spacing:-.035em;margin:0}.section-heading small{color:var(--gold);font:500 11px var(--mono)}.subtitle{color:var(--muted);font-size:13px;margin:4px 0 20px}.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:24px}.stat{background:var(--panel);border:1px solid var(--line);border-radius:13px;padding:19px}.stat span{color:var(--muted);font-size:12px;display:block}.stat strong{font-size:30px;display:block;margin:12px 0 5px;font-weight:600}.stat small{color:var(--muted);font-size:11px}.columns{display:grid;grid-template-columns:1.25fr 1fr;gap:20px}.panel{border:1px solid var(--line);border-radius:14px;background:var(--panel);padding:24px}.panel h3{margin:0 0 8px;font-size:17px;letter-spacing:-.025em}.panel p{color:var(--muted);font-size:13px;margin:0 0 18px}.empty{padding:40px 15px;border:1px dashed #355447;border-radius:9px;text-align:center;color:var(--muted);font-size:13px}.empty strong{display:block;margin-bottom:6px;color:var(--text);font-size:14px}.terms{margin:20px 0 0}.term{display:flex;justify-content:space-between;gap:15px;border-top:1px solid var(--line);padding:12px 0;font-size:13px}.term span{color:var(--muted)}.term b{font-size:12px;font-weight:550}.privacy{border-left:3px solid var(--accent);padding:0 0 0 15px;margin-top:22px;color:var(--muted);font-size:12px}.privacy strong{color:var(--text)}
+    .builder{border:1px solid #3d9572;border-radius:15px;background:var(--panel);padding:26px}.builder-head{display:flex;justify-content:space-between;gap:15px;align-items:start;margin-bottom:22px}.builder-head h2{font-size:24px;letter-spacing:-.04em;margin:0 0 5px}.builder-head p{margin:0;color:var(--muted);font-size:13px}.step{font:700 10px var(--mono);letter-spacing:.1em;text-transform:uppercase;color:var(--accent);margin:22px 0 12px}.segmented{display:flex;gap:10px;flex-wrap:wrap}.choice{border:1px solid var(--line);border-radius:9px;background:#081b15;color:var(--muted);padding:13px 19px;font-size:13px;font-weight:650;min-height:48px}.choice[aria-pressed="true"]{border:2px solid var(--accent);background:#12382b;color:var(--accent);padding:12px 18px;box-shadow:inset 0 0 0 1px #12382b}.mode-help{color:var(--muted);font-size:13px;margin:12px 0 20px;min-height:40px}.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:18px}.field{display:flex;flex-direction:column;gap:7px}.field.full{grid-column:1/-1}.field label{font-size:13px;font-weight:650}.field small{font-size:11px;color:var(--muted)}input,select{width:100%;padding:13px;border:1px solid #3c5f4d;background:#06150f;color:var(--text);border-radius:8px;min-height:48px}input::placeholder{color:#819f90;opacity:1}input:focus,select:focus{border-color:var(--accent)}input[aria-invalid="true"]{border-color:#fa9b89}.validation{font-size:12px;min-height:22px;margin-top:14px;color:#f5b6a3}.validation.ready{color:var(--accent)}.config{border:1px solid var(--line);background:#06140e;border-radius:12px;padding:20px;margin-top:18px}.config-head{display:flex;gap:15px;align-items:center;justify-content:space-between;margin-bottom:14px}.config-head b{font-size:13px}.config pre{font:12px/1.9 var(--mono);margin:0;white-space:pre-wrap;overflow-wrap:anywhere;color:#d7f5e3}.config-note{font-size:11px;color:var(--gold);margin:12px 0 0}.copy-result{font-size:12px;color:var(--accent);min-height:20px;margin-top:8px}.connection-banner{border:1px solid #5c5135;border-radius:10px;background:#221f15;padding:14px 16px;margin-bottom:22px;font-size:13px;color:#e5d8bd}.connection-banner strong{color:var(--gold)}
+    .reward-grid{display:grid;grid-template-columns:1.15fr 1fr;gap:22px}.explain-row{display:grid;grid-template-columns:28px 1fr;gap:14px;padding:15px 0;border-bottom:1px solid var(--line)}.explain-row:last-child{border-bottom:0}.number{background:#17372a;border-radius:6px;color:var(--accent);font:700 12px var(--mono);height:28px;display:grid;place-items:center}.explain-row b{display:block;font-size:13px;margin-bottom:4px}.explain-row span{display:block;font-size:12px;color:var(--muted)}.allocation{border-top:1px solid var(--line);margin-top:20px;padding-top:18px}.allocation strong{font-size:42px;font-weight:600;letter-spacing:-.045em}.allocation p{font-size:12px}.meter{height:9px;border-radius:6px;background:#1f3a2d;overflow:hidden;margin:10px 0 18px}.meter span{display:block;height:100%;width:1%;background:var(--accent);border-radius:6px}.small-print{font-size:11px!important;color:var(--muted)!important}.table-wrap{overflow:auto}table{width:100%;border-collapse:collapse;text-align:left;min-width:520px}th{font:600 10px var(--mono);color:var(--muted);text-transform:uppercase;letter-spacing:.08em;padding:14px 10px;border-bottom:1px solid var(--line)}td{font-size:12px;padding:18px 10px;border-bottom:1px solid var(--line)}.launch-table td:nth-child(2){color:var(--gold)}.launch-note{margin-top:20px!important}.faq{margin-top:24px;border:1px solid var(--line);border-radius:12px;overflow:hidden}details{padding:17px 20px;border-bottom:1px solid var(--line)}details:last-child{border-bottom:0}summary{cursor:pointer;font-size:13px;font-weight:600}details p{font-size:12px;color:var(--muted);margin:12px 0 0}footer{border-top:1px solid var(--line);padding:24px 0;color:var(--muted);font-size:11px}.footer-inner{display:flex;justify-content:space-between;gap:20px}.sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0)}
+    @media(max-width:900px){.hero{grid-template-columns:1fr;gap:24px;padding-top:32px}.hero h1{max-width:630px}.architecture{max-width:600px}.columns,.reward-grid{grid-template-columns:1fr}.stats{grid-template-columns:repeat(2,1fr)}}@media(max-width:600px){.wrap{width:calc(100% - 32px)}.header-inner{gap:12px;padding:16px 0}.brand{font-size:20px}.header-links{gap:12px}.header-links a{display:none}.preview-note{align-items:flex-start;flex-direction:column;gap:5px;padding:12px 14px}.hero h1{font-size:43px}.hero p{font-size:14px}.coin{padding:12px 10px}.tabs{gap:22px}.section-heading{align-items:start;flex-direction:column}.stat{padding:15px}.builder,.panel{padding:20px}.builder-head{flex-direction:column}.form-grid{grid-template-columns:1fr}.field.full{grid-column:auto}.footer-inner{flex-direction:column;gap:8px}.config{padding:16px}.config-head{align-items:flex-start;flex-direction:column}}
+    @media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}}
+  </style>
+</head>
+<body>
+  <header><div class="wrap header-inner"><a class="brand" href="https://zkas.stream/">ZKAS<span>.stream</span></a><div class="header-links"><a href="https://zkas.stream/community-mining.html">Community mining ↗</a><span class="preview-chip">Design preview</span></div></div></header>
+  <main class="wrap">
+    <div class="preview-note"><strong>Pool in development</strong><span>This is an interactive design preview. A Stream Pool mining server and payout service have not been connected.</span></div>
+    <section class="hero" aria-labelledby="page-title">
+      <div><div class="eyebrow">Stream Pool · proposed KAS + ZKAS pool</div><h1 id="page-title">One connection.<br>Two networks.</h1><p>A proposed merged mining pool for Kaspa and ZKas, with simple miner setup, shared rewards, and a clear view of your workers and payouts.</p><div class="hero-actions"><button class="btn primary" type="button" data-open="connect">Try the settings builder →</button><button class="btn" type="button" data-open="launch">What needs to be ready</button></div></div>
+      <aside class="architecture"><div class="architecture-label">Planned native payouts</div><div class="coin-pair"><div class="coin"><span class="symbol">KAS</span><div><b>Kaspa</b><small>Your KAS wallet</small></div></div><div class="coin"><span class="symbol">ZKAS</span><div><b>ZKas</b><small>Your ZKAS wallet</small></div></div></div><div class="tag">PPLNS + SOLO · proposed modes</div><p>A separate mining server would accept work. The website would provide setup, statistics, and a miner dashboard.</p></aside>
+    </section>
+    <nav class="tabs" role="tablist" aria-label="Pool preview sections">
+      <button class="tab" id="tab-overview" role="tab" aria-selected="true" aria-controls="overview" tabindex="0" data-tab="overview">Pool overview</button>
+      <button class="tab" id="tab-connect" role="tab" aria-selected="false" aria-controls="connect" tabindex="-1" data-tab="connect">Connect a miner</button>
+      <button class="tab" id="tab-rewards" role="tab" aria-selected="false" aria-controls="rewards" tabindex="-1" data-tab="rewards">How rewards work</button>
+      <button class="tab" id="tab-launch" role="tab" aria-selected="false" aria-controls="launch" tabindex="-1" data-tab="launch">Launch requirements</button>
+    </nav>
+    <section id="overview" role="tabpanel" aria-labelledby="tab-overview" tabindex="0">
+      <div class="section-heading"><h2>The pool at a glance</h2><small>Awaiting a verified pool backend</small></div><p class="subtitle">These figures will come from Stream Pool itself once the mining service is connected.</p>
+      <div class="stats"><div class="stat"><span>Pool hashrate</span><strong>—</strong><small>Accepted work · 15 minutes</small></div><div class="stat"><span>Active miners</span><strong>—</strong><small>Verified pool connections</small></div><div class="stat"><span>Online workers</span><strong>—</strong><small>Miners submitting valid shares</small></div><div class="stat"><span>Confirmed payouts</span><strong>—</strong><small>KAS + ZKAS, tracked separately</small></div></div>
+      <div class="columns"><div class="panel"><h3>Hashrate history</h3><p>Accepted shares will power the chart and worker status.</p><div class="empty"><strong>Waiting for pool data</strong>No mining figures have been published for Stream Pool.</div></div><div class="panel"><h3>Pool terms</h3><p>Operating terms will be set after the payout service is tested.</p><div class="terms"><div class="term"><span>Reward modes</span><b>PPLNS + SOLO planned</b></div><div class="term"><span>Pool fee</span><b>To be decided</b></div><div class="term"><span>Minimum payouts</span><b>To be decided per coin</b></div><div class="term"><span>Payout schedule</span><b>To be decided</b></div><div class="term"><span>Mining endpoint</span><b>Not configured</b></div></div></div></div>
+      <p class="privacy"><strong>Privacy in the design.</strong> Public tables would show worker aliases and aggregate activity. Wallet addresses, miner IP addresses, and individual balances would stay out of public tables.</p>
+    </section>
+    <section id="connect" role="tabpanel" aria-labelledby="tab-connect" tabindex="0" hidden>
+      <div class="connection-banner"><strong>Preview settings only.</strong> The endpoint and address format need to be confirmed against the new pool software before miners can connect.</div>
+      <div class="builder"><div class="builder-head"><div><h2>Build your miner settings</h2><p>Choose a mode, enter payout addresses, and review the proposed setup.</p></div><span class="preview-chip">KAS + ZKAS</span></div>
+        <div class="step">01 / Choose how to mine</div><div class="segmented" aria-label="Proposed reward mode"><button class="choice" type="button" data-mode="pplns" aria-pressed="true">PPLNS · share rewards</button><button class="choice" type="button" data-mode="solo" aria-pressed="false">SOLO · your own finds</button></div><p class="mode-help" id="mode-help">In PPLNS mode, confirmed rewards are divided using miners’ accepted, difficulty-weighted work in the pool’s reward window.</p>
+        <form id="settings-form" autocomplete="off"><div class="step">02 / Add your payout addresses</div><div class="form-grid">
+          <div class="field full"><label for="zkas-address">ZKAS payout address</label><input id="zkas-address" type="text" placeholder="zkas:…" spellcheck="false" autocapitalize="none" maxlength="250" aria-describedby="address-note"><small id="address-note">Public receive address only. Keep seed words and private keys in your wallet.</small></div>
+          <div class="field full"><label for="kas-address">Kaspa payout address</label><input id="kas-address" type="text" placeholder="kaspa:…" spellcheck="false" autocapitalize="none" maxlength="250"><small>Native payouts to your own KAS and ZKAS wallets are the initial plan.</small></div>
+          <div class="field"><label for="worker-name">Worker name</label><input id="worker-name" type="text" value="rig1" placeholder="rig1" spellcheck="false" autocapitalize="none" maxlength="32" aria-describedby="worker-note"><small id="worker-note">Use letters, numbers, underscores, or hyphens.</small></div>
+          <div class="field"><label for="miner-type">Miner type</label><select id="miner-type"><option value="asic">ASIC · IceRiver / Antminer / Goldshell</option><option value="rental">Hashrate rental · MRR</option></select><small id="hardware-help">The draft shows the fields used on an ASIC pool settings page.</small></div>
+        </div><p class="validation" id="validation" aria-live="polite">Enter both public payout addresses to review a draft.</p>
+        <div class="step">03 / Review the draft</div><div class="config"><div class="config-head"><b id="config-title">Proposed ASIC settings · PPLNS</b><button class="btn" id="copy-draft" type="button" disabled>Copy draft</button></div><pre id="config-output">Endpoint: not configured
+User / worker: enter your ZKAS address
+Password: enter your Kaspa address</pre><p class="config-note">Draft only. This output cannot connect a miner. The new pool’s login format is still to be verified.</p></div><div class="copy-result" id="copy-result" role="status"></div></form>
+        <p class="small-print">Addresses stay in this page while it is open. They are not uploaded or saved. Only basic format checks are performed here; the mining server must validate complete address checksums.</p>
+      </div>
+    </section>
+    <section id="rewards" role="tabpanel" aria-labelledby="tab-rewards" tabindex="0" hidden>
+      <div class="section-heading"><h2>From accepted work to a payout</h2><small>Proposed payout design</small></div><div class="reward-grid"><div class="panel"><h3>Shared rewards · PPLNS</h3><p>Payment depends on confirmed pool rewards and your accepted work in the relevant reward window.</p><div class="explain-row"><div class="number">1</div><div><b>Record accepted shares</b><span>Store each share’s worker, mode, difficulty, and timestamp durably.</span></div></div><div class="explain-row"><div class="number">2</div><div><b>Confirm the actual reward</b><span>Reconcile rewards received by the pool on each chain before crediting miners.</span></div></div><div class="explain-row"><div class="number">3</div><div><b>Allocate the reward</b><span>Use the PPLNS window and difficulty-weighted work, with KAS and ZKAS accounted for separately.</span></div></div><div class="explain-row"><div class="number">4</div><div><b>Track the payout</b><span>Reserve balances, persist the transaction, and reconcile confirmation before marking a payment complete.</span></div></div></div>
+        <div class="panel"><h3>Try an allocation example</h3><p>This illustrates reward sharing with sample work units.</p><div class="form-grid"><div class="field"><label for="your-work">Your weighted work</label><input type="number" id="your-work" value="1" min="0" max="1000000000000" step="any"></div><div class="field"><label for="total-work">Total pool work</label><input type="number" id="total-work" value="100" min="0" max="1000000000000" step="any"></div></div><div class="allocation" aria-live="polite"><strong id="allocation-output">1%</strong><div class="meter" aria-hidden="true"><span id="allocation-meter"></span></div><p id="allocation-caption">1% of the distributable reward in this example.</p><p class="small-print">Work means accepted share difficulty in the same reward window, including your shares in the total. This is arithmetic, not a payout estimate.</p></div></div></div>
+      <div class="faq"><details><summary>How is SOLO different?</summary><p>In SOLO mode, a confirmed reward is credited to the miner whose work found that block, after any published pool fee. SOLO work is accounted for separately from the shared reward window.</p></details><details><summary>Would Stream Pool hold rewards before payout?</summary><p>The proposed shared-payout service would receive rewards into pool-controlled wallets and then pay each miner. That makes it custodial between receipt and payout. Operating terms must explain this clearly before mining opens.</p></details><details><summary>Would it use my existing community bridge settings?</summary><p>The draft uses the existing ZKAS-first address layout as a starting point. The new pool’s software must confirm the exact endpoint, port, login format, and payout behavior before those settings become usable.</p></details><details><summary>What about BTC, USDC, or USDT payouts?</summary><p>The first version is planned around native KAS and ZKAS payouts. Conversion requires a separate exchange integration, rate handling, settlement, fees, and accounting.</p></details></div>
+    </section>
+    <section id="launch" role="tabpanel" aria-labelledby="tab-launch" tabindex="0" hidden>
+      <div class="section-heading"><h2>What needs to be ready</h2><small>Website + a separate mining service</small></div><p class="subtitle">The existing community solo bridge provides useful experience. A shared pool adds a persistent reward ledger and payout operations.</p>
+      <div class="panel table-wrap"><table class="launch-table"><thead><tr><th>Component</th><th>Current preview state</th><th>Before public mining</th></tr></thead><tbody><tr><td>Website and settings builder</td><td>Interactive draft</td><td>Connect verified pool APIs and endpoint</td></tr><tr><td>Mining server</td><td>Not connected</td><td>Provision a server with reliable uptime and TCP access</td></tr><tr><td>KAS + ZKAS nodes</td><td>Pool links unverified</td><td>Sync and test both against the current network rules</td></tr><tr><td>Stratum and merge mining</td><td>Backend to be selected</td><td>Verify miner compatibility and both-chain submissions</td></tr><tr><td>Reward ledger</td><td>Not implemented</td><td>Persist shares, allocations, balances, and recovery state</td></tr><tr><td>Pool wallets and payouts</td><td>Not configured</td><td>Test reward receipt, signing, sending, and confirmation</td></tr><tr><td>Fees and minimum payouts</td><td>Not set</td><td>Publish tested operating terms for each coin</td></tr></tbody></table></div>
+      <p class="privacy"><strong>First live milestone:</strong> one test miner, verified shares on both networks, confirmed reward receipt, and a small reconciled payout in each coin. Restart recovery and payout retries must pass before opening shared payouts.</p>
+      <div class="hero-actions"><a class="btn" href="https://zkas.stream/community-mining.html">Open community mining ↗</a><button class="btn primary" type="button" data-open="connect">Back to settings builder →</button></div>
+    </section>
+  </main>
+  <footer><div class="wrap footer-inner"><span>ZKAS.stream · Independent community project</span><span>Stream Pool design preview · mining is not open</span></div></footer>
+  <script>
+    (() => {
+      'use strict';
+      const byId = id => document.getElementById(id);
+      const tabs = Array.from(document.querySelectorAll('[data-tab]'));
+      const modes = Array.from(document.querySelectorAll('[data-mode]'));
+      const state = {mode:'pplns', draft:''};
+      function showTab(id, focus = false) {
+        if (!tabs.some(tab => tab.dataset.tab === id)) return;
+        for (const tab of tabs) {
+          const selected = tab.dataset.tab === id;
+          tab.setAttribute('aria-selected', String(selected));
+          tab.tabIndex = selected ? 0 : -1;
+          byId(tab.dataset.tab).hidden = !selected;
+          if (selected && focus) tab.focus();
+        }
+        history.replaceState(null, '', '#' + id);
+      }
+      for (const tab of tabs) {
+        tab.addEventListener('click', () => showTab(tab.dataset.tab));
+        tab.addEventListener('keydown', event => {
+          const index = tabs.indexOf(tab);
+          let next;
+          if (event.key === 'ArrowRight') next = (index + 1) % tabs.length;
+          if (event.key === 'ArrowLeft') next = (index - 1 + tabs.length) % tabs.length;
+          if (event.key === 'Home') next = 0;
+          if (event.key === 'End') next = tabs.length - 1;
+          if (next !== undefined) {event.preventDefault();showTab(tabs[next].dataset.tab, true);}
+        });
+      }
+      for (const button of document.querySelectorAll('[data-open]')) {
+        button.addEventListener('click', () => {
+          showTab(button.dataset.open, true);
+          document.querySelector('.tabs').scrollIntoView({block:'start',behavior:'auto'});
+        });
+      }
+      function basicAddress(value, prefix) {
+        return value.length >= prefix.length + 20 && value.length <= 250 &&
+          value.startsWith(prefix) && /^[a-z0-9]+$/.test(value.slice(prefix.length));
+      }
+      function updateDraft() {
+        const zkas = byId('zkas-address').value.trim();
+        const kas = byId('kas-address').value.trim();
+        const worker = byId('worker-name').value.trim();
+        const zkasOk = basicAddress(zkas, 'zkas:');
+        const kasOk = basicAddress(kas, 'kaspa:');
+        const workerOk = /^[A-Za-z0-9_-]{1,32}$/.test(worker);
+        const ready = zkasOk && kasOk && workerOk;
+        const type = byId('miner-type').value;
+        const mode = state.mode.toUpperCase();
+        for (const [id, value, valid] of [['zkas-address',zkas,zkasOk],['kas-address',kas,kasOk],['worker-name',worker,workerOk]]) {
+          byId(id).setAttribute('aria-invalid', String(Boolean(value) && !valid));
+        }
+        byId('config-title').textContent = 'Proposed ' + (type === 'rental' ? 'rental' : 'ASIC') + ' settings · ' + mode;
+        byId('hardware-help').textContent = type === 'rental' ? 'Rental support and required share difficulty must be tested against the new server.' : 'The draft shows the fields used on an ASIC pool settings page.';
+        byId('copy-draft').disabled = !ready;
+        byId('copy-result').textContent = '';
+        state.draft = 'STREAM POOL — DESIGN DRAFT — NOT READY FOR MINING\n' +
+          'Reward mode: ' + mode + '\nEndpoint: not configured\n' +
+          'Proposed user / worker: ' + (zkasOk && workerOk ? zkas + '.' + worker : 'enter a ZKAS address and worker name') + '\n' +
+          'Proposed password: ' + (kasOk ? kas : 'enter a Kaspa address') + '\n' +
+          'Login format is provisional and must be verified against the pool backend.';
+        byId('config-output').textContent = state.draft;
+        const errors = [];
+        if (zkas && !zkasOk) errors.push('Use a full public zkas: receive address.');
+        if (kas && !kasOk) errors.push('Use a full public kaspa: receive address.');
+        if (!workerOk) errors.push('Worker name: 1–32 letters, numbers, underscores, or hyphens.');
+        byId('validation').textContent = errors.length ? errors.join(' ') : ready ? 'Basic format checks passed. Checksum and payout verification still require the mining server.' : 'Enter both public payout addresses to review a draft.';
+        byId('validation').classList.toggle('ready', ready);
+      }
+      for (const button of modes) button.addEventListener('click', () => {
+        state.mode = button.dataset.mode;
+        for (const item of modes) item.setAttribute('aria-pressed', String(item === button));
+        byId('mode-help').textContent = state.mode === 'solo' ? 'In SOLO mode, confirmed rewards are credited to the miner who finds the block, after any published fee. Your work stays separate from PPLNS.' : 'In PPLNS mode, confirmed rewards are divided using miners’ accepted, difficulty-weighted work in the pool’s reward window.';
+        updateDraft();
+      });
+      byId('settings-form').addEventListener('submit', event => event.preventDefault());
+      for (const id of ['zkas-address','kas-address','worker-name','miner-type']) {
+        byId(id).addEventListener(id === 'miner-type' ? 'change' : 'input', updateDraft);
+      }
+      byId('copy-draft').addEventListener('click', async () => {
+        if (byId('copy-draft').disabled) return;
+        try {await navigator.clipboard.writeText(state.draft);byId('copy-result').textContent = 'Draft copied. A live mining endpoint is still required.';}
+        catch {byId('copy-result').textContent = 'Copy is unavailable here. Select the draft text above to copy it.';}
+      });
+      function updateAllocation() {
+        const own = byId('your-work').value.trim();
+        const all = byId('total-work').value.trim();
+        const ownNumber = Number(own), allNumber = Number(all);
+        const valid = own !== '' && all !== '' && Number.isFinite(ownNumber) && Number.isFinite(allNumber) && ownNumber >= 0 && allNumber > 0 && ownNumber <= allNumber && allNumber <= 1e12;
+        byId('your-work').setAttribute('aria-invalid', String(!valid));
+        byId('total-work').setAttribute('aria-invalid', String(!valid));
+        if (!valid) {
+          byId('allocation-output').textContent = '—';
+          byId('allocation-caption').textContent = 'Enter non-negative work and a positive pool total that includes your work, up to 1 trillion units.';
+          byId('allocation-meter').style.width = '0%';
+          return;
+        }
+        const percent = ownNumber / allNumber * 100;
+        const label = new Intl.NumberFormat('en-US',{maximumFractionDigits:3}).format(percent) + '%';
+        byId('allocation-output').textContent = label;
+        byId('allocation-caption').textContent = label + ' of the distributable reward in this example.';
+        byId('allocation-meter').style.width = percent + '%';
+      }
+      for (const id of ['your-work','total-work']) byId(id).addEventListener('input', updateAllocation);
+      window.addEventListener('hashchange', () => showTab(location.hash.slice(1)));
+      showTab(location.hash.slice(1) || 'overview');
+      updateDraft();
+      updateAllocation();
+    })();
+  </script>
+</body>
+</html>
