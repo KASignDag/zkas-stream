@@ -58,7 +58,7 @@ function counterValue(value) {
 function cleanAlias(value) {
   if (typeof value !== 'string') return null;
   const alias = value.trim();
-  return /^[A-Za-z0-9._-]{1,32}$/.test(alias) ? alias : null;
+  return /^[A-Za-z0-9._#-]{1,32}$/.test(alias) ? alias : null;
 }
 
 function payoutStatus(value, { allowLegacy = true } = {}) {
