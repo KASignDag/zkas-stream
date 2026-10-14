@@ -56,8 +56,9 @@ export async function onRequest(context) {
   const origin = request.headers.get('Origin');
   if (origin && origin !== new URL(request.url).origin) return json({ error: 'invalid_origin' }, 403);
 
-  const store = env.COMMUNITY_MINING || env.OTC_TRADES;
-  if (!store) return json({ error: 'storage_not_configured' }, 503);
+  const telemetryStore = env.COMMUNITY_MINING_SOURCE || env.COMMUNITY_MINING || env.OTC_TRADES;
+  const privateStore = env.SOLO_ALERT || env.COMMUNITY_MINING || env.OTC_TRADES;
+  if (!telemetryStore || !privateStore) return json({ error: 'storage_not_configured' }, 503);
 
   let body;
   try { body = await request.json(); } catch { return json({ error: 'invalid_json' }, 400); }
@@ -67,7 +68,7 @@ export async function onRequest(context) {
 
   const matches = [];
   for (const [gateway, key] of SNAPSHOTS) {
-    const snapshot = await store.get(key, 'json');
+    const snapshot = await telemetryStore.get(key, 'json');
     for (const miner of (Array.isArray(snapshot?.miners) ? snapshot.miners : [])) {
       if (miner?.ownerKey === ownerKey) matches.push(safeMiner(miner, gateway));
     }
@@ -82,7 +83,7 @@ export async function onRequest(context) {
 
   const dashboardToken = token();
   const dashboardHash = await digest(dashboardToken);
-  await store.put(`solo-dashboard:${dashboardHash}`, JSON.stringify({
+  await privateStore.put(`solo-dashboard:${dashboardHash}`, JSON.stringify({
     schemaVersion: 2,
     status: 'claimed',
     mode,
