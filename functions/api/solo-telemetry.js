@@ -89,40 +89,41 @@ function cleanTelemetry(body, profile) {
 
 export async function onRequest(context) {
   const { request, env } = context;
-  const store = env.COMMUNITY_MINING || env.OTC_TRADES;
-  if (!store) return json({ error: 'storage_not_configured' }, 503);
+  const telemetryStore = env.COMMUNITY_MINING_SOURCE || env.COMMUNITY_MINING || env.OTC_TRADES;
+  const privateStore = env.SOLO_ALERT || env.COMMUNITY_MINING || env.OTC_TRADES;
+  if (!telemetryStore || !privateStore) return json({ error: 'storage_not_configured' }, 503);
 
   const supplied = request.headers.get('Authorization')?.replace(/^Bearer\s+/i, '') || '';
   if (!supplied) return json({ error: 'unauthorized' }, 401);
 
   if (request.method === 'POST') {
     const publisherHash = await digest(supplied);
-    const profile = await store.get(`solo-publisher:${publisherHash}`, 'json');
+    const profile = await privateStore.get(`solo-publisher:${publisherHash}`, 'json');
     if (!profile) return json({ error: 'unauthorized' }, 401);
     let body;
     try { body = await request.json(); } catch { return json({ error: 'invalid_json' }, 400); }
     const telemetry = cleanTelemetry(body, profile);
     await Promise.all([
-      store.put(`solo-telemetry:${profile.dashboardHash}`, JSON.stringify(telemetry), { expirationTtl: 60 * 60 * 24 * 30 }),
-      appendHistory(store, profile.dashboardHash, telemetry),
+      privateStore.put(`solo-telemetry:${profile.dashboardHash}`, JSON.stringify(telemetry), { expirationTtl: 60 * 60 * 24 * 30 }),
+      appendHistory(privateStore, profile.dashboardHash, telemetry),
     ]);
     return json({ ok: true, updatedAt: telemetry.updatedAt });
   }
 
   if (request.method === 'GET') {
     const dashboardHash = await digest(supplied);
-    const dashboard = await store.get(`solo-dashboard:${dashboardHash}`, 'json');
+    const dashboard = await privateStore.get(`solo-dashboard:${dashboardHash}`, 'json');
     if (!dashboard) return json({ error: 'unauthorized' }, 401);
     const url = new URL(request.url);
     const range = url.searchParams.get('range');
-    let telemetry = await store.get(`solo-telemetry:${dashboardHash}`, 'json');
+    let telemetry = await privateStore.get(`solo-telemetry:${dashboardHash}`, 'json');
     let workers = [];
     let history = null;
 
     if (Array.isArray(dashboard.workers) && dashboard.workers.length) {
       for (const ref of dashboard.workers) {
         const storageKey = ref.gateway === 'community-107' ? 'community-mining:v1:community-107' : 'community-mining:v1';
-        const snapshot = await store.get(storageKey, 'json');
+        const snapshot = await telemetryStore.get(storageKey, 'json');
         const miner = (Array.isArray(snapshot?.miners) ? snapshot.miners : []).find((row) => row?.alias === ref.alias);
         if (miner) {
           const { ownerKey, ...safeMiner } = miner;
@@ -132,7 +133,7 @@ export async function onRequest(context) {
       if (workers.length) {
         telemetry = {
           schemaVersion: 2,
-          updatedAt: Math.max(...workers.map((worker) => Number(worker.lastSeenAt || worker.lastShareAt || 0)), Date.now()),
+          updatedAt: Math.max(...workers.map((worker) => Number(worker.lastSeenAt || worker.lastShareAt || 0))),
           name: workers[0].alias,
           mode: dashboard.mode || 'basic',
           status: workers.some((worker) => worker.status === 'online') ? 'online' : 'offline',
@@ -149,12 +150,12 @@ export async function onRequest(context) {
       }
       if (range && HISTORY_WINDOWS[range] && dashboard.workers[0]) {
         const first = dashboard.workers[0];
-        const saved = await store.get(`solo-community-history:${first.gateway}:${first.alias}`, 'json');
+        const saved = await telemetryStore.get(`solo-community-history:${first.gateway}:${first.alias}`, 'json');
         const cutoff = Date.now() - HISTORY_WINDOWS[range];
         history = (Array.isArray(saved?.points) ? saved.points : []).filter((point) => Number(point?.t) >= cutoff);
       }
     } else if (range && HISTORY_WINDOWS[range]) {
-      const saved = await store.get(`solo-history:${dashboardHash}`, 'json');
+      const saved = await privateStore.get(`solo-history:${dashboardHash}`, 'json');
       const cutoff = Date.now() - HISTORY_WINDOWS[range];
       history = (Array.isArray(saved?.points) ? saved.points : []).filter((point) => Number(point?.t) >= cutoff);
     }
