@@ -255,6 +255,7 @@ function Build-Snapshot([string]$text) {
   $bridgeStatus = Get-BridgeStatus
 
   $valid = Get-Series $text 'ks_valid_share_counter'
+  $validShareDiff = Get-Series $text 'ks_valid_share_diff_counter'
   $invalid = Get-Series $text 'ks_invalid_share_counter'
   $currentDiff = Get-Series $text 'ks_worker_current_difficulty'
   $start = Get-Series $text 'ks_worker_start_time'
@@ -263,14 +264,26 @@ function Build-Snapshot([string]$text) {
   $kasAcceptedLegacy = Get-Series $text 'ks_merged_kas_blocks_accepted_total'
   $kasPayoutSet = Get-Series $text 'ks_worker_kas_payout_set'
 
-  $identitySeries = @($valid, $invalid, $currentDiff, $start, $zkasBlocks, $kasSubmit, $kasAcceptedLegacy, $kasPayoutSet)
+  $identitySeries = @($valid, $validShareDiff, $invalid, $currentDiff, $start, $zkasBlocks, $kasSubmit, $kasAcceptedLegacy, $kasPayoutSet)
   $workers = Get-WorkersFromSeries $identitySeries
   $miners = @()
 
   foreach ($worker in ($workers | Sort-Object)) {
     $publicAlias = Get-PublicAlias $identitySeries $worker
     $acceptedShares = Sum-SessionMax $valid $worker
-    $shareSessions = Get-WorkerShareSessions $valid $currentDiff $worker
+    # Newer bridges expose the accumulated difficulty of accepted shares.
+    # Its per-second rate multiplied by 1e9 is the worker hashrate. Reuse the
+    # rolling-work pipeline with a conversion factor that cancels its final
+    # 2^32 multiplier. Fall back for bridges that do not expose this metric.
+    $shareSessions = Get-WorkerShareSessions $validShareDiff @() $worker
+    if ($shareSessions.Count -gt 0) {
+      $difficultyToWork = 1e9 / $Two32
+      foreach ($sessionKey in @($shareSessions.Keys)) {
+        $shareSessions[$sessionKey].Difficulty = $difficultyToWork
+      }
+    } else {
+      $shareSessions = Get-WorkerShareSessions $valid $currentDiff $worker
+    }
     $difficultyNow = Max-WorkerValue $currentDiff $worker
 
     $invalidShares = 0.0
