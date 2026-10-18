@@ -88,8 +88,10 @@ type Detail = { type: 'block' | 'transaction' | 'privacy'; query: string; data: 
 const fmt = new Intl.NumberFormat('en-US', { maximumFractionDigits: 2 });
 const compact = new Intl.NumberFormat('en-US', { notation: 'compact', maximumFractionDigits: 2 });
 
-const MINER_REWARD_SHARE = 0.95;
-const DEVELOPMENT_SHARE = 0.05;
+// ZKrise ended the development share at mainnet DAA 6,983,500.
+// These helpers describe current and future rewards, not historical blocks.
+const MINER_REWARD_SHARE = 1;
+const DEVELOPMENT_SHARE = 0;
 
 function minerPayout(gross: number | null) {
   return gross === null ? null : gross * MINER_REWARD_SHARE;
@@ -842,6 +844,26 @@ function App() {
         {tab !== 'otc' && tab !== 'otcPreview' && tab !== 'exchanges' && tab !== 'importer' && tab !== 'supporters' && status === 'stale' && <div className="demo-banner"><b>Live refresh delayed.</b> Showing the last good public mainnet snapshot while the API retries. {error && <span>{error}</span>}</div>}
         {tab !== 'otc' && tab !== 'otcPreview' && tab !== 'exchanges' && tab !== 'importer' && tab !== 'supporters' && status === 'connecting' && <div className="demo-banner"><b>Connecting to ZKas mainnet.</b> Waiting for the first public API snapshot. {error && <span>{error}</span>}</div>}
 
+        {(tab === 'intelligence' || tab === 'merged' || tab === 'supply' || tab === 'reference') && (
+          <section className="panel zkrise-update" aria-label="ZKrise network upgrade">
+            <div className="panel-head">
+              <div><span className="panel-icon"><ShieldCheck size={20} /></span><h2>ZKrise is live</h2></div>
+              <a className="secondary-link" href="https://github.com/firecash/zkas-rusty/releases/tag/zkas-v1.0.11" target="_blank" rel="noreferrer">Official release ↗</a>
+            </div>
+            <p className="feature-intro">Activated at mainnet DAA 6,983,500. The 5% development share has ended: miners now receive 100% of the block subsidy. The issuance schedule is unchanged.</p>
+            <details>
+              <summary>What changed for miners and wallet users</summary>
+              <ul>
+                <li><b>Bound merged mining:</b> ZKM1 binds each solution to one ZKas block, closing the double-mining hole.</li>
+                <li><b>Batched miner rewards:</b> rewards accumulate into one note roughly every 100 DAA scores, or when the payout script changes.</li>
+                <li><b>Stronger verification:</b> anchor-block checks, expanded state commitments and verified shielded-history sync.</li>
+                <li><b>Node and wallet improvements:</b> RPC hardening, Zakura 2.2.0, improved note selection and faster wallet processing.</li>
+              </ul>
+              <p>Operators need ZKrise-compatible node, bridge and wallet software. Use the official release instructions and confirm your node’s virtual DAA score continues advancing.</p>
+            </details>
+          </section>
+        )}
+
         {tab === 'intelligence' && (
           <IntelligenceHome data={data} txValues={txValues} pulseTimes={pulseTimes} onReference={() => navigateToTab('reference')} />
         )}
@@ -1454,7 +1476,7 @@ function SoloMiningIntelligence({ data }: { data: DashboardData }) {
           <div className="solo-live-condition"><span>ZKAS network hashrate</span><b>{displayHashrate(networkHps)}</b><small>public consensus work estimate</small></div>
           <div className="solo-live-condition"><span>ZKAS block flow</span><b>{liveBps === null ? '—' : `${fmt.format(liveBps)} BPS`}</b><small>observed public rate</small></div>
           <div className="solo-live-condition"><span>ZKAS difficulty</span><b>{displayNumber(data.difficulty, true)}</b><small>current consensus target difficulty</small></div>
-          <div className="solo-live-condition"><span>ZKAS miner payout</span><b>{payout === null ? '—' : `${fmt.format(payout)} ZKAS`}</b><small>95% of gross block emission</small></div>
+          <div className="solo-live-condition"><span>ZKAS miner payout</span><b>{payout === null ? '—' : `${fmt.format(payout)} ZKAS`}</b><small>100% of gross block emission · ZKrise</small></div>
           <div className="solo-live-condition"><span>Kaspa network hashrate</span><b>{displayHashrate(kaspa.hashrateHps)}</b><small>{kaspa.status === 'unavailable' ? 'live Kaspa input unavailable' : (kaspa.source ?? 'public Kaspa network estimate')}</small></div>
           <div className="solo-live-condition"><span>Kaspa block reward</span><b>{kaspa.blockRewardKas === null ? '—' : `${displayMiningEstimate(kaspa.blockRewardKas)} KAS`}</b><small>current public reward per block</small></div>
           <div className="solo-live-condition"><span>Kaspa price</span><b>{displayUsd(kaspa.priceUsd)}</b><small>current public USD price</small></div>
@@ -1462,8 +1484,8 @@ function SoloMiningIntelligence({ data }: { data: DashboardData }) {
 
         <div className="solo-reward-strip">
           <div><span>ZKAS gross block emission</span><b>{grossReward === null ? '—' : `${fmt.format(grossReward)} ZKAS`}</b></div>
-          <div><span>Miner payout (95%)</span><b>{payout === null ? '—' : `${fmt.format(payout)} ZKAS`}</b></div>
-          <div><span>Development allocation (5%)</span><b>{grossReward === null ? '—' : `${fmt.format(developmentAllocation(grossReward) ?? 0)} ZKAS`}</b></div>
+          <div><span>Miner payout (100%)</span><b>{payout === null ? '—' : `${fmt.format(payout)} ZKAS`}</b></div>
+          <div><span>Development allocation (0%)</span><b>{grossReward === null ? '—' : `${fmt.format(developmentAllocation(grossReward) ?? 0)} ZKAS`}</b></div>
           <div><span>Next miner payout</span><b>{nextPayout === null ? '—' : `${fmt.format(nextPayout)} ZKAS`}</b><small>{data.nextReductionSeconds === null ? 'schedule unavailable' : `in ${countdown(data.nextReductionSeconds)}`}</small></div>
         </div>
 
@@ -1983,8 +2005,8 @@ function SupplyPrivacyPage({ data, history, range, onRange }: { data: DashboardD
       <div className="metric-grid nodes-metrics">
         <MetricCard icon={<Coins size={19} />} label="Circulating supply" value={displayNumber(data.supply, true)} sub={supplyDelta === null ? 'Consensus-derived issued supply' : `${signed(supplyDelta, ' ZKAS')} in selected observer window`} />
         <MetricCard icon={<CircleDollarSign size={19} />} label="Gross block emission" value={data.reward === null ? '—' : `${displayNumber(data.reward)} ZKAS`} sub="Consensus emission per block" />
-        <MetricCard icon={<Coins size={19} />} label="Miner payout (95%)" value={minerPayout(data.reward) === null ? '—' : `${displayNumber(minerPayout(data.reward))} ZKAS`} sub="Expected accepted-block miner credit" />
-        <MetricCard icon={<CircleDollarSign size={19} />} label="Development allocation (5%)" value={developmentAllocation(data.reward) === null ? '—' : `${displayNumber(developmentAllocation(data.reward))} ZKAS`} sub="Per accepted block" />
+        <MetricCard icon={<Coins size={19} />} label="Miner payout (100%)" value={minerPayout(data.reward) === null ? '—' : `${displayNumber(minerPayout(data.reward))} ZKAS`} sub="Expected accepted-block miner credit" />
+        <MetricCard icon={<CircleDollarSign size={19} />} label="Development allocation (0%)" value={developmentAllocation(data.reward) === null ? '—' : `${displayNumber(developmentAllocation(data.reward))} ZKAS`} sub="Ended at DAA 6,983,500 · ZKrise" />
         <MetricCard icon={<TimerReset size={19} />} label="Next reduction" value={countdown(data.nextReductionSeconds)} sub={data.nextReward === null ? 'Consensus schedule' : `Next gross ${displayNumber(data.nextReward)} · miner ${displayNumber(minerPayout(data.nextReward))} ZKAS`} />
         <MetricCard icon={<LockKeyhole size={19} />} label="Shielded notes" value={displayNumber(data.shieldedNotes, true)} sub={notesDelta === null ? 'Backend-observed aggregate' : `+${displayNumber(notesDelta, true)} in selected window`} />
         <MetricCard icon={<LockKeyhole size={19} />} label="Nullifiers / spends" value={displayNumber(data.nullifiers, true)} sub={nullifierReset ? 'Backend counter reset observed' : nullifierDelta === null ? 'Backend-observed aggregate' : `+${displayNumber(nullifierDelta, true)} in selected window`} />
@@ -2027,8 +2049,8 @@ function SupplyPrivacyPage({ data, history, range, onRange }: { data: DashboardD
         <div className="panel-head"><div><span className="panel-icon"><TimerReset size={20} /></span><h2>Emission schedule</h2></div><span className="range-chip">CONSENSUS</span></div>
         <div className="merge-stats node-stats">
           <div><span>Gross block emission</span><b>{data.reward === null ? '—' : `${displayNumber(data.reward)} ZKAS`}</b></div>
-          <div><span>Miner payout (95%)</span><b>{minerPayout(data.reward) === null ? '—' : `${displayNumber(minerPayout(data.reward))} ZKAS`}</b></div>
-          <div><span>Development allocation (5%)</span><b>{developmentAllocation(data.reward) === null ? '—' : `${displayNumber(developmentAllocation(data.reward))} ZKAS`}</b></div>
+          <div><span>Miner payout (100%)</span><b>{minerPayout(data.reward) === null ? '—' : `${displayNumber(minerPayout(data.reward))} ZKAS`}</b></div>
+          <div><span>Development allocation (0%)</span><b>{developmentAllocation(data.reward) === null ? '—' : `${displayNumber(developmentAllocation(data.reward))} ZKAS`}</b></div>
           <div><span>Next gross emission</span><b>{data.nextReward === null ? '—' : `${displayNumber(data.nextReward)} ZKAS`}</b></div>
           <div><span>Next miner payout</span><b>{minerPayout(data.nextReward) === null ? '—' : `${displayNumber(minerPayout(data.nextReward))} ZKAS`}</b></div>
           <div><span>Next reduction</span><b>{countdown(data.nextReductionSeconds)}</b></div>
@@ -2087,7 +2109,7 @@ function ReferencePage({ data, txs, onSelect }: { data: DashboardData; txs: Arra
         </div>
         <p className="feature-intro">ZKAS launched with a front-loaded proof-of-work schedule. The block reward halves every three months until it reaches a two-step permanent tail.</p>
         <div className="tokenomics-timeline">
-          <div><span>Launch</span><b>60 ZKAS / block</b><small>57 to the miner · 3 to development</small></div>
+          <div><span>Launch</span><b>60 ZKAS / block</b><small>Historical launch split: 57 miner · 3 development; ended with ZKrise</small></div>
           <div><span>Month 3</span><b>30 ZKAS / block</b><small>First three-month halving</small></div>
           <div><span>Month 6</span><b>15 ZKAS / block</b><small>Second three-month halving</small></div>
           <div><span>About month 10</span><b>6 ZKAS / block</b><small>First tail-emission floor begins</small></div>
@@ -2126,7 +2148,7 @@ function ReferencePage({ data, txs, onSelect }: { data: DashboardData; txs: Arra
       <div className="metric-grid nodes-metrics">
         {data.supply !== null && <MetricCard icon={<Coins size={19} />} label="Circulating" value={displayNumber(data.supply, true)} sub="ZKAS issued" />}
         {data.reward !== null && <MetricCard icon={<CircleDollarSign size={19} />} label="Gross emission" value={`${displayNumber(data.reward)} ZKAS`} sub="Per block" />}
-        {data.reward !== null && <MetricCard icon={<Coins size={19} />} label="Miner payout" value={`${displayNumber(minerPayout(data.reward))} ZKAS`} sub="95% of gross emission" />}
+        {data.reward !== null && <MetricCard icon={<Coins size={19} />} label="Miner payout" value={`${displayNumber(minerPayout(data.reward))} ZKAS`} sub="100% of gross emission · ZKrise" />}
         {data.nextReductionSeconds !== null && <MetricCard icon={<TimerReset size={19} />} label="Next reduction" value={countdown(data.nextReductionSeconds)} sub={data.nextReward === null ? 'Consensus schedule' : `Next gross ${displayNumber(data.nextReward)} · miner ${displayNumber(minerPayout(data.nextReward))} ZKAS`} />}
         {data.blockCount !== null && <MetricCard icon={<Boxes size={19} />} label="Blocks" value={displayNumber(data.blockCount, true)} sub="Observed chain total" />}
         {data.txCount !== null && <MetricCard icon={<Activity size={19} />} label="Transactions" value={displayNumber(data.txCount, true)} sub="Public aggregate" />}
@@ -2971,7 +2993,7 @@ function MiningPage({ data, diffValues, pulseTimes }: { data: DashboardData; dif
       <div className="metric-grid mining-metrics">
         <MetricCard icon={<Gauge size={19} />} label="Network hashrate" value={displayHashrate(data.hashrate)} sub="Public network estimate" accent />
         <MetricCard icon={<Activity size={19} />} label="BPS" value={displayNumber(data.bps)} sub="Block production" />
-        <MetricCard icon={<CircleDollarSign size={19} />} label="Miner payout" value={`${displayNumber(minerPayout(data.reward))} ZKAS`} sub="95% of gross block emission" />
+        <MetricCard icon={<CircleDollarSign size={19} />} label="Miner payout" value={`${displayNumber(minerPayout(data.reward))} ZKAS`} sub="100% of gross block emission · ZKrise" />
         <MetricCard icon={<GitMerge size={19} />} label="Co-located peers" value={displayNumber(data.merged.found)} sub="Kaspa node detected" />
       </div>
       <div className="panel"><div className="panel-head"><div><span className="panel-icon"><Gauge size={20} /></span><h2>Network difficulty</h2></div><span className="range-chip">15M</span></div><SparkChart values={diffValues} labels={pulseTimes} height={240} /></div>
