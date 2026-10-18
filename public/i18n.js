@@ -18,6 +18,7 @@
     if (typeof value !== 'string' || !dictionary || !value.trim()) return value;
     const key = normalize(value);
     if(/^[A-Z]{2}$/.test(key))return value; // Country codes and technical abbreviations are data.
+    if(/^(?:≈\s*)?[+-]?(?:\d[\d,.]*(?:[eE][+-]?\d+)?|—)\s*(?:[KMGTPE]?H\/s|BPS|ZKAS|KAS|USDT|USD|BTC|sompi)$/i.test(key))return value;
     let result = Object.prototype.hasOwnProperty.call(dictionary,key) ? dictionary[key] : null;
     if (!result) {
       for (const entry of templates) {
