@@ -1956,3 +1956,13 @@ footer { width: min(1320px, calc(100% - 40px)); margin: 0 auto; padding: 22px 0 
   .network-map-foot > span:first-child { grid-column: 1 / -1; }
   .network-map-foot button { margin: 0; padding: 7px 10px; font-size: 8px; }
 }
+
+/* ZKrise release notice */
+.zkrise-update { margin-bottom: 20px; border: 2px solid var(--accent); background: linear-gradient(135deg, var(--surface), var(--accent-soft)); }
+.zkrise-update .feature-intro { margin-bottom: 12px; }
+.zkrise-update summary { cursor: pointer; color: var(--accent); font-weight: 800; line-height: 1.5; }
+.zkrise-update ul { margin: 14px 0; padding-left: 22px; }
+.zkrise-update li { margin: 8px 0; line-height: 1.65; color: var(--muted); }
+.zkrise-update li b { color: var(--text); }
+.zkrise-update details p { color: var(--muted); font-size: 12px; line-height: 1.65; }
+@media (max-width: 600px) { .zkrise-update .panel-head { align-items: flex-start; flex-wrap: wrap; gap: 12px; } }
