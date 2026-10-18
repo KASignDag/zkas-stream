@@ -169,7 +169,7 @@ export function ShareZkasUpdate({ data }: { data: DashboardData }) {
     mining:[
       {label:'NETWORK HASHRATE',value:hash(data.hashrate)},
       {label:'BLOCK REWARD',value:reward(data.reward)},
-      {label:'MINER SHARE',value:reward(data.reward===null?null:data.reward*.95)},
+      {label:'MINER SHARE · 100%',value:reward(data.reward)},
       {label:'DIFFICULTY',value:compact(data.difficulty)},
     ],
     community:[
