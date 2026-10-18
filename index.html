@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" data-i18n-renderer="react">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -9,29 +9,18 @@
     <title>ZKAS Stream</title>
     <script>
       if (window.location.hash === '#community-mining' || window.location.hash === '#/community-mining') {
-        window.location.replace('/community-mining.html');
+        window.location.replace('/community-mining.html'+window.location.search);
       }
       document.addEventListener('click', function (event) {
         const target = event.target instanceof Element ? event.target.closest('a[href="#community-mining"], a[href="#/community-mining"]') : null;
         if (!target) return;
         event.preventDefault();
-        window.location.href = '/community-mining.html';
+        window.location.href = '/community-mining.html'+window.location.search;
       });
 
-      // Keep the Genesis Supporters page code intact, but hide its navigation
-      // entry for now so it does not take space in the main site UI.
-      function hideSupportersNav() {
-        document.querySelectorAll('.nav button').forEach(function (button) {
-          if (button.textContent && button.textContent.trim() === 'Supporters') {
-            button.style.display = 'none';
-          }
-        });
-      }
-      document.addEventListener('DOMContentLoaded', function () {
-        hideSupportersNav();
-        new MutationObserver(hideSupportersNav).observe(document.body, { childList: true, subtree: true });
-      });
     </script>
+  <link rel="stylesheet" href="/i18n.css" />
+    <script src="/i18n.js"></script>
   </head>
   <body>
     <div id="root"></div>

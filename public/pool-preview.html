@@ -18,9 +18,9 @@
     @media(max-width:900px){.hero{grid-template-columns:1fr;gap:24px;padding-top:32px}.hero h1{max-width:630px}.architecture{max-width:600px}.columns,.reward-grid{grid-template-columns:1fr}.stats{grid-template-columns:repeat(2,1fr)}}@media(max-width:600px){.wrap{width:calc(100% - 32px)}.header-inner{gap:12px;padding:16px 0}.brand{font-size:20px}.header-links{gap:12px}.header-links a{display:none}.preview-note{align-items:flex-start;flex-direction:column;gap:5px;padding:12px 14px}.hero h1{font-size:43px}.hero p{font-size:14px}.coin{padding:12px 10px}.tabs{gap:22px}.section-heading{align-items:start;flex-direction:column}.stat{padding:15px}.builder,.panel{padding:20px}.builder-head{flex-direction:column}.form-grid{grid-template-columns:1fr}.field.full{grid-column:auto}.footer-inner{flex-direction:column;gap:8px}.config{padding:16px}.config-head{align-items:flex-start;flex-direction:column}}
     @media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}}
   </style>
-</head>
+<link rel="stylesheet" href="/i18n.css"><script src="/i18n.js"></script></head>
 <body>
-  <header><div class="wrap header-inner"><a class="brand" href="https://zkas.stream/">ZKAS<span>.stream</span></a><div class="header-links"><a href="https://zkas.stream/community-mining.html">Community mining ↗</a><span class="preview-chip">Design preview</span></div></div></header>
+  <header><div class="wrap header-inner"><a class="brand" href="https://zkas.stream/">ZKAS<span>.stream</span></a><div class="header-links"><a href="https://zkas.stream/community-mining.html">Community mining ↗</a><span class="preview-chip">Design preview</span></div><div class="language-control" data-no-i18n><label class="language-picker"><span aria-hidden="true">🌐</span><select data-language-picker aria-label="Language"></select></label><span id="languageStatus" class="language-status" role="status"></span></div></div></header>
   <main class="wrap">
     <div class="preview-note"><strong>Pool in development</strong><span>This is an interactive design preview. A Stream Pool mining server and payout service have not been connected.</span></div>
     <section class="hero" aria-labelledby="page-title">
@@ -66,7 +66,7 @@ Password: enter your Kaspa address</pre><p class="config-note">Draft only. This 
       <p class="privacy"><strong>First live milestone:</strong> one test miner, verified shares on both networks, confirmed reward receipt, and a small reconciled payout in each coin. Restart recovery and payout retries must pass before opening shared payouts.</p>
       <div class="hero-actions"><a class="btn" href="https://zkas.stream/community-mining.html">Open community mining ↗</a><button class="btn primary" type="button" data-open="connect">Back to settings builder →</button></div>
     </section>
-  </main>
+  </main><p id="translationNote" class="translation-note" hidden>Translations are generated automatically. Refer to English for the original wording.</p>
   <footer><div class="wrap footer-inner"><span>ZKAS.stream · Independent community project</span><span>Stream Pool design preview · mining is not open</span></div></footer>
   <script>
     (() => {

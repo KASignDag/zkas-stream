@@ -1,3 +1,4 @@
+import { LanguagePicker, TranslationNote } from '../i18n/LanguagePicker';
 import { useEffect, useMemo, useState } from 'react';
 
 type BufferChannel = { id: string; name?: string; displayName?: string; service?: string; isQueuePaused?: boolean };
@@ -238,6 +239,7 @@ export function BufferAdminPage() {
   }
 
   return <main style={{maxWidth:900,margin:'0 auto',padding:'36px 20px 80px',fontFamily:'system-ui'}}>
+    <LanguagePicker /><TranslationNote />
     <a href="/" style={{textDecoration:'none',fontWeight:900,color:'#159a7e'}}>← ZKAS.stream</a>
     <h1 style={{fontSize:'clamp(34px,6vw,64px)',margin:'22px 0 8px'}}>Buffer Publisher</h1>
     <p style={{color:'#687a75',fontWeight:650}}>Private ZKAS.stream admin workspace. Your Buffer API key stays server-side in Cloudflare.</p>
@@ -255,7 +257,7 @@ export function BufferAdminPage() {
       </label>
       <label style={{display:'grid',gap:8,fontWeight:800}}>Buffer channel
         <select value={channelId} onChange={e=>setChannelId(e.target.value)} style={{padding:14,border:'1px solid #b9cec7',borderRadius:12,fontSize:16}}>
-          {channels.map(channel=><option key={channel.id} value={channel.id}>{channel.displayName||channel.name||channel.id} · {channel.service} · {channel.orgName}</option>)}
+          {channels.map(channel=><option data-no-i18n key={channel.id} value={channel.id}>{channel.displayName||channel.name||channel.id} · {channel.service} · {channel.orgName}</option>)}
         </select>
       </label>
       <div style={{padding:16,border:'1px dashed #9ec8bb',borderRadius:14,background:'#f5fbf9'}}>
@@ -288,7 +290,7 @@ export function BufferAdminPage() {
     {status&&<details style={{marginTop:18,padding:24,border:'1px solid #cfe2dc',borderRadius:22,background:'#fff'}}><summary style={{fontWeight:900,cursor:'pointer'}}>Single post publisher</summary><section style={{marginTop:18,display:'grid',gap:16}}>
       <label style={{display:'grid',gap:8,fontWeight:800}}>Buffer channel
         <select value={channelId} onChange={e=>setChannelId(e.target.value)} style={{padding:14,border:'1px solid #b9cec7',borderRadius:12,fontSize:16}}>
-          {channels.map(channel=><option key={channel.id} value={channel.id}>{channel.displayName||channel.name||channel.id} · {channel.service} · {channel.orgName}</option>)}
+          {channels.map(channel=><option data-no-i18n key={channel.id} value={channel.id}>{channel.displayName||channel.name||channel.id} · {channel.service} · {channel.orgName}</option>)}
         </select>
       </label>
       <label style={{display:'grid',gap:8,fontWeight:800}}>Post

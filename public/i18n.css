@@ -1,0 +1,27 @@
+.language-control{display:inline-flex;position:relative;max-width:100%;flex-shrink:0}.language-picker{display:inline-flex;align-items:center;gap:5px;padding:6px 8px;border:1px solid var(--line,var(--border,#34534c));border-radius:10px;color:var(--text,inherit);background:var(--panel,transparent)}.language-picker select{width:112px;max-width:100%;padding:3px 2px;background:transparent;color:inherit;border:0;outline-offset:4px;font-family:inherit;font-size:13px;cursor:pointer}.language-picker option{color:#172b23;background:#fff}.language-status{position:absolute;top:100%;inset-inline-end:0;max-width:260px;font-size:12px;background:var(--panel,var(--surface,#fff));color:var(--text,#13251b);z-index:100}.language-status:empty{display:none}.translation-note{font-size:12px;line-height:1.5;color:var(--muted,#809a8d);text-align:center;padding:12px 20px;margin:10px 0}.language-controls-static{display:flex;align-items:center;flex-wrap:wrap;gap:10px}.nav button,.nav a{white-space:normal}.metric-card,.panel,.card{min-width:0}[dir=rtl] table th,[dir=rtl] table td{text-align:right}[dir=rtl] .miner-card-reward{border-left:0;border-right:3px solid var(--line);padding-left:0;padding-right:10px}[dir=rtl] th:first-child,[dir=rtl] td:first-child{left:auto;right:0}[dir=rtl] .history-chevron{transform:rotate(180deg)}[dir=rtl] .history-toggle[aria-expanded=true] .history-chevron{transform:rotate(90deg)}[dir=rtl] input[type=number],[dir=rtl] input[type=url],[dir=rtl] input[type=password],[dir=rtl] code,[dir=rtl] pre{direction:ltr;unicode-bidi:isolate}
+@media(max-width:1300px){.header-actions{flex-wrap:wrap;justify-content:flex-end}.app-shell .topbar{gap:10px}}
+@media(max-width:900px){.language-picker select{width:92px;font-size:16px}.language-picker{padding:5px}.header-actions .public-pill{display:none}.app-shell .topbar .brand small{display:none}}
+@media(max-width:480px){.header-actions .live-pill{display:none}.language-picker select{width:83px}.language-controls-static{gap:6px}.language-controls-static .back{font-size:12px;padding:8px}.language-controls-static .language-picker select{width:90px}header:has(.language-controls-static){padding-inline:4vw;gap:8px}.brand{flex-shrink:0}}
+/* Give translated navigation room without squeezing the language or theme controls. */
+@media(max-width:1180px){
+ .app-shell .topbar>.nav{position:absolute;display:none;top:76px;left:0;right:0;height:auto;padding:10px 18px 18px;background:var(--surface);border-bottom:1px solid var(--border);flex-direction:column;align-items:stretch;z-index:60}
+ .app-shell .topbar>.nav.open{display:flex}
+ .app-shell .topbar .nav button{min-height:44px;padding:8px 15px;text-align:start;border:0;border-radius:8px}
+ .app-shell .topbar .nav button.active{background:var(--accent-soft)}
+ .app-shell .topbar .mobile-menu{display:grid}
+ .app-shell .topbar .header-actions{margin-inline-start:auto}
+ .app-shell .topbar .nav .discord-nav-link,.app-shell .topbar .nav .telegram-nav-link,.app-shell .topbar .nav .x-nav-link{display:flex;align-items:center;gap:8px;min-height:44px;padding:8px 15px;color:var(--accent);font-size:13px;font-weight:800;text-decoration:none}
+}
+@media(min-width:1181px){.app-shell .topbar{height:auto;min-height:76px;padding-block:10px}.app-shell .topbar>.nav{flex-wrap:wrap;height:auto}.app-shell .topbar .nav button{min-height:30px;padding-block:6px;max-width:160px}}
+@media(max-width:620px){.app-shell .topbar .header-discord,.app-shell .topbar .header-telegram,.app-shell .topbar .header-x{display:none}.app-shell .topbar>.nav{top:66px}.app-shell .topbar{gap:8px}.app-shell .topbar .header-actions{flex-wrap:nowrap;gap:5px}}
+@media(max-width:480px){.app-shell .topbar .brand-mark{display:none}.app-shell .topbar .language-picker select{width:78px}.header-inner:has(.language-control){flex-wrap:wrap}.header-inner:has(.language-control) .header-links{margin-inline-start:auto}.header-inner:has(.language-control) .language-control{margin-inline-start:auto}}
+[dir=rtl] .app-shell .topbar .header-actions{margin-left:0;margin-right:auto}
+[dir=rtl] .metric-value,[dir=rtl] .card b,[dir=rtl] .miner-card-stat b,[dir=rtl] .connection code{unicode-bidi:plaintext}
+
+.app-shell .topbar>.nav{min-width:0}.app-shell .topbar .header-actions{flex-shrink:0}.app-shell .topbar .nav button{overflow-wrap:anywhere}
+
+@media(max-width:620px){.app-shell .topbar .language-status{position:fixed;top:66px;left:12px;right:12px;max-width:none;padding:8px;border-radius:8px}}
+@media(max-width:1440px){.app-shell .topbar .brand small,.app-shell .topbar .public-pill{display:none}}
+html:not([lang=en]) .hero h1,html:not([lang=en]) .hero-strip h1{letter-spacing:normal;line-height:1.2;overflow-wrap:anywhere}
+[dir=rtl] .nav button,[dir=rtl] .eyebrow{letter-spacing:normal}
+[dir=rtl] .miner-card-reward.current{border-right-color:var(--accent)}

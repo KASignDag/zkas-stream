@@ -1,3 +1,4 @@
+import { LanguagePicker, TranslationNote } from './i18n/LanguagePicker';
 import { FormEvent, type ReactNode, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Activity,
@@ -783,7 +784,7 @@ function App() {
         </button>
 
         <nav className={`nav ${menuOpen ? 'open' : ''}`}>
-          {nav.map(([id, label]) => (
+          {nav.filter(([id]) => id !== 'supporters').map(([id, label]) => (
             <button key={id} className={tab === id ? 'active' : ''} onClick={() => { navigateToTab(id); setMenuOpen(false); }}>{label}</button>
           ))}
           <a className="discord-nav-link" href="https://discord.gg/jysMS4XNFT" target="_blank" rel="noreferrer" onClick={() => setMenuOpen(false)}><MessageCircle size={17} /> Join Discord</a>
@@ -792,6 +793,7 @@ function App() {
         </nav>
 
         <div className="header-actions">
+          <LanguagePicker />
           <span className="public-pill"><Globe2 size={14} /> PUBLIC ONLY</span>
           <span className={`live-pill ${status}`}><i />{status === 'live' ? 'MAINNET LIVE' : status === 'stale' ? 'LIVE · RETRYING' : 'CONNECTING'}</span>
           <a className="icon-btn header-discord" href="https://discord.gg/jysMS4XNFT" target="_blank" rel="noreferrer" aria-label="Join ZKAS Discord" title="Join ZKAS Discord"><MessageCircle size={19} /></a>
@@ -801,6 +803,7 @@ function App() {
           <button className="icon-btn mobile-menu" onClick={() => setMenuOpen((v) => !v)} aria-label="Open navigation">{menuOpen ? <X size={20} /> : <Menu size={20} />}</button>
         </div>
       </header>
+      <TranslationNote />
 
       <main>
         <section className="hero-strip">

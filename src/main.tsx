@@ -1,3 +1,4 @@
+import { LanguagePicker, TranslationNote } from './i18n/LanguagePicker';
 import ReactDOM from 'react-dom/client';
 import App from './App';
 import { CommunityMiningPage } from './components/CommunityMiningPage';
@@ -20,7 +21,9 @@ function Root() {
             <a href="#merged-mining">Merged Mining</a>
             <a href="#community-mining" className="active">Community Mining</a>
           </nav>
+          <LanguagePicker />
         </header>
+        <TranslationNote />
         <main>
           <section className="hero-strip">
             <div>
