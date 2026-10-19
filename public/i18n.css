@@ -25,3 +25,15 @@
 html:not([lang=en]) .hero h1,html:not([lang=en]) .hero-strip h1{letter-spacing:normal;line-height:1.2;overflow-wrap:anywhere}
 [dir=rtl] .nav button,[dir=rtl] .eyebrow{letter-spacing:normal}
 [dir=rtl] .miner-card-reward.current{border-right-color:var(--accent)}
+
+/* Desktop: separate navigation from the brand and utility controls. */
+@media(min-width:1181px){
+ .app-shell .topbar{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:14px 24px;padding:18px 28px 0}
+ .app-shell .topbar>.brand{grid-column:1;grid-row:1;justify-self:start}
+ .app-shell .topbar>.header-actions{grid-column:2;grid-row:1;flex-wrap:nowrap;margin:0;gap:10px}
+ .app-shell .topbar>.nav{grid-column:1 / -1;grid-row:2;justify-content:center;gap:4px 10px;width:100%;padding:8px 0 0;border-top:1px solid var(--border)}
+ .app-shell .topbar .nav button{font-size:11px;letter-spacing:.65px;min-height:42px;max-width:none;padding:10px 9px;white-space:nowrap;overflow-wrap:normal}
+ .app-shell .topbar .brand small{display:inline}
+ .app-shell .topbar .header-discord,.app-shell .topbar .header-telegram,.app-shell .topbar .header-x{display:none}
+ .app-shell .topbar .language-picker select{width:150px}
+}

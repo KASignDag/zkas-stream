@@ -1,7 +1,7 @@
 /* Local dictionaries only. No visitor text or telemetry is sent to a translation service. */
 (() => {
   'use strict';
-  const languages = [['en','English'],['es','Español'],['pt','Português'],['fr','Français'],['de','Deutsch'],['it','Italiano'],['nl','Nederlands'],['pl','Polski'],['uk','Українська'],['ru','Русский'],['tr','Türkçe'],['ar','العربية'],['fa','فارسی'],['ur','اردو'],['hi','हिन्दी'],['bn','বাংলা'],['id','Bahasa Indonesia'],['vi','Tiếng Việt'],['th','ไทย'],['zh','简体中文'],['zh-TW','繁體中文'],['ja','日本語'],['ko','한국어'],['fil','Filipino']];
+  const languages = [['en','English'],['es','Español'],['pt','Português'],['fr','Français'],['de','Deutsch'],['it','Italiano'],['nl','Nederlands'],['pl','Polski'],['uk','Українська'],['ru','Russian / Русский'],['tr','Türkçe'],['ar','العربية'],['fa','فارسی'],['ur','اردو'],['hi','हिन्दी'],['bn','বাংলা'],['id','Bahasa Indonesia'],['vi','Tiếng Việt'],['th','ไทย'],['zh','简体中文'],['zh-TW','繁體中文'],['ja','日本語'],['ko','한국어'],['fil','Filipino']];
   const supported = new Set(languages.map(([code]) => code));
   const listeners = new Set(), cache = new Map(), sourceNodes = new WeakMap(), sourceAttributes = new WeakMap();
   let dictionary = null, templates = [], requestId = 0, observer;
